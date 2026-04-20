@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true
+  },
+  "references": [{ "path": "../pkg-a" }],
+  "include": ["src"]
+}

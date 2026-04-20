@@ -1,0 +1,192 @@
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import {
+  DISMISSAL_APP_DIR,
+  DISMISSAL_REGISTRY_FILE,
+  DISMISSAL_REGISTRY_VERSION,
+  type DismissalEntry,
+  type DismissalRegistry,
+  emptyRegistry,
+} from "./types.ts";
+
+export interface LoadOptions {
+  onWarning?: (msg: string) => void;
+}
+
+function xdgConfigHome(): string {
+  const xdg = process.env.XDG_CONFIG_HOME;
+  if (xdg && xdg.length > 0 && isAbsolute(xdg)) return xdg;
+  return join(homedir(), ".config");
+}
+
+function projectKey(absProjectPath: string): string {
+  return createHash("sha256").update(absProjectPath).digest("hex").slice(0, 16);
+}
+
+export function registryPath(rootDir: string): string {
+  const abs = resolve(rootDir);
+  return join(
+    xdgConfigHome(),
+    DISMISSAL_APP_DIR,
+    projectKey(abs),
+    DISMISSAL_REGISTRY_FILE,
+  );
+}
+
+export function loadRegistry(
+  rootDir: string,
+  options: LoadOptions = {},
+): DismissalRegistry {
+  const path = registryPath(rootDir);
+  if (!existsSync(path)) return emptyRegistry();
+  try {
+    const raw = readFileSync(path, "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+    return normalizeRegistry(parsed);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    options.onWarning?.(
+      `ts-hotspots: ignoring invalid dismissal registry at ${path}: ${msg}`,
+    );
+    return emptyRegistry();
+  }
+}
+
+export function saveRegistry(
+  rootDir: string,
+  registry: DismissalRegistry,
+): void {
+  const path = registryPath(rootDir);
+  mkdirSync(dirname(path), { recursive: true });
+  const body = `${JSON.stringify(registry, null, 2)}\n`;
+  const tmp = `${path}.tmp-${String(process.pid)}-${String(Date.now())}`;
+  writeFileSync(tmp, body, "utf8");
+  renameSync(tmp, path);
+}
+
+export interface PruneResult {
+  registry: DismissalRegistry;
+  prunedCount: number;
+}
+
+export function pruneRegistry(
+  registry: DismissalRegistry,
+  currentIds: ReadonlySet<string>,
+): PruneResult {
+  const kept: DismissalEntry[] = [];
+  let prunedCount = 0;
+  for (const entry of registry.entries) {
+    if (currentIds.has(entry.id)) kept.push(entry);
+    else prunedCount += 1;
+  }
+  return {
+    registry: withEntries(registry, kept),
+    prunedCount,
+  };
+}
+
+export function registryIdSet(registry: DismissalRegistry): Set<string> {
+  return new Set(registry.entries.map((e) => e.id));
+}
+
+export function findEntry(
+  registry: DismissalRegistry,
+  id: string,
+): DismissalEntry | undefined {
+  return registry.entries.find((e) => e.id === id);
+}
+
+export function addEntry(
+  registry: DismissalRegistry,
+  entry: DismissalEntry,
+): { registry: DismissalRegistry; added: boolean } {
+  if (findEntry(registry, entry.id) !== undefined) {
+    return { registry, added: false };
+  }
+  return {
+    registry: withEntries(registry, [...registry.entries, entry]),
+    added: true,
+  };
+}
+
+export function removeEntry(
+  registry: DismissalRegistry,
+  id: string,
+): { registry: DismissalRegistry; removed: boolean } {
+  const next = registry.entries.filter((e) => e.id !== id);
+  const removed = next.length !== registry.entries.length;
+  return {
+    registry: withEntries(registry, next),
+    removed,
+  };
+}
+
+export function withProjectPath(
+  registry: DismissalRegistry,
+  projectPath: string,
+): DismissalRegistry {
+  return {
+    version: DISMISSAL_REGISTRY_VERSION,
+    projectPath,
+    entries: registry.entries,
+  };
+}
+
+function withEntries(
+  registry: DismissalRegistry,
+  entries: DismissalEntry[],
+): DismissalRegistry {
+  if (registry.projectPath === undefined) {
+    return { version: DISMISSAL_REGISTRY_VERSION, entries };
+  }
+  return {
+    version: DISMISSAL_REGISTRY_VERSION,
+    projectPath: registry.projectPath,
+    entries,
+  };
+}
+
+function normalizeRegistry(parsed: unknown): DismissalRegistry {
+  if (parsed === null || typeof parsed !== "object") {
+    throw new Error("registry is not an object");
+  }
+  const obj = parsed as Record<string, unknown>;
+  if (obj.version !== DISMISSAL_REGISTRY_VERSION) {
+    throw new Error(`unsupported registry version: ${String(obj.version)}`);
+  }
+  if (!Array.isArray(obj.entries)) {
+    throw new Error("registry.entries is not an array");
+  }
+  const entries: DismissalEntry[] = [];
+  for (const raw of obj.entries) {
+    if (raw === null || typeof raw !== "object") continue;
+    const e = raw as Record<string, unknown>;
+    if (typeof e.id !== "string" || typeof e.reason !== "string") continue;
+    if (typeof e.dismissedAt !== "string") continue;
+    const entry: DismissalEntry = {
+      id: e.id,
+      reason: e.reason,
+      dismissedAt: e.dismissedAt,
+    };
+    if (e.display !== undefined && typeof e.display === "object") {
+      entry.display = e.display as DismissalEntry["display"];
+    }
+    entries.push(entry);
+  }
+  if (typeof obj.projectPath === "string") {
+    return {
+      version: DISMISSAL_REGISTRY_VERSION,
+      projectPath: obj.projectPath,
+      entries,
+    };
+  }
+  return { version: DISMISSAL_REGISTRY_VERSION, entries };
+}

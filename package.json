@@ -1,0 +1,59 @@
+{
+  "name": "ts-hotspots",
+  "version": "0.1.0",
+  "description": "A CLI that statically analyzes a TypeScript project and returns hotspots (likely refactor candidates) as JSON.",
+  "type": "module",
+  "bin": {
+    "ts-hotspots": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm clean && pnpm build",
+    "start": "node src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "biome check --write .",
+    "format:check": "biome check ."
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged && pnpm typecheck"
+  },
+  "lint-staged": {
+    "*.{ts,js}": [
+      "biome check --write",
+      "eslint --fix"
+    ],
+    "*.{json,jsonc}": [
+      "biome check --write"
+    ]
+  },
+  "packageManager": "pnpm@10.27.0",
+  "devDependencies": {
+    "@biomejs/biome": "2.4.11",
+    "@types/node": "25.6.0",
+    "eslint": "10.2.0",
+    "lint-staged": "16.4.0",
+    "simple-git-hooks": "2.13.1",
+    "typescript": "6.0.2",
+    "typescript-eslint": "8.58.1",
+    "vitest": "4.1.4"
+  },
+  "dependencies": {
+    "commander": "14.0.3",
+    "minimatch": "10.2.5",
+    "ts-morph": "27.0.2"
+  }
+}
