@@ -17,7 +17,6 @@ function makeFunctionReport(
     tool: { name: "ts-hotspots", version: "0.1.0" },
     project: {
       tsconfigPath: "/abs/tsconfig.json",
-      rootDir: "/abs",
       sourceFileCount: 3,
       functionCount: 5,
     },
@@ -125,7 +124,6 @@ describe("renderMarkdown", () => {
     const b = makeFunctionReport({
       project: {
         tsconfigPath: "/other/tsconfig.json",
-        rootDir: "/other",
         sourceFileCount: 999,
         functionCount: 123,
       },

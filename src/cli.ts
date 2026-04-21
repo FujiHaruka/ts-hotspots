@@ -329,7 +329,6 @@ function prepare(
   });
   const projectInfo: ReportProject = {
     tsconfigPath,
-    rootDir,
     sourceFileCount: files.length,
     functionCount: functions.length,
   };

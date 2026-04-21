@@ -41,7 +41,6 @@ interface ParsedFunctionReport {
   tool: { name: string; version: string };
   project: {
     tsconfigPath: string;
-    rootDir: string;
     sourceFileCount: number;
     functionCount: number;
   };
@@ -72,7 +71,6 @@ describe("run (default: function-axis command)", () => {
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     expect(report.tool.name).toBe("ts-hotspots");
     expect(report.project.tsconfigPath).toBe(FIXTURE_TSCONFIG);
-    expect(report.project.rootDir).toBe(FIXTURE_DIR);
     expect(report.project.sourceFileCount).toBeGreaterThan(0);
     expect(report.project.functionCount).toBeGreaterThan(0);
 

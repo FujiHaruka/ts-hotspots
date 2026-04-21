@@ -100,7 +100,6 @@ export interface ReportTool {
 
 export interface ReportProject {
   tsconfigPath: string;
-  rootDir: string;
   sourceFileCount: number;
   functionCount: number;
 }
