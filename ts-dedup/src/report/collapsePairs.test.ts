@@ -161,7 +161,7 @@ describe("collapsePairs", () => {
       ),
     ];
     const a = collapsePairs(pairs);
-    const b = collapsePairs([...pairs].reverse());
+    const b = collapsePairs([...pairs].toReversed());
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });
