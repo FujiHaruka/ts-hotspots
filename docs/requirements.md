@@ -64,8 +64,6 @@ Each axis is internally classified as either **quality** or **leverage**. This c
 
 ### 5.1 Function axes (`FunctionAxisId`, 13 axes) — note: no file axes in v1
 
-Type-soundness signals (`any` density, assertions, non-null `!`, `@ts-ignore` family, etc.) are intentionally not measured here — they overlap 1:1 with `typescript-eslint` rules (`no-explicit-any`, `no-non-null-assertion`, `consistent-type-assertions`, `ban-ts-comment`, `no-unsafe-*`). Enable those rules in your linter; this tool ranks structural/behavioral hotspots and leaves type hygiene to the linter.
-
 **Quality (11 axes)**
 
 | Axis ID | Meaning |
