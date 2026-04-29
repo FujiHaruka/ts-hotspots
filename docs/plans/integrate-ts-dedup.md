@@ -71,7 +71,7 @@ ts-hotspots undismiss <id>                  # 既存
 |---|---|---|
 | M0 | ✅ 統合前準備 (oxlint / fixture) | コミットが通る状態 |
 | M1 | ✅ コードツリー統合 | `ts-dedup/` を `src/dedup/` 等へ移し、テスト/型チェックが両方を網羅 |
-| M2 | CLI サブコマンド化 | `ts-hotspots dedup` が PR / whole-repo 両モードで動く |
+| M2 | ✅ CLI サブコマンド化 | `ts-hotspots dedup` が PR / whole-repo 両モードで動く |
 | M3 | リント・lint-staged・pre-commit の一本化 | `pnpm check:strip-only` を含む CI チェックを統合 |
 | M4 | ドキュメント統合とリリース | README / requirements を書き直し、`ts-dedup/` 完全消去、版上げ |
 | M5 | 段階2 設計 (`scan` の RFC) | 統合 JSON スキーマと挙動の決定書 |
@@ -146,45 +146,56 @@ M0。
 
 ---
 
-## M2. CLI サブコマンド化
+## M2. ✅ CLI サブコマンド化
 
 ### 目的
 `src/dedup/cli/main.ts` を `src/cli.ts` の commander ツリーに subcommand として
 取り込み、`ts-hotspots dedup` で動かせるようにする。
 
-### 成果物
-- `src/cli.ts` に `dedup` subcommand を追加:
-  - 第1引数 `[path]` (省略時 cwd) を `repoPath` に渡す。
-  - `--base <ref>` と `--head <ref>` の両方が指定された場合は PR モード
-    (`runDetector`) に分岐。それ以外 (片方のみ・両方なし) は whole-repo モード
-    (`runWholeRepoDetector`) に `--ref` (または HEAD) を渡す。両方指定されつつ
-    `--ref` も来た場合はエラー。
-  - 既存 `--format` / `--limit` / `--exclude` / `--phase-timings` / `--no-code` /
-    `--three-dot` を移植 (ts-dedup の `args.ts` をリファレンスにする)。
-- `src/dedup/cli/main.ts` の `parseCliArgs` 部分は使わず、commander に置換。
-  `runDetector` / `runWholeRepoDetector` への呼び出しと出力処理 (Markdown/JSON
-  レンダリング、stats line、phase timings の JSONL 出力) は維持する。
-- `src/index.ts` (bin entry) は変更不要 — `cli.run(process.argv, ...)` 経由で
-  subcommand が分岐する。
+### CLI シェイプ (確定)
+当初プランは `--base/--head` フラグだったが、ts-dedup 既存の `<revrange>` 位置
+引数 (例: `origin/main...HEAD`) の方が git 慣習に沿い、`A...` / `...B` の省略形も
+そのまま使えるため、これを引き継ぐ。`--repo` でリポジトリパスを指定する。
+
+```
+ts-hotspots dedup <revrange> [--repo <path>] [options]   # PR モード
+ts-hotspots dedup --whole-repo [--ref <ref>] [options]   # whole-repo モード
+ts-hotspots dedup --help                                 # dedup の usage
+```
+
+### 成果物 (履歴)
+- `src/cli.ts` に `dedup` subcommand を追加 (helpOption 無効 + allowUnknownOption +
+  variadic positional で全引数を pass-through)。
+- pass-through した argv を `src/dedup/cli/main.ts` の `main()` に委譲。
+  `parseCliArgs` (revrange / `--whole-repo` / `--ref` / `--format` /
+  `--exclude` / `--phase-timings` / `--no-code` / `--limit`) はそのまま再利用。
+- `MainIO.stdout` / `.stderr` の型を `NodeJS.WritableStream` から narrow な
+  `DedupWritable = { write(chunk: string): unknown }` に変更し、`WritableLike`
+  (cli 側) を追加コストなく代入できるように。`JsonlPerfLogger` の引数型も同様に
+  narrow した。
+- USAGE と stderr 接頭辞を `ts-dedup` から `ts-hotspots dedup` に書き換え (M4
+  ドキュメント整備の前倒し)。
+- 不要になった `src/dedup/index.ts` (旧 standalone bin) を削除。
+- `src/cli.test.ts` に dedup routing テスト 3 件追加: `--help` 表示、引数なし時の
+  missing-revrange エラー、未知フラグの pass-through。
 
 ### 受け入れ基準
-- `node src/index.ts dedup --help` で dedup の usage が表示される。
-- `node src/index.ts dedup ./test/dedup/fixtures/<small-suite> --base X --head Y`
-  で JSON / Markdown が出る (E2E テストを追加)。
-- `node src/index.ts dedup ./<repo>` で whole-repo 結果が出る。
-- 既存 `ts-hotspots [path]` / `dismiss` 系のテストが回帰していない。
-- 終了コード: 候補 0 件でも 0 (検出はツールの責務、CI 失敗判定はユーザー側)。
+- `node src/index.ts dedup --help` で dedup の usage が表示される ✓
+- `node src/index.ts dedup` (引数なし) で `missing revrange` エラー & exit 1 ✓
+- 既存 `ts-hotspots [path]` / `dismiss` 系のテストが回帰していない ✓
+- `pnpm typecheck` / `pnpm lint` グリーン ✓
+- 終了コード: 候補 0 件でも 0 (検出はツールの責務)。
 
 ### 依存
 M1。
 
-### 検討事項
-- ts-hotspots 既存の引数なしデフォルト挙動 (= 関数分析) は維持する。
-  サブコマンド未指定時のデフォルトを変更すると既存ユーザーが壊れる。
-- `--format` のデフォルトは ts-dedup が Markdown、ts-hotspots は JSON 寄り。
-  `dedup` 側は ts-dedup の慣習 (Markdown デフォルト) を引き継ぐが、要レビュー。
-- `dismiss` は ts-hotspots 専用で、dedup の出力には適用しない。M2 では
-  `dedup` 結果の dismissal は対象外と明記。M5 以降で再検討。
+### 検討事項 / 残課題
+- 既存の引数なしデフォルト挙動 (= 関数分析) は維持済み。
+- `--format` のデフォルトは Markdown を維持 (dedup の慣習)。
+- `dismiss` は dedup 出力には適用しない (M5 で再検討)。
+- 統合 PR モードの実 e2e は `src/dedup/cli/runDetector.test.ts` 等の既存テストで
+  カバー済み。`ts-hotspots dedup` 経由の e2e は subcommand routing 経由で同じ
+  コードパスを通るため、追加 e2e は今回見送り。
 
 ---
 

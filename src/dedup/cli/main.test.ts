@@ -64,7 +64,7 @@ describe("main", () => {
     const code = await main(["--help"], cap.io);
     expect(code).toBe(0);
     expect(cap.stderr()).toContain("Usage:");
-    expect(cap.stderr()).toContain("ts-dedup <revrange>");
+    expect(cap.stderr()).toContain("ts-hotspots dedup <revrange>");
     expect(cap.stdout()).toBe("");
   });
 
@@ -175,7 +175,7 @@ describe("main", () => {
       cap.io,
     );
     expect(code).toBe(1);
-    expect(cap.stderr()).toMatch(/ts-dedup:/);
+    expect(cap.stderr()).toMatch(/ts-hotspots dedup:/);
   });
 
   it("--phase-timings emits a JSON Lines perf log on stderr", async () => {
@@ -345,6 +345,6 @@ describe("main", () => {
     expect(parsed.groups.length).toBeGreaterThan(0);
 
     const stderr = cap.stderr();
-    expect(stderr).toMatch(/^ts-dedup: repo=\d+ files\/\d+ fragments/);
+    expect(stderr).toMatch(/^ts-hotspots dedup: repo=\d+ files\/\d+ fragments/);
   });
 });
