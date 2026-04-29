@@ -1,0 +1,167 @@
+import type ts from "typescript";
+import type { PerfLogger } from "../cli/perfLog.ts";
+import type { Config } from "../config/config.ts";
+import type { CandidateScore } from "../domain/candidate.ts";
+import type { Fragment } from "../domain/fragment.ts";
+import type {
+  AnalysisSummary,
+  CloneCandidateReport,
+} from "../domain/report.ts";
+import { isThinWrapperFragment } from "../features/internal/isThinWrapper.ts";
+import { buildCloneGroups } from "./buildCloneGroups.ts";
+import { buildCloneGroupsFromClusters } from "./buildCloneGroupsFromClusters.ts";
+import { capPerFragmentPairs } from "./capPerFragmentPairs.ts";
+import { clusterPairs, type ClusterStats } from "./clusterPairs.ts";
+import { collapsePairs } from "./collapsePairs.ts";
+import { dropLowSemanticEvidence } from "./dropLowSemanticEvidence.ts";
+import { dropThinWrapperPairs } from "./dropThinWrapperPairs.ts";
+import type { Intersections } from "./evidence.ts";
+import { sortCandidates } from "./ranking.ts";
+
+export interface ScoredPair {
+  score: CandidateScore;
+  changedFragment: Fragment;
+  baseFragment: Fragment;
+  intersections: Intersections;
+}
+
+export interface ReportInput {
+  pr: { baseSha: string; headSha: string };
+  pairs: readonly ScoredPair[];
+  config: Config;
+  summary: AnalysisSummary;
+  /**
+   * When `false`, fragment source is omitted from each group's
+   * anchor/member views. Defaults to `true` so AI readers get actionable
+   * context out of the box.
+   */
+  includeCode?: boolean;
+  /**
+   * Resolve a fragment's parsed `SourceFile`. The pipeline uses it to
+   * judge whether a fragment is a "thin wrapper" before applying
+   * `dropThinWrapperPairs`. When the hook is omitted (e.g. tests) or
+   * returns `undefined`, the filter conservatively treats the fragment
+   * as not-thin and the pair survives.
+   */
+  getSourceFile?: (filePath: string) => ts.SourceFile | undefined;
+}
+
+/**
+ * Materialise a `CloneCandidateReport` from a set of scored pairs.
+ *
+ * Pipeline:
+ * 1. Deduplicate on the `(changedId, baseId)` tuple — defensive, since
+ *    upstream is expected to emit each pair at most once.
+ * 2. Drop pairs with no shared call or property access whose combined
+ *    score sits below the medium-confidence floor — without semantic
+ *    evidence the OR-based decision otherwise admits a lot of shape-only
+ *    structural noise. See `dropLowSemanticEvidence`.
+ * 3. Collapse cross-granularity echoes via `collapsePairs`: when a larger
+ *    pair line-contains a smaller one on both sides, only the larger is
+ *    retained. This trims the function/block/window redundancy emitted by
+ *    M1 so one logical clone maps to one report candidate.
+ * 4. Sort the remaining pairs with the deterministic ranking in
+ *    `ranking.ts`.
+ * 5. Cap each fragment's reported associates via `capPerFragmentPairs` so
+ *    hot file-header windows and tiny structural blocks can't drag in a
+ *    long tail of weak partners.
+ * 6. Build `CloneGroup`s. PR mode pivots on `changedFragment.id` via
+ *    `buildCloneGroups`. Whole-repo mode hands the symmetric pair set to
+ *    `clusterPairs` (graph clustering with edge prune → connected
+ *    components → quasi-clique extraction → intra-cluster collapse) and
+ *    converts each cluster via `buildCloneGroupsFromClusters`. The
+ *    branch lives at the very end of the pipeline so every upstream
+ *    filter (dedup, semantic-evidence drop, thin-wrapper drop, cap)
+ *    runs identically in both modes.
+ */
+export function buildJsonReport(
+  input: ReportInput,
+  perfLog?: PerfLogger,
+): CloneCandidateReport {
+  const seen = new Set<string>();
+  const unique: ScoredPair[] = [];
+  for (const pair of input.pairs) {
+    const key = `${pair.changedFragment.id}|${pair.baseFragment.id}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push(pair);
+  }
+
+  const semanticallyFiltered = dropLowSemanticEvidence(unique);
+  const collapsed = collapsePairs(semanticallyFiltered);
+  const isThinById = buildThinWrapperMap(collapsed, input);
+  const thinFiltered = input.config.report.thinWrapper.enabled
+    ? dropThinWrapperPairs(collapsed, isThinById)
+    : collapsed;
+  const sorted = sortCandidates(thinFiltered);
+  const capped = capPerFragmentPairs(sorted);
+  const includeCode = input.includeCode !== false;
+
+  const useClusterPath =
+    input.summary.mode === "whole-repo" && input.config.report.cluster.enabled;
+  const clusterStats: ClusterStats | undefined =
+    useClusterPath && perfLog !== undefined
+      ? { components: 0, clusters: 0, droppedByDensity: 0 }
+      : undefined;
+  const groups = useClusterPath
+    ? buildCloneGroupsFromClusters(
+        clusterPairs(capped, input.config.report.cluster, clusterStats),
+        input.config,
+        includeCode,
+        isThinById,
+      )
+    : buildCloneGroups(capped, input.config, includeCode, isThinById);
+
+  if (perfLog !== undefined) {
+    perfLog.emit("report.summary", {
+      before: { afterDecide: input.pairs.length },
+      afterUnique: unique.length,
+      dropLowSemanticEvidence: semanticallyFiltered.length,
+      collapsePairs: collapsed.length,
+      dropThinWrapperPairs: thinFiltered.length,
+      capPerFragmentPairs: capped.length,
+      reportedPairs: capped.length,
+      reportedGroups: groups.length,
+      ...(clusterStats !== undefined ? { cluster: clusterStats } : {}),
+    });
+  }
+
+  return {
+    pr: {
+      baseSha: input.pr.baseSha,
+      headSha: input.pr.headSha,
+    },
+    summary: input.summary,
+    groups,
+  };
+}
+
+function buildThinWrapperMap(
+  pairs: readonly ScoredPair[],
+  input: ReportInput,
+): ReadonlyMap<string, boolean> {
+  const map = new Map<string, boolean>();
+  if (
+    !input.config.report.thinWrapper.enabled ||
+    input.getSourceFile === undefined
+  ) {
+    return map;
+  }
+  const thinCfg = input.config.report.thinWrapper;
+  const judge = (fragment: Fragment): void => {
+    if (map.has(fragment.id)) return;
+    const sourceFile = input.getSourceFile?.(fragment.filePath);
+    if (sourceFile === undefined) {
+      map.set(fragment.id, false);
+      return;
+    }
+    map.set(fragment.id, isThinWrapperFragment(fragment, sourceFile, thinCfg));
+  };
+  for (const pair of pairs) {
+    judge(pair.changedFragment);
+    judge(pair.baseFragment);
+  }
+  return map;
+}

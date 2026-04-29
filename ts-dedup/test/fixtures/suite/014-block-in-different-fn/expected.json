@@ -1,0 +1,12 @@
+{
+  "description": "Type-3 block-in-different-function: same if-for-if structure, different outer purpose",
+  "tags": ["type-3", "block", "cross-granularity"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/runB.ts", "startLine": 1, "endLine": 9 },
+      "existing": { "filePath": "src/runA.ts", "startLine": 1, "endLine": 9 },
+      "rationale": "shared if/for/if block"
+    }
+  ],
+  "expectedNegative": []
+}

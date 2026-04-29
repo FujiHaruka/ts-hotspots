@@ -1,0 +1,20 @@
+snapshot of `node dist/index.js --whole-repo --repo genesis-v2-charlie@b33bbf2 ...` top-15
+captured after lsh-overlap-skip-and-directive-trim was applied.
+the format is `<left-file>:<startLine>-<endLine> <-> <right-file>:<startLine>-<endLine> (combined=<score>)`.
+keep this checked in so future rank-quality regressions show up in `git diff`.
+
+apps/web/src/app/_components/project-detail-sidebar.tsx:293-404 <-> apps/web/src/app/_components/project-detail-sidebar.tsx:419-533 (combined=0.9855)
+apps/web/src/app/app/[orgSlug]/projects/[id]/_components/spec-list.tsx:217-345 <-> apps/web/src/app/app/[orgSlug]/projects/[id]/_components/spec-list.tsx:347-476 (combined=0.9771)
+apps/web/src/app/app/[orgSlug]/projects/[id]/_components/assistant-intro-dialog.tsx:7-35 <-> apps/web/src/app/app/[orgSlug]/projects/[id]/_components/codebase-intro-dialog.tsx:7-35 (combined=0.9537)
+apps/web/src/app/app/[orgSlug]/projects/[id]/_components/assistant-intro-dialog.tsx:7-35 <-> apps/web/src/app/app/[orgSlug]/projects/[id]/_components/files-intro-dialog.tsx:7-35 (combined=0.9537)
+apps/web/src/app/app/[orgSlug]/projects/[id]/_components/assistant-intro-dialog.tsx:7-35 <-> apps/web/src/app/app/[orgSlug]/projects/[id]/_components/workflow-list-intro-dialog.tsx:7-35 (combined=0.9537)
+apps/web/src/app/app/[orgSlug]/projects/[id]/_components/codebase-intro-dialog.tsx:7-35 <-> apps/web/src/app/app/[orgSlug]/projects/[id]/_components/files-intro-dialog.tsx:7-35 (combined=0.9537)
+apps/web/src/app/app/[orgSlug]/projects/[id]/_components/codebase-intro-dialog.tsx:7-35 <-> apps/web/src/app/app/[orgSlug]/projects/[id]/_components/workflow-list-intro-dialog.tsx:7-35 (combined=0.9537)
+apps/web/src/app/app/[orgSlug]/projects/[id]/_components/files-intro-dialog.tsx:7-35 <-> apps/web/src/app/app/[orgSlug]/projects/[id]/_components/workflow-list-intro-dialog.tsx:7-35 (combined=0.9537)
+apps/web/src/app/app/[orgSlug]/projects/[id]/_components/workflow-run-detail-intro-dialog.tsx:7-35 <-> apps/web/src/app/app/[orgSlug]/projects/[id]/_components/workflow-runs-intro-dialog.tsx:7-35 (combined=0.9537)
+apps/web/src/app/app/[orgSlug]/settings/security/page.tsx:6-28 <-> apps/web/src/app/app/[orgSlug]/settings/sso/page.tsx:6-28 (combined=0.9431)
+apps/web/src/app/app/[orgSlug]/projects/[id]/_components/delete-version-dialog.tsx:17-87 <-> apps/web/src/app/app/[orgSlug]/projects/[id]/_components/restore-version-dialog.tsx:17-87 (combined=0.9303)
+packages/kb/src/embeddings/azure-openai-provider.ts:60-77 <-> packages/kb/src/embeddings/openai-provider.ts:27-46 (combined=0.9269)
+packages/api/src/router/chat.ts:163-185 <-> packages/api/src/router/chat.ts:188-210 (combined=0.9193)
+apps/web/src/app/app/[orgSlug]/projects/[id]/workflows/_components/workflow-template-builder.tsx:1249-1261 <-> apps/web/src/app/app/[orgSlug]/projects/[id]/workflows/_components/workflow-template-builder.tsx:714-726 (combined=0.9171)
+apps/web/src/auth/server.ts:48-59 <-> apps/web/src/auth/server.ts:80-91 (combined=0.9134)

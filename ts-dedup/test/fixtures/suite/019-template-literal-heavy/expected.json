@@ -1,0 +1,12 @@
+{
+  "description": "Type-3: template-literal-heavy URL builder duplicated with renamed args",
+  "tags": ["type-3", "function", "template-literal"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/urlB.ts", "startLine": 1, "endLine": 6 },
+      "existing": { "filePath": "src/urlA.ts", "startLine": 1, "endLine": 6 },
+      "rationale": "template literal bodies align after identifier normalization"
+    }
+  ],
+  "expectedNegative": []
+}

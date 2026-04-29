@@ -1,0 +1,12 @@
+{
+  "description": "Type-2 generic: same body with renamed type parameters and identifiers",
+  "tags": ["type-2", "function", "generics"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/mapB.ts", "startLine": 1, "endLine": 5 },
+      "existing": { "filePath": "src/mapA.ts", "startLine": 1, "endLine": 5 },
+      "rationale": "type params T/U vs A/B should normalize"
+    }
+  ],
+  "expectedNegative": []
+}

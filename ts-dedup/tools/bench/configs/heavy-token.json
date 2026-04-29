@@ -1,0 +1,10 @@
+{
+  "scoring": {
+    "weights": {
+      "token": 0.6,
+      "statement": 0.2,
+      "call": 0.1,
+      "size": 0.1
+    }
+  }
+}

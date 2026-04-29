@@ -1,0 +1,12 @@
+{
+  "description": "Type-2 TSX: render helper copied to another file with renamed params",
+  "tags": ["type-2", "function", "tsx"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/renderItems.tsx", "startLine": 1, "endLine": 4 },
+      "existing": { "filePath": "src/renderList.tsx", "startLine": 1, "endLine": 4 },
+      "rationale": "render helper structure identical"
+    }
+  ],
+  "expectedNegative": []
+}

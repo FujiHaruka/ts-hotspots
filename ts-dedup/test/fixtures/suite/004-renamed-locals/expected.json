@@ -1,0 +1,12 @@
+{
+  "description": "Type-2: local variable names differ (out/result, item/entry, trimmed/clean)",
+  "tags": ["type-2", "function", "rename"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/normB.ts", "startLine": 1, "endLine": 9 },
+      "existing": { "filePath": "src/normA.ts", "startLine": 1, "endLine": 9 },
+      "rationale": "structure identical; only local identifiers renamed"
+    }
+  ],
+  "expectedNegative": []
+}

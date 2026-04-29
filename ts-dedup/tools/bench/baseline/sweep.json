@@ -1,0 +1,77 @@
+{
+  "fixtureCount": 25,
+  "rows": [
+    {
+      "label": "[2,3]",
+      "recallAt10": 0.95,
+      "recallAt50": 0.95,
+      "recallAtAll": 0.95,
+      "negativeViolations": 4,
+      "wallMs": 7218,
+      "recallRegressions": [],
+      "precisionRegressions": [
+        "024-neg-different-async-styles"
+      ]
+    },
+    {
+      "label": "[3,4,5]",
+      "recallAt10": 0.95,
+      "recallAt50": 0.95,
+      "recallAtAll": 0.95,
+      "negativeViolations": 3,
+      "wallMs": 7468,
+      "recallRegressions": [],
+      "precisionRegressions": []
+    },
+    {
+      "label": "[3,4,5,6]",
+      "recallAt10": 0.95,
+      "recallAt50": 0.95,
+      "recallAtAll": 0.95,
+      "negativeViolations": 3,
+      "wallMs": 7258,
+      "recallRegressions": [],
+      "precisionRegressions": []
+    },
+    {
+      "label": "[4,5,6]",
+      "recallAt10": 0.95,
+      "recallAt50": 0.95,
+      "recallAtAll": 0.95,
+      "negativeViolations": 3,
+      "wallMs": 7178,
+      "recallRegressions": [],
+      "precisionRegressions": []
+    },
+    {
+      "label": "[4,5,6,7]",
+      "recallAt10": 0.95,
+      "recallAt50": 0.95,
+      "recallAtAll": 0.95,
+      "negativeViolations": 3,
+      "wallMs": 6866,
+      "recallRegressions": [],
+      "precisionRegressions": []
+    },
+    {
+      "label": "[5,6,7,8]",
+      "recallAt10": 0.95,
+      "recallAt50": 0.95,
+      "recallAtAll": 0.95,
+      "negativeViolations": 3,
+      "wallMs": 6675,
+      "recallRegressions": [],
+      "precisionRegressions": []
+    },
+    {
+      "label": "[3..8]",
+      "recallAt10": 0.95,
+      "recallAt50": 0.95,
+      "recallAtAll": 0.95,
+      "negativeViolations": 3,
+      "wallMs": 6543,
+      "recallRegressions": [],
+      "precisionRegressions": []
+    }
+  ]
+}

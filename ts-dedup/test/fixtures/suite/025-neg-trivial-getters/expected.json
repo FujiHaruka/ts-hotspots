@@ -1,0 +1,12 @@
+{
+  "description": "Negative: trivial return-this-field getters on two unrelated classes",
+  "tags": ["negative", "function", "small"],
+  "expectedPositive": [],
+  "expectedNegative": [
+    {
+      "changed": { "filePath": "src/boxB.ts" },
+      "existing": { "filePath": "src/boxA.ts" },
+      "rationale": "`return this.x` getter is not a refactoring candidate"
+    }
+  ]
+}

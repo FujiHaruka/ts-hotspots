@@ -1,0 +1,12 @@
+{
+  "description": "Negative: same goal via callback vs async/await; different control flow",
+  "tags": ["negative", "function", "async"],
+  "expectedPositive": [],
+  "expectedNegative": [
+    {
+      "changed": { "filePath": "src/asyncLoad.ts" },
+      "existing": { "filePath": "src/cbLoad.ts" },
+      "rationale": "style difference is a refactor, not a clone"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "description": "Type-2: same async await->validate->return pattern, different call target",
+  "tags": ["type-2", "function", "async"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/userB.ts", "startLine": 3, "endLine": 7 },
+      "existing": { "filePath": "src/userA.ts", "startLine": 3, "endLine": 7 },
+      "rationale": "await+guard+return pattern is clone-worthy"
+    }
+  ],
+  "expectedNegative": []
+}

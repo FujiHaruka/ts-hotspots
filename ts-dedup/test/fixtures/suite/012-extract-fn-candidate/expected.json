@@ -1,0 +1,12 @@
+{
+  "description": "Type-3 extract-function candidate: two outer functions share a 6-line inner filter/clean block",
+  "tags": ["type-3", "window", "refactoring"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/reportB.ts", "startLine": 1, "endLine": 11 },
+      "existing": { "filePath": "src/reportA.ts", "startLine": 1, "endLine": 11 },
+      "rationale": "the 6 inner lines are a prime extract-function candidate"
+    }
+  ],
+  "expectedNegative": []
+}

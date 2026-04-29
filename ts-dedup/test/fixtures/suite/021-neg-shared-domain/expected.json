@@ -1,0 +1,12 @@
+{
+  "description": "Negative: shared domain vocabulary (id / validate / check) but unrelated control flow",
+  "tags": ["negative", "function"],
+  "expectedPositive": [],
+  "expectedNegative": [
+    {
+      "changed": { "filePath": "src/checkAccount.ts" },
+      "existing": { "filePath": "src/validateUser.ts" },
+      "rationale": "id-check boilerplate is not enough to call these a clone"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Type-1: verbatim function copy across files",
+  "tags": ["type-1", "function", "cross-file"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/util.ts", "startLine": 1, "endLine": 7 },
+      "existing": { "filePath": "src/math.ts", "startLine": 1, "endLine": 7 },
+      "rationale": "util.ts is a verbatim paste of math.ts add()",
+      "minScore": { "combined": 0.5 }
+    }
+  ],
+  "expectedNegative": []
+}
