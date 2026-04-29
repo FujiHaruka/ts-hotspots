@@ -1,0 +1,12 @@
+{
+  "description": "Type-2: class method vs free function with identical body",
+  "tags": ["type-2", "function", "method"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/fn.ts", "startLine": 1, "endLine": 6 },
+      "existing": { "filePath": "src/cls.ts", "startLine": 2, "endLine": 7 },
+      "rationale": "method body === free function body; should match across kinds"
+    }
+  ],
+  "expectedNegative": []
+}

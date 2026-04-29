@@ -1,0 +1,15 @@
+export type FeatureKind = "token" | "statement" | "call";
+
+export type FeatureKey = string;
+
+export interface Feature {
+  kind: FeatureKind;
+  key: FeatureKey;
+}
+
+export interface FragmentFeatures {
+  fragmentId: string;
+  tokens: FeatureKey[];
+  statements: FeatureKey[];
+  calls: FeatureKey[];
+}

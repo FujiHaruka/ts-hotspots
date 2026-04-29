@@ -1,0 +1,12 @@
+{
+  "description": "Negative: two tiny 3-line functions may tokenwise look similar",
+  "tags": ["negative", "function", "small"],
+  "expectedPositive": [],
+  "expectedNegative": [
+    {
+      "changed": { "filePath": "src/doubleIt.ts" },
+      "existing": { "filePath": "src/addOne.ts" },
+      "rationale": "trivial arithmetic 1-liners should not be flagged"
+    }
+  ]
+}

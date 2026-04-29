@@ -1,0 +1,12 @@
+{
+  "description": "Type-2 same-file: a twin helper added beside an existing one",
+  "tags": ["type-2", "function", "same-file"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/helpers.ts", "startLine": 1, "endLine": 11 },
+      "existing": { "filePath": "src/helpers.ts", "startLine": 1, "endLine": 5 },
+      "rationale": "riskFlagB (lines 7-11) is a rename of riskFlagA (lines 1-5); the detector naturally reports the containing source-file window"
+    }
+  ],
+  "expectedNegative": []
+}

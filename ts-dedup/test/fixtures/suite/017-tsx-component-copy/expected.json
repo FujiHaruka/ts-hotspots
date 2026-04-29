@@ -1,0 +1,12 @@
+{
+  "description": "Type-1 TSX: React component copied verbatim (only the component name differs)",
+  "tags": ["type-1", "function", "tsx"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/CardB.tsx", "startLine": 1, "endLine": 6 },
+      "existing": { "filePath": "src/CardA.tsx", "startLine": 1, "endLine": 6 },
+      "rationale": "JSX body identical"
+    }
+  ],
+  "expectedNegative": []
+}

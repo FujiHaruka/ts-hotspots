@@ -1,0 +1,12 @@
+{
+  "description": "Type-3: same logic plus one extra console.log statement",
+  "tags": ["type-3", "function"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/greetB.ts", "startLine": 1, "endLine": 8 },
+      "existing": { "filePath": "src/greetA.ts", "startLine": 1, "endLine": 7 },
+      "rationale": "single added statement should not kill the match"
+    }
+  ],
+  "expectedNegative": []
+}

@@ -1,0 +1,12 @@
+{
+  "description": "Type-2: identical structure, numeric and string literals differ",
+  "tags": ["type-2", "function", "literal"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/errB.ts", "startLine": 1, "endLine": 6 },
+      "existing": { "filePath": "src/errA.ts", "startLine": 1, "endLine": 6 },
+      "rationale": "only literals (0/100, \"negative\"/\"too small\", 2/5) differ"
+    }
+  ],
+  "expectedNegative": []
+}

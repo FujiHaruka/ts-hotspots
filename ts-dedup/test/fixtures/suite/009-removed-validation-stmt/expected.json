@@ -1,0 +1,12 @@
+{
+  "description": "Type-3: one validation statement removed from an otherwise identical function",
+  "tags": ["type-3", "function"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/procB.ts", "startLine": 1, "endLine": 6 },
+      "existing": { "filePath": "src/procA.ts", "startLine": 1, "endLine": 7 },
+      "rationale": "single removed guard statement"
+    }
+  ],
+  "expectedNegative": []
+}

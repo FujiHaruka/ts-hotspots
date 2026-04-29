@@ -1,0 +1,12 @@
+{
+  "description": "Type-3: two independent statements swapped in order",
+  "tags": ["type-3", "function"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/buildB.ts", "startLine": 1, "endLine": 6 },
+      "existing": { "filePath": "src/buildA.ts", "startLine": 1, "endLine": 6 },
+      "rationale": "aStr/bStr swapped; result identical"
+    }
+  ],
+  "expectedNegative": []
+}

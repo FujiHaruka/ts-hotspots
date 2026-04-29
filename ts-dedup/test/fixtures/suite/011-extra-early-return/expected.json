@@ -1,0 +1,12 @@
+{
+  "description": "Type-3: added early-return guard at top of function",
+  "tags": ["type-3", "function"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/chkB.ts", "startLine": 1, "endLine": 6 },
+      "existing": { "filePath": "src/chkA.ts", "startLine": 1, "endLine": 5 },
+      "rationale": "one added guard line should not break function-level match"
+    }
+  ],
+  "expectedNegative": []
+}

@@ -1,0 +1,12 @@
+{
+  "description": "Type-2: same body, parameters renamed a/b -> x/y",
+  "tags": ["type-2", "function", "rename"],
+  "expectedPositive": [
+    {
+      "changed": { "filePath": "src/sum.ts", "startLine": 1, "endLine": 6 },
+      "existing": { "filePath": "src/add.ts", "startLine": 1, "endLine": 6 },
+      "rationale": "identifier normalization should collapse a/b ~ x/y"
+    }
+  ],
+  "expectedNegative": []
+}

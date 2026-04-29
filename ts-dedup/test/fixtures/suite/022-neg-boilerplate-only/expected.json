@@ -1,0 +1,12 @@
+{
+  "description": "Negative: only constructor + field-init boilerplate is similar",
+  "tags": ["negative", "function"],
+  "expectedPositive": [],
+  "expectedNegative": [
+    {
+      "changed": { "filePath": "src/Vehicle.ts" },
+      "existing": { "filePath": "src/Animal.ts" },
+      "rationale": "two-line constructors are not a refactoring candidate"
+    }
+  ]
+}
