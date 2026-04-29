@@ -39,7 +39,7 @@ A 4-layer pipeline. Each layer is separated by a swappable boundary.
 Implementation notes:
 
 - **A single ts-morph Project is the source of truth.** No per-file independent parses.
-- **Enable the TypeChecker.** We need information that syntax alone cannot give us (e.g. implicit `any`), so we prioritize accuracy over performance.
+- **Enable the TypeChecker.** `callerCount` resolves call-sites via `findReferences`, which requires symbol resolution that syntax alone cannot give us; we prioritize accuracy over performance.
 - **Collectors are plugin-shaped.** Adding a new metric takes "one more collector + one more axis ID registration."
 - **Solution-style monorepo support**: transitively follow `references` from the root `tsconfig.json` and load every referenced project into a single Project. Cross-package analysis happens on one TypeChecker.
 
@@ -59,28 +59,19 @@ TSX function components are measured as ordinary functions. Class components get
 
 Each axis is internally classified as either **quality** or **leverage**. This classification drives hotspot-candidate selection logic but is not exposed in the output schema.
 
-- **quality**: expresses "tangledness" inside the function body, type soundness, or side-effect density. Material for deciding whether to refactor.
+- **quality**: expresses "tangledness" inside the function body or side-effect density. Material for deciding whether to refactor.
 - **leverage**: the dimension that amplifies refactor ROI (blast radius / edit frequency). Only meaningful once a quality problem exists.
 
-### 5.1 Function axes (`FunctionAxisId`, 19 axes) — note: no file axes in v1
+### 5.1 Function axes (`FunctionAxisId`, 10 axes) — note: no file axes in v1
 
-**Quality (17 axes)**
+**Quality (8 axes)**
 
 | Axis ID | Meaning |
 |---|---|
 | `cognitiveComplexity` | Sonar-spec Cognitive Complexity |
-| `cyclomaticComplexity` | Classic Cyclomatic Complexity |
 | `maxNestingDepth` | Max nesting depth inside the function |
 | `sloc` | Source Lines of Code for the function |
-| `statementCount` | Statement count |
 | `parameterCount` | Parameter count |
-| `returnCount` | Number of `return` statements |
-| `anyCount` | Explicit `any` + TypeChecker-detected implicit `any` occurrences |
-| `anyTaintedExpressionCount` | Number of expressions tainted by `any` propagation |
-| `typeAssertionCount` | `as` assertions (excluding `as const`) |
-| `unsafeCastCount` | Dangerous `as` casts among the above (e.g. downcasts) |
-| `nonNullAssertionCount` | `!` non-null assertion count |
-| `tsSuppressionsFamily` | Sum of `@ts-ignore` + `@ts-expect-error` + `@ts-nocheck` |
 | `calleeCount` | Direct `CallExpression` count inside the function body (delegation density; does not recurse into nested functions) |
 | `tryCatchCount` | `try/catch` density (an error-handling axis that tends to get buried inside CC) |
 | `awaitCount` | `await` expression count (async complexity axis) |

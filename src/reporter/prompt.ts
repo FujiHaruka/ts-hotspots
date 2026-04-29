@@ -1,6 +1,6 @@
 export const FUNCTION_REPORT_PROMPT = `# ts-hotspots report
 
-This is the output of \`ts-hotspots\`, a static analyzer that scans a TypeScript project and surfaces likely refactor candidates (hotspots) based on multiple quality axes (complexity, length, nesting, type safety, and more).
+This is the output of \`ts-hotspots\`, a static analyzer that scans a TypeScript project and surfaces likely refactor candidates (hotspots) based on multiple quality axes (complexity, length, nesting, side-effect density, and more).
 
 ## Your task
 

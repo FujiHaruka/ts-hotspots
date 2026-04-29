@@ -33,34 +33,8 @@ describe("aggregate", () => {
       location: "src/a.ts:1",
       name: "f",
       kind: "function",
-      metrics: { cyclomaticComplexity: 2 },
+      metrics: { cognitiveComplexity: 1, parameterCount: 1 },
     });
-  });
-
-  test("includes all type-safety metrics on function entries", () => {
-    const ctx = buildCtx(
-      {
-        "/proj/src/a.ts": [
-          "export function f(x: any){",
-          "  // @ts-ignore",
-          "  const y = x.foo!;",
-          "  return y as number;",
-          "}",
-        ].join("\n"),
-      },
-      "/proj",
-    );
-
-    const [f] = aggregate(ctx).functions;
-    const m = f?.metrics;
-    if (!m) throw new Error("no function");
-    expect(m.anyCount ?? 0).toBeGreaterThanOrEqual(1);
-    expect(m.anyTaintedExpressionCount ?? 0).toBeGreaterThanOrEqual(1);
-    expect(m.typeAssertionCount).toBe(1);
-    expect(m.nonNullAssertionCount).toBe(1);
-    expect(m.tsIgnoreCount).toBe(1);
-    expect(m.tsExpectErrorCount).toBeUndefined();
-    expect(m.tsNocheckCount).toBeUndefined();
   });
 
   test("sorts functions by (file, line, name)", () => {

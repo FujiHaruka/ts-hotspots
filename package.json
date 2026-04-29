@@ -23,8 +23,8 @@
     "start": "node src/index.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
     "format": "biome check --write .",
     "format:check": "biome check ."
   },
@@ -34,7 +34,7 @@
   "lint-staged": {
     "*.{ts,js}": [
       "biome check --write",
-      "eslint --fix"
+      "oxlint --fix"
     ],
     "*.{json,jsonc}": [
       "biome check --write"
@@ -44,11 +44,11 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.11",
     "@types/node": "25.6.0",
-    "eslint": "10.2.0",
     "lint-staged": "16.4.0",
+    "oxlint": "1.61.0",
+    "oxlint-tsgolint": "0.21.1",
     "simple-git-hooks": "2.13.1",
     "typescript": "6.0.2",
-    "typescript-eslint": "8.58.1",
     "vitest": "4.1.4"
   },
   "dependencies": {

@@ -8,21 +8,10 @@ export type FunctionKind =
   | "constructor";
 
 export interface FunctionMetrics {
-  cyclomaticComplexity: number;
   cognitiveComplexity: number;
   sloc: number;
-  statementCount: number;
   parameterCount: number;
   maxNestingDepth: number;
-  returnCount: number;
-  anyCount: number;
-  anyTaintedExpressionCount: number;
-  typeAssertionCount: number;
-  unsafeCastCount: number;
-  nonNullAssertionCount: number;
-  tsIgnoreCount: number;
-  tsExpectErrorCount: number;
-  tsNocheckCount: number;
   callerCount: number;
   calleeCount: number;
   tryCatchCount: number;
@@ -33,18 +22,9 @@ export interface FunctionMetrics {
 
 export type FunctionAxisId =
   | "cognitiveComplexity"
-  | "cyclomaticComplexity"
   | "maxNestingDepth"
   | "sloc"
-  | "statementCount"
   | "parameterCount"
-  | "returnCount"
-  | "anyCount"
-  | "anyTaintedExpressionCount"
-  | "typeAssertionCount"
-  | "unsafeCastCount"
-  | "nonNullAssertionCount"
-  | "tsSuppressionsFamily"
   | "callerCount"
   | "calleeCount"
   | "tryCatchCount"
@@ -54,18 +34,9 @@ export type FunctionAxisId =
 
 export const FUNCTION_AXIS_IDS: readonly FunctionAxisId[] = [
   "cognitiveComplexity",
-  "cyclomaticComplexity",
   "maxNestingDepth",
   "sloc",
-  "statementCount",
   "parameterCount",
-  "returnCount",
-  "anyCount",
-  "anyTaintedExpressionCount",
-  "typeAssertionCount",
-  "unsafeCastCount",
-  "nonNullAssertionCount",
-  "tsSuppressionsFamily",
   "callerCount",
   "calleeCount",
   "tryCatchCount",
