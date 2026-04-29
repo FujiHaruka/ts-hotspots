@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUB_PR_SUMMARY,
   STUB_WHOLE_REPO_SUMMARY,
-} from "../../test/helpers/stubSummary.ts";
+} from "../../../test/dedup/helpers/stubSummary.ts";
 import type { CloneGroup, GroupMember } from "../domain/cloneGroup.ts";
 import type { CloneCandidateReport } from "../domain/report.ts";
 import { buildMarkdownReport } from "./markdownReport.ts";

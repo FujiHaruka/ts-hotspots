@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUB_PR_SUMMARY,
   STUB_WHOLE_REPO_SUMMARY,
-} from "../../test/helpers/stubSummary.ts";
+} from "../../../test/dedup/helpers/stubSummary.ts";
 import { RecordingPerfLogger } from "../cli/perfLog.ts";
 import { defaultConfig } from "../config/index.ts";
 import type { CandidateScore, ScoreBreakdown } from "../domain/candidate.ts";

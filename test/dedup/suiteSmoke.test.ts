@@ -1,11 +1,11 @@
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runDetector } from "../src/cli/runDetector.ts";
-import { defaultConfig } from "../src/config/index.ts";
-import { groupsToPairs } from "../tools/bench/groupsToPairs.ts";
-import { loadFixtures } from "../tools/bench/loadFixtures.ts";
-import { matchReport } from "../tools/bench/matchReport.ts";
-import { type SetupRepoResult, setupRepo } from "../tools/bench/setupRepo.ts";
+import { runDetector } from "../../src/dedup/cli/runDetector.ts";
+import { defaultConfig } from "../../src/dedup/config/index.ts";
+import { groupsToPairs } from "../../tools/bench/groupsToPairs.ts";
+import { loadFixtures } from "../../tools/bench/loadFixtures.ts";
+import { matchReport } from "../../tools/bench/matchReport.ts";
+import { type SetupRepoResult, setupRepo } from "../../tools/bench/setupRepo.ts";
 
 /**
  * Smoke subset of the ts-dedup fixture suite. Picks one representative scenario

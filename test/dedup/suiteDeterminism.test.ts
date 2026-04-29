@@ -1,10 +1,10 @@
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runDetector } from "../src/cli/runDetector.ts";
-import { runWholeRepoDetector } from "../src/cli/runWholeRepoDetector.ts";
-import { defaultConfig } from "../src/config/index.ts";
-import { loadFixtures } from "../tools/bench/loadFixtures.ts";
-import { setupRepo, type SetupRepoResult } from "../tools/bench/setupRepo.ts";
+import { runDetector } from "../../src/dedup/cli/runDetector.ts";
+import { runWholeRepoDetector } from "../../src/dedup/cli/runWholeRepoDetector.ts";
+import { defaultConfig } from "../../src/dedup/config/index.ts";
+import { loadFixtures } from "../../tools/bench/loadFixtures.ts";
+import { setupRepo, type SetupRepoResult } from "../../tools/bench/setupRepo.ts";
 
 /**
  * End-to-end determinism tripwire. Runs `runDetector` twice against the same

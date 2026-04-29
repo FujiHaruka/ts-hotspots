@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { runDetector } from "../../src/cli/runDetector.ts";
-import { defaultConfig } from "../../src/config/index.ts";
+import { runDetector } from "../../../src/dedup/cli/runDetector.ts";
+import { defaultConfig } from "../../../src/dedup/config/index.ts";
 import { createTempRepo, type TempRepo } from "./helpers/tempRepo.ts";
 
 describe("e2e: partial statement-window copy", () => {

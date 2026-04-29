@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { runDetector } from "../../src/cli/runDetector.ts";
-import type { Config } from "../../src/config/index.ts";
-import { defaultConfig } from "../../src/config/index.ts";
+import { runDetector } from "../../src/dedup/cli/runDetector.ts";
+import type { Config } from "../../src/dedup/config/index.ts";
+import { defaultConfig } from "../../src/dedup/config/index.ts";
 import { groupsToPairs } from "./groupsToPairs.ts";
 import { type Fixture, loadFixtures } from "./loadFixtures.ts";
 import { matchReport } from "./matchReport.ts";
@@ -220,7 +220,7 @@ interface SweepJson {
 
 export async function runSweep(argv: readonly string[]): Promise<number> {
   const cli = parseCli(argv);
-  const suiteRoot = resolve("test/fixtures/suite");
+  const suiteRoot = resolve("test/dedup/fixtures/suite");
   const fixtures = loadFixtures(suiteRoot);
   if (fixtures.length === 0) {
     process.stderr.write(`no fixtures found in ${suiteRoot}\n`);

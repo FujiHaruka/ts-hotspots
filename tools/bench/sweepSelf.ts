@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
-import { runDetector } from "../../src/cli/runDetector.ts";
-import type { Config } from "../../src/config/index.ts";
-import { defaultConfig } from "../../src/config/index.ts";
+import { runDetector } from "../../src/dedup/cli/runDetector.ts";
+import type { Config } from "../../src/dedup/config/index.ts";
+import { defaultConfig } from "../../src/dedup/config/index.ts";
 import { groupsToPairs } from "./groupsToPairs.ts";
 
 /**
