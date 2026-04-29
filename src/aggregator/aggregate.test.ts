@@ -33,7 +33,7 @@ describe("aggregate", () => {
       location: "src/a.ts:1",
       name: "f",
       kind: "function",
-      metrics: { cyclomaticComplexity: 2 },
+      metrics: { cognitiveComplexity: 1, parameterCount: 1 },
     });
   });
 
