@@ -101,23 +101,14 @@ describe("run (default: function-axis command)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [
-        ...ARGV_PREFIX,
-        FIXTURE_TSCONFIG,
-        "-m",
-        "cyclomaticComplexity",
-        "--full",
-        "--json",
-      ],
+      [...ARGV_PREFIX, FIXTURE_TSCONFIG, "-m", "sloc", "--full", "--json"],
       stdout,
       stderr,
     );
     expect(code).toBe(0);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
-    expect(
-      (report.functionRankings?.cyclomaticComplexity ?? []).length,
-    ).toBeGreaterThan(0);
-    expect(report.functionRankings?.sloc).toEqual([]);
+    expect((report.functionRankings?.sloc ?? []).length).toBeGreaterThan(0);
+    expect(report.functionRankings?.parameterCount).toEqual([]);
     expect(report.functionRankings?.cognitiveComplexity).toEqual([]);
   });
 
@@ -146,7 +137,7 @@ describe("run (default: function-axis command)", () => {
     expect(report.functionAxisMeta?.awaitCount).toBeDefined();
     expect(report.functionAxisMeta?.mutationSiteCount).toBeDefined();
     // Unrequested axes yield empty rankings under --full.
-    expect(report.functionRankings?.cyclomaticComplexity).toEqual([]);
+    expect(report.functionRankings?.cognitiveComplexity).toEqual([]);
   });
 
   test("--metrics rejects unknown axis ids", async () => {
@@ -280,7 +271,7 @@ describe("run (default: function-axis command)", () => {
         ...ARGV_PREFIX,
         FIXTURE_TSCONFIG,
         "-m",
-        "cognitiveComplexity,cyclomaticComplexity",
+        "cognitiveComplexity,sloc",
         "--json",
       ],
       stdout,
@@ -290,7 +281,7 @@ describe("run (default: function-axis command)", () => {
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     expect(report.functionCoOccurrence).toBeUndefined();
     // Candidates must stay confined to the requested axes.
-    const allowed = new Set(["cognitiveComplexity", "cyclomaticComplexity"]);
+    const allowed = new Set(["cognitiveComplexity", "sloc"]);
     for (const c of report.functionHotspotCandidates) {
       for (const key of Object.keys(c.metrics)) {
         expect(allowed.has(key)).toBe(true);

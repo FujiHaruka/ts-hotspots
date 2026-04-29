@@ -19,12 +19,9 @@ type FunctionExtractor = (e: FunctionEntry) => number;
 
 const functionExtractors: Record<FunctionAxisId, FunctionExtractor> = {
   cognitiveComplexity: (e) => e.metrics.cognitiveComplexity ?? 0,
-  cyclomaticComplexity: (e) => e.metrics.cyclomaticComplexity ?? 0,
   maxNestingDepth: (e) => e.metrics.maxNestingDepth ?? 0,
   sloc: (e) => e.metrics.sloc ?? 0,
-  statementCount: (e) => e.metrics.statementCount ?? 0,
   parameterCount: (e) => e.metrics.parameterCount ?? 0,
-  returnCount: (e) => e.metrics.returnCount ?? 0,
   callerCount: (e) => e.metrics.callerCount ?? 0,
   calleeCount: (e) => e.metrics.calleeCount ?? 0,
   tryCatchCount: (e) => e.metrics.tryCatchCount ?? 0,
@@ -156,12 +153,9 @@ const functionAxisMetricKeys: Record<
   readonly (keyof FunctionMetrics)[]
 > = {
   cognitiveComplexity: ["cognitiveComplexity"],
-  cyclomaticComplexity: ["cyclomaticComplexity"],
   maxNestingDepth: ["maxNestingDepth"],
   sloc: ["sloc"],
-  statementCount: ["statementCount"],
   parameterCount: ["parameterCount"],
-  returnCount: ["returnCount"],
   callerCount: ["callerCount"],
   calleeCount: ["calleeCount"],
   tryCatchCount: ["tryCatchCount"],
@@ -175,12 +169,9 @@ const HOTSPOT_DISCRIMINATIVE_TOP_N = 3;
 
 const FUNCTION_AXIS_CATEGORY: Record<FunctionAxisId, "quality" | "leverage"> = {
   cognitiveComplexity: "quality",
-  cyclomaticComplexity: "quality",
   maxNestingDepth: "quality",
   sloc: "quality",
-  statementCount: "quality",
   parameterCount: "quality",
-  returnCount: "quality",
   callerCount: "leverage",
   calleeCount: "quality",
   tryCatchCount: "quality",

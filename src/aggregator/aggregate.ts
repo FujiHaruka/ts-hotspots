@@ -1,12 +1,9 @@
 import { calleeCountCollector } from "../collectors/call-graph/callee-count.ts";
 import { callerCountCollector } from "../collectors/call-graph/caller-count.ts";
 import { cognitiveCollector } from "../collectors/complexity/cognitive.ts";
-import { cyclomaticCollector } from "../collectors/complexity/cyclomatic.ts";
 import { maxNestingDepthCollector } from "../collectors/complexity/max-nesting-depth.ts";
 import { parameterCountCollector } from "../collectors/complexity/parameter-count.ts";
-import { returnCountCollector } from "../collectors/complexity/return-count.ts";
 import { slocCollector } from "../collectors/complexity/sloc.ts";
-import { statementCountCollector } from "../collectors/complexity/statement-count.ts";
 import { awaitCountCollector } from "../collectors/effects/await-count.ts";
 import { mutationCountCollector } from "../collectors/effects/mutation-count.ts";
 import { tryCatchCountCollector } from "../collectors/effects/try-catch-count.ts";
@@ -32,13 +29,10 @@ export interface AggregateResult {
 // collector means appending it here — the per-declaration loop below picks it
 // up automatically.
 const METRIC_COLLECTORS = [
-  cyclomaticCollector,
   cognitiveCollector,
   slocCollector,
-  statementCountCollector,
   parameterCountCollector,
   maxNestingDepthCollector,
-  returnCountCollector,
   callerCountCollector,
   calleeCountCollector,
   tryCatchCountCollector,

@@ -16,7 +16,7 @@ function fn(opts: {
   endLine?: number;
   name?: string;
   cognitive?: number;
-  cyclomatic?: number;
+  sloc?: number;
   paramCount?: number;
   mutationSiteCount?: number;
   callerCount?: number;
@@ -32,13 +32,10 @@ function fn(opts: {
     name: opts.name ?? "f",
     kind: "function",
     metrics: {
-      cyclomaticComplexity: opts.cyclomatic ?? 0,
       cognitiveComplexity: opts.cognitive ?? 0,
-      sloc: 0,
-      statementCount: 0,
+      sloc: opts.sloc ?? 0,
       parameterCount: opts.paramCount ?? 0,
       maxNestingDepth: 0,
-      returnCount: 0,
       callerCount: opts.callerCount ?? 0,
       calleeCount: 0,
       tryCatchCount: 0,
@@ -125,7 +122,7 @@ describe("rankFunctions", () => {
 describe("dedup collectors", () => {
   test("collectFunctionRefKeys dedups across axes", () => {
     const entries: FunctionEntry[] = [
-      fn({ file: "a.ts", name: "x", cognitive: 5, cyclomatic: 5 }),
+      fn({ file: "a.ts", name: "x", cognitive: 5, sloc: 5 }),
       fn({ file: "b.ts", name: "y", cognitive: 2, paramCount: 7 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
@@ -141,11 +138,11 @@ describe("computeFunctionCoOccurrence", () => {
         file: "a.ts",
         name: "hot",
         cognitive: 10,
-        cyclomatic: 9,
+        sloc: 9,
         paramCount: 4,
         mutationSiteCount: 3,
       }),
-      fn({ file: "b.ts", name: "two", cognitive: 8, cyclomatic: 7 }),
+      fn({ file: "b.ts", name: "two", cognitive: 8, sloc: 7 }),
       fn({ file: "c.ts", name: "solo", cognitive: 6 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
@@ -156,7 +153,7 @@ describe("computeFunctionCoOccurrence", () => {
     ]);
     expect(co[0]?.axes).toEqual([
       "cognitiveComplexity",
-      "cyclomaticComplexity",
+      "sloc",
       "parameterCount",
       "mutationSiteCount",
     ]);
@@ -179,14 +176,14 @@ describe("computeFunctionCoOccurrence", () => {
         paramCount: 5,
         cognitive: 5,
         mutationSiteCount: 5,
-        cyclomatic: 5,
+        sloc: 5,
       }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const co = computeFunctionCoOccurrence(rankings);
     expect(co[0]?.axes).toEqual([
       "cognitiveComplexity",
-      "cyclomaticComplexity",
+      "sloc",
       "parameterCount",
       "mutationSiteCount",
     ]);
@@ -194,9 +191,9 @@ describe("computeFunctionCoOccurrence", () => {
 
   test("ties on axisHitCount break by location, then name, then kind", () => {
     const entries: FunctionEntry[] = [
-      fn({ file: "b.ts", name: "x", cognitive: 5, cyclomatic: 5 }),
-      fn({ file: "a.ts", name: "y", cognitive: 5, cyclomatic: 5 }),
-      fn({ file: "a.ts", name: "x", cognitive: 5, cyclomatic: 5 }),
+      fn({ file: "b.ts", name: "x", cognitive: 5, sloc: 5 }),
+      fn({ file: "a.ts", name: "y", cognitive: 5, sloc: 5 }),
+      fn({ file: "a.ts", name: "x", cognitive: 5, sloc: 5 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const co = computeFunctionCoOccurrence(rankings);
@@ -209,8 +206,8 @@ describe("computeFunctionCoOccurrence", () => {
 
   test("ties break by start line numerically, not lexicographically", () => {
     const entries: FunctionEntry[] = [
-      fn({ file: "a.ts", line: 10, name: "f", cognitive: 5, cyclomatic: 5 }),
-      fn({ file: "a.ts", line: 9, name: "f", cognitive: 5, cyclomatic: 5 }),
+      fn({ file: "a.ts", line: 10, name: "f", cognitive: 5, sloc: 5 }),
+      fn({ file: "a.ts", line: 9, name: "f", cognitive: 5, sloc: 5 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const co = computeFunctionCoOccurrence(rankings);
@@ -223,7 +220,7 @@ describe("computeFunctionCoOccurrence", () => {
         file: "a.ts",
         name: "wide",
         cognitive: 10,
-        cyclomatic: 10,
+        sloc: 10,
         paramCount: 10,
       }),
     ];
@@ -325,10 +322,10 @@ describe("computeFunctionHotspotCandidates", () => {
         file: "a.ts",
         name: "hot",
         cognitive: 10,
-        cyclomatic: 9,
+        sloc: 9,
         paramCount: 4,
       }),
-      fn({ file: "b.ts", name: "two", cognitive: 8, cyclomatic: 7 }),
+      fn({ file: "b.ts", name: "two", cognitive: 8, sloc: 7 }),
       fn({ file: "c.ts", name: "solo", cognitive: 6 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
@@ -344,7 +341,7 @@ describe("computeFunctionHotspotCandidates", () => {
     expect(hot).toBeDefined();
     expect(Object.keys(hot?.metrics ?? {})).toEqual([
       "cognitiveComplexity",
-      "cyclomaticComplexity",
+      "sloc",
       "parameterCount",
     ]);
     // "two" has only 2 axes → not in A; only 1 axis is discriminative so it
@@ -420,21 +417,21 @@ describe("computeFunctionHotspotCandidates", () => {
         file: "a.ts",
         name: "hot",
         cognitive: 10,
-        cyclomatic: 10,
+        sloc: 10,
         paramCount: 10,
       }),
       fn({
         file: "b.ts",
         name: "b",
         cognitive: 5,
-        cyclomatic: 4,
+        sloc: 4,
         paramCount: 3,
       }),
       fn({
         file: "c.ts",
         name: "c",
         cognitive: 1,
-        cyclomatic: 1,
+        sloc: 1,
         paramCount: 1,
       }),
     ];
@@ -451,7 +448,7 @@ describe("computeFunctionHotspotCandidates", () => {
     expect(hot).toBeDefined();
     expect(Object.keys(hot?.metrics ?? {})).toEqual([
       "cognitiveComplexity",
-      "cyclomaticComplexity",
+      "sloc",
       "parameterCount",
     ]);
   });
@@ -462,21 +459,21 @@ describe("computeFunctionHotspotCandidates", () => {
         file: "b.ts",
         name: "three",
         cognitive: 5,
-        cyclomatic: 5,
+        sloc: 5,
         paramCount: 5,
       }),
       fn({
         file: "a.ts",
         name: "also-three",
         cognitive: 4,
-        cyclomatic: 4,
+        sloc: 4,
         paramCount: 4,
       }),
       fn({
         file: "a.ts",
         name: "four",
         cognitive: 3,
-        cyclomatic: 3,
+        sloc: 3,
         paramCount: 3,
         mutationSiteCount: 3,
       }),
@@ -504,21 +501,21 @@ describe("computeFunctionHotspotCandidates", () => {
         file: "a.ts",
         name: "hot",
         cognitive: 10,
-        cyclomatic: 9,
+        sloc: 9,
         mutationSiteCount: 5,
       }),
       fn({
         file: "b.ts",
         name: "b",
         cognitive: 5,
-        cyclomatic: 4,
+        sloc: 4,
         mutationSiteCount: 2,
       }),
       fn({
         file: "c.ts",
         name: "c",
         cognitive: 1,
-        cyclomatic: 1,
+        sloc: 1,
         mutationSiteCount: 1,
       }),
     ];
@@ -534,7 +531,7 @@ describe("computeFunctionHotspotCandidates", () => {
     const hot = candidates.find((c) => c.ref.name === "hot");
     expect(hot?.metrics).toEqual({
       cognitiveComplexity: 10,
-      cyclomaticComplexity: 9,
+      sloc: 9,
       mutationSiteCount: 5,
     });
     // parameterCount axis was not hit → key must not be present.
@@ -547,28 +544,28 @@ describe("computeFunctionHotspotCandidates", () => {
         file: "a.ts",
         name: "hot",
         cognitive: 10,
-        cyclomatic: 9,
+        sloc: 9,
         paramCount: 4,
       }),
       fn({
         file: "b.ts",
         name: "b",
         cognitive: 5,
-        cyclomatic: 4,
+        sloc: 4,
         paramCount: 2,
       }),
       fn({
         file: "c.ts",
         name: "c",
         cognitive: 1,
-        cyclomatic: 1,
+        sloc: 1,
         paramCount: 1,
       }),
     ];
     const full = rankFunctions(entries, { topN: 5 });
     const narrowed = filterFunctionRankings(full, [
       "cognitiveComplexity",
-      "cyclomaticComplexity",
+      "sloc",
     ]);
     const meta = computeFunctionAxisMeta(entries, narrowed);
     const co = computeFunctionCoOccurrence(narrowed);
@@ -579,12 +576,12 @@ describe("computeFunctionHotspotCandidates", () => {
       co,
     );
     // With parameterCount filtered out: "hot" has 2 axes → not in A. B still
-    // picks it (and "b", "c") because cognitive/cyclomatic are discriminative.
+    // picks it (and "b", "c") because cognitive/sloc are discriminative.
     const hot = candidates.find((c) => c.ref.name === "hot");
     expect(hot).toBeDefined();
     expect(Object.keys(hot?.metrics ?? {})).toEqual([
       "cognitiveComplexity",
-      "cyclomaticComplexity",
+      "sloc",
     ]);
     // parameterCount raw value must not leak into metrics.
     expect(Object.hasOwn(hot?.metrics ?? {}, "parameterCount")).toBe(false);
@@ -650,21 +647,21 @@ describe("computeFunctionHotspotCandidates", () => {
         file: "a.ts",
         name: "quality-only",
         cognitive: 10,
-        cyclomatic: 10,
+        sloc: 10,
         paramCount: 10,
       }),
       fn({
         file: "b.ts",
         name: "quality-plus-leverage",
         cognitive: 5,
-        cyclomatic: 5,
+        sloc: 5,
         callerCount: 10,
       }),
       fn({
         file: "c.ts",
         name: "all-four",
         cognitive: 1,
-        cyclomatic: 1,
+        sloc: 1,
         paramCount: 1,
         callerCount: 1,
       }),
@@ -701,11 +698,11 @@ describe("computeFunctionHotspotCandidates", () => {
 describe("filter rankings", () => {
   test("filterFunctionRankings keeps only listed axes, others are empty", () => {
     const entries: FunctionEntry[] = [
-      fn({ file: "a.ts", cognitive: 5, cyclomatic: 7 }),
+      fn({ file: "a.ts", cognitive: 5, sloc: 7 }),
     ];
     const full = rankFunctions(entries, { topN: 5 });
     const filtered = filterFunctionRankings(full, ["cognitiveComplexity"]);
     expect(filtered.cognitiveComplexity).toHaveLength(1);
-    expect(filtered.cyclomaticComplexity).toEqual([]);
+    expect(filtered.sloc).toEqual([]);
   });
 });

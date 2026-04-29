@@ -8,13 +8,10 @@ export type FunctionKind =
   | "constructor";
 
 export interface FunctionMetrics {
-  cyclomaticComplexity: number;
   cognitiveComplexity: number;
   sloc: number;
-  statementCount: number;
   parameterCount: number;
   maxNestingDepth: number;
-  returnCount: number;
   callerCount: number;
   calleeCount: number;
   tryCatchCount: number;
@@ -25,12 +22,9 @@ export interface FunctionMetrics {
 
 export type FunctionAxisId =
   | "cognitiveComplexity"
-  | "cyclomaticComplexity"
   | "maxNestingDepth"
   | "sloc"
-  | "statementCount"
   | "parameterCount"
-  | "returnCount"
   | "callerCount"
   | "calleeCount"
   | "tryCatchCount"
@@ -40,12 +34,9 @@ export type FunctionAxisId =
 
 export const FUNCTION_AXIS_IDS: readonly FunctionAxisId[] = [
   "cognitiveComplexity",
-  "cyclomaticComplexity",
   "maxNestingDepth",
   "sloc",
-  "statementCount",
   "parameterCount",
-  "returnCount",
   "callerCount",
   "calleeCount",
   "tryCatchCount",

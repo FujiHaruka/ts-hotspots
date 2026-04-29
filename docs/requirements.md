@@ -62,19 +62,16 @@ Each axis is internally classified as either **quality** or **leverage**. This c
 - **quality**: expresses "tangledness" inside the function body or side-effect density. Material for deciding whether to refactor.
 - **leverage**: the dimension that amplifies refactor ROI (blast radius / edit frequency). Only meaningful once a quality problem exists.
 
-### 5.1 Function axes (`FunctionAxisId`, 13 axes) — note: no file axes in v1
+### 5.1 Function axes (`FunctionAxisId`, 10 axes) — note: no file axes in v1
 
-**Quality (11 axes)**
+**Quality (8 axes)**
 
 | Axis ID | Meaning |
 |---|---|
 | `cognitiveComplexity` | Sonar-spec Cognitive Complexity |
-| `cyclomaticComplexity` | Classic Cyclomatic Complexity |
 | `maxNestingDepth` | Max nesting depth inside the function |
 | `sloc` | Source Lines of Code for the function |
-| `statementCount` | Statement count |
 | `parameterCount` | Parameter count |
-| `returnCount` | Number of `return` statements |
 | `calleeCount` | Direct `CallExpression` count inside the function body (delegation density; does not recurse into nested functions) |
 | `tryCatchCount` | `try/catch` density (an error-handling axis that tends to get buried inside CC) |
 | `awaitCount` | `await` expression count (async complexity axis) |
