@@ -1,8 +1,18 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "node",
+    "import",
+    "promise",
+    "vitest"
+  ],
   "categories": {
-    "correctness": "off"
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
   },
   "options": {
     "typeAware": true
@@ -122,9 +132,20 @@
     "typescript/prefer-includes": "error",
     "typescript/prefer-nullish-coalescing": "error",
     "typescript/prefer-regexp-exec": "error",
-    "typescript/prefer-string-starts-ends-with": "error"
+    "typescript/prefer-string-starts-ends-with": "error",
+    "typescript/no-unsafe-type-assertion": "off",
+    "unicorn/no-array-sort": "off"
   },
   "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "no-await-in-loop": "off",
+        "unicorn/consistent-function-scoping": "off",
+        "jest/no-conditional-expect": "off",
+        "jest/require-to-throw-message": "off"
+      }
+    },
     {
       "files": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
       "rules": {
