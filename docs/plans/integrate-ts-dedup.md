@@ -72,7 +72,7 @@ ts-hotspots undismiss <id>                  # 既存
 | M0 | ✅ 統合前準備 (oxlint / fixture) | コミットが通る状態 |
 | M1 | ✅ コードツリー統合 | `ts-dedup/` を `src/dedup/` 等へ移し、テスト/型チェックが両方を網羅 |
 | M2 | ✅ CLI サブコマンド化 | `ts-hotspots dedup` が PR / whole-repo 両モードで動く |
-| M3 | リント・lint-staged・pre-commit の一本化 | `pnpm check:strip-only` を含む CI チェックを統合 |
+| M3 | ✅ リント・lint-staged・pre-commit の一本化 | `pnpm check:strip-only` を含む CI チェックを統合 |
 | M4 | ドキュメント統合とリリース | README / requirements を書き直し、`ts-dedup/` 完全消去、版上げ |
 | M5 | 段階2 設計 (`scan` の RFC) | 統合 JSON スキーマと挙動の決定書 |
 | M6 | 段階2 実装 (`scan` コマンド) | `ts-hotspots scan` と単一レポート出力 |
@@ -199,35 +199,32 @@ M1。
 
 ---
 
-## M3. リント・lint-staged・pre-commit の一本化
+## M3. ✅ リント・lint-staged・pre-commit の一本化
 
 ### 目的
-M1 で取り込んだ `tools/check-strip-only.ts` と `bench` 系を CI / pre-commit に
-組み込み、両方のルールを満たす状態を維持できるようにする。
+M1 で取り込んだ `tools/check-strip-only.ts` を pre-commit に組み込み、
+hotspots / dedup 両方のルールを満たす状態を維持できるようにする。
 
-### 成果物
-- `package.json` の `simple-git-hooks.pre-commit` を
-  `pnpm lint-staged && pnpm typecheck && pnpm check:strip-only` に更新。
-- `lint-staged` ルールを oxlint ベースで再定義 (eslint は使わない):
-  - `*.{ts,js}`: `biome check --write` → `oxlint --fix`
-  - `*.{json,jsonc}`: `biome check --write`
-- `tools/check-strip-only.ts` を `src/**` 全体 (hotspots + dedup) に対して
-  走るよう確認。hotspots 既存コードが strip-only 違反をしていないかを
-  M3 で初めて検証する。違反があれば修正 (likely zero、要 dry-run)。
-- `package.json` の `engines.node` を `>=24` に揃える (ts-dedup 由来の制約)。
+### 成果物 (履歴)
+- `package.json`:
+  - `simple-git-hooks.pre-commit` を
+    `pnpm lint-staged && pnpm typecheck && pnpm check:strip-only` に更新。
+  - `engines.node: ">=24"` を追加 (ts-dedup 由来の strip-only 前提を明示)。
+- `lint-staged` は M0 時点で既に oxlint ベース (`biome check --write` →
+  `oxlint --fix`) になっていたためルール変更なし。
+- `tools/check-strip-only.ts` を `src/cli.ts` import に切り替え。`src/cli.ts` が
+  hotspots / dedup の全モジュールを静的 import で引き込むため、これ1本で
+  全 src ツリーの strip-only 互換を検証できる。
+- hotspots 既存コードに strip-only 違反は見つからず、修正なしで全モジュールを
+  ロードできた (`enum` / `namespace` / parameter properties いずれも未使用)。
 
 ### 受け入れ基準
-- `pnpm check:strip-only` がグリーン。
-- 任意の `.ts` を編集してコミットすると lint-staged が走り、oxlint でブロック
-  されることが確認できる。
-- pre-commit hook 全体の所要時間が許容範囲 (実測で <30s 程度を目安)。
+- `pnpm check:strip-only` がグリーン (Node v22 / v24 共に)  ✓
+- `pnpm typecheck` / `pnpm lint` グリーン ✓
+- `simple-git-hooks` が `check:strip-only` を含むよう更新済み ✓
 
 ### 依存
 M2。
-
-### 検討事項
-- hotspots 側に strip-only 違反が見つかった場合、修正するか override するかを
-  M3 内で判断。原則は「修正」。違反が多ければ M3 を blocker としてスコープ拡大。
 
 ---
 
