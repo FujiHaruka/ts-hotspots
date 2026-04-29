@@ -12,7 +12,7 @@ The primary ranking unit is the function (including methods, arrow functions, an
 - **Do not report commits or pushes.** The user is not interested in commit/push activity. Skip mentioning them in turn summaries or status updates.
 - **Keep commit messages short.** One concise line, no body unless absolutely necessary.
 - **Write tests alongside code.** Whenever you add or change behavior, add or update tests for it and run them in the same turn to verify the code you just wrote. Do not defer verification.
-- **Do not run `pnpm format` manually before committing.** The pre-commit hook runs `biome check --write` and `eslint --fix` via lint-staged, so formatting is applied automatically on commit. Running it explicitly is redundant.
+- **Do not run `pnpm format` manually before committing.** The pre-commit hook runs `biome check --write` and `oxlint --fix` via lint-staged, so formatting is applied automatically on commit. Running it explicitly is redundant.
 
 ## User-facing docs (README etc.)
 

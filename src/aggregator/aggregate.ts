@@ -1,22 +1,13 @@
 import { calleeCountCollector } from "../collectors/call-graph/callee-count.ts";
 import { callerCountCollector } from "../collectors/call-graph/caller-count.ts";
 import { cognitiveCollector } from "../collectors/complexity/cognitive.ts";
-import { cyclomaticCollector } from "../collectors/complexity/cyclomatic.ts";
 import { maxNestingDepthCollector } from "../collectors/complexity/max-nesting-depth.ts";
 import { parameterCountCollector } from "../collectors/complexity/parameter-count.ts";
-import { returnCountCollector } from "../collectors/complexity/return-count.ts";
 import { slocCollector } from "../collectors/complexity/sloc.ts";
-import { statementCountCollector } from "../collectors/complexity/statement-count.ts";
 import { awaitCountCollector } from "../collectors/effects/await-count.ts";
 import { mutationCountCollector } from "../collectors/effects/mutation-count.ts";
 import { tryCatchCountCollector } from "../collectors/effects/try-catch-count.ts";
 import type { SourceFileInfo } from "../collectors/enumerate-source-files.ts";
-import { anyCountCollector } from "../collectors/type-safety/any-count.ts";
-import { anyTaintedExpressionCountCollector } from "../collectors/type-safety/any-tainted-expression-count.ts";
-import { nonNullAssertionCollector } from "../collectors/type-safety/non-null-assertion.ts";
-import { tsSuppressionsCollector } from "../collectors/type-safety/ts-suppressions.ts";
-import { typeAssertionCountCollector } from "../collectors/type-safety/type-assertion-count.ts";
-import { unsafeCastCountCollector } from "../collectors/type-safety/unsafe-cast-count.ts";
 import type { CollectorContext } from "../collectors/types.ts";
 import { computeBodyHash } from "../dismissal/hash.ts";
 import type { FunctionEntry, FunctionMetrics } from "../schema.ts";
@@ -38,19 +29,10 @@ export interface AggregateResult {
 // collector means appending it here — the per-declaration loop below picks it
 // up automatically.
 const METRIC_COLLECTORS = [
-  cyclomaticCollector,
   cognitiveCollector,
   slocCollector,
-  statementCountCollector,
   parameterCountCollector,
   maxNestingDepthCollector,
-  returnCountCollector,
-  anyCountCollector,
-  anyTaintedExpressionCountCollector,
-  typeAssertionCountCollector,
-  unsafeCastCountCollector,
-  nonNullAssertionCollector,
-  tsSuppressionsCollector,
   callerCountCollector,
   calleeCountCollector,
   tryCatchCountCollector,

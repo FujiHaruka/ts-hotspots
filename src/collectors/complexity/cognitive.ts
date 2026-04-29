@@ -78,9 +78,11 @@ export function computeCognitive(node: FunctionLikeNode): number {
       case SyntaxKind.DoStatement: {
         score += 1 + nesting;
         // Walk children at same nesting, except the loop body goes to nesting+1.
-        const body = (n as unknown as { getStatement(): Node }).getStatement();
+        const loopBody = (
+          n as unknown as { getStatement(): Node }
+        ).getStatement();
         for (const child of n.getChildren()) {
-          if (child === body) {
+          if (child === loopBody) {
             visit(child, nesting + 1);
           } else {
             visit(child, nesting);
