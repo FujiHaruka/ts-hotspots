@@ -17,15 +17,19 @@ export interface PerfLogger {
   emit(name: string, payload: Record<string, unknown>): void;
 }
 
+interface PerfLogSink {
+  write: (chunk: string) => unknown;
+}
+
 /**
  * `PerfLogger` that serialises each event to a JSON line on the given
  * stream. Each line carries `{ ts: <ms_since_start>, event, ...payload }`.
  */
 export class JsonlPerfLogger implements PerfLogger {
   private readonly start: number;
-  private readonly out: NodeJS.WritableStream;
+  private readonly out: PerfLogSink;
   readonly level: PhaseTimingsLevel;
-  constructor(out: NodeJS.WritableStream, level: PhaseTimingsLevel) {
+  constructor(out: PerfLogSink, level: PhaseTimingsLevel) {
     this.out = out;
     this.level = level;
     this.start = performance.now();
