@@ -11,12 +11,6 @@ import { awaitCountCollector } from "../collectors/effects/await-count.ts";
 import { mutationCountCollector } from "../collectors/effects/mutation-count.ts";
 import { tryCatchCountCollector } from "../collectors/effects/try-catch-count.ts";
 import type { SourceFileInfo } from "../collectors/enumerate-source-files.ts";
-import { anyCountCollector } from "../collectors/type-safety/any-count.ts";
-import { anyTaintedExpressionCountCollector } from "../collectors/type-safety/any-tainted-expression-count.ts";
-import { nonNullAssertionCollector } from "../collectors/type-safety/non-null-assertion.ts";
-import { tsSuppressionsCollector } from "../collectors/type-safety/ts-suppressions.ts";
-import { typeAssertionCountCollector } from "../collectors/type-safety/type-assertion-count.ts";
-import { unsafeCastCountCollector } from "../collectors/type-safety/unsafe-cast-count.ts";
 import type { CollectorContext } from "../collectors/types.ts";
 import { computeBodyHash } from "../dismissal/hash.ts";
 import type { FunctionEntry, FunctionMetrics } from "../schema.ts";
@@ -45,12 +39,6 @@ const METRIC_COLLECTORS = [
   parameterCountCollector,
   maxNestingDepthCollector,
   returnCountCollector,
-  anyCountCollector,
-  anyTaintedExpressionCountCollector,
-  typeAssertionCountCollector,
-  unsafeCastCountCollector,
-  nonNullAssertionCollector,
-  tsSuppressionsCollector,
   callerCountCollector,
   calleeCountCollector,
   tryCatchCountCollector,

@@ -325,7 +325,7 @@ describe("run (default: function-axis command)", () => {
     expect(meta).toBeDefined();
     if (meta === undefined) throw new Error("unreachable");
     expect(meta.cognitiveComplexity).toBeDefined();
-    expect(meta.tsSuppressionsFamily).toBeDefined();
+    expect(meta.tryCatchCount).toBeDefined();
     for (const axis of Object.values(meta)) {
       expect(axis.nonZeroCount).toBeGreaterThanOrEqual(0);
       expect(axis.maxTieLength).toBeGreaterThanOrEqual(0);
@@ -356,8 +356,8 @@ describe("run (default: function-axis command)", () => {
     if (rankings === undefined) throw new Error("unreachable");
     const axes = Object.keys(rankings) as FunctionAxisId[];
     expect(axes).toContain("cognitiveComplexity");
-    expect(axes).toContain("tsSuppressionsFamily");
-    expect(rankings.tsSuppressionsFamily).toEqual([]);
+    expect(axes).toContain("tryCatchCount");
+    expect(rankings.tryCatchCount).toEqual([]);
 
     expect(Array.isArray(report.functionHotspotCandidates)).toBe(true);
     expect(report.functionAxisMeta?.cognitiveComplexity).toBeDefined();

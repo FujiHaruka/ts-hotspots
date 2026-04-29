@@ -17,10 +17,8 @@ function fn(opts: {
   name?: string;
   cognitive?: number;
   cyclomatic?: number;
-  anyCount?: number;
-  tsIgnore?: number;
-  tsExpectError?: number;
-  tsNocheck?: number;
+  paramCount?: number;
+  mutationSiteCount?: number;
   callerCount?: number;
 }): FunctionEntry {
   const start = opts.line ?? 1;
@@ -38,22 +36,14 @@ function fn(opts: {
       cognitiveComplexity: opts.cognitive ?? 0,
       sloc: 0,
       statementCount: 0,
-      parameterCount: 0,
+      parameterCount: opts.paramCount ?? 0,
       maxNestingDepth: 0,
       returnCount: 0,
-      anyCount: opts.anyCount ?? 0,
-      anyTaintedExpressionCount: 0,
-      typeAssertionCount: 0,
-      unsafeCastCount: 0,
-      nonNullAssertionCount: 0,
-      tsIgnoreCount: opts.tsIgnore ?? 0,
-      tsExpectErrorCount: opts.tsExpectError ?? 0,
-      tsNocheckCount: opts.tsNocheck ?? 0,
       callerCount: opts.callerCount ?? 0,
       calleeCount: 0,
       tryCatchCount: 0,
       awaitCount: 0,
-      mutationSiteCount: 0,
+      mutationSiteCount: opts.mutationSiteCount ?? 0,
     },
     bodyHash: `sha256:${opts.file}:${String(start)}:${opts.name ?? "f"}`,
   };
@@ -115,31 +105,10 @@ describe("rankFunctions", () => {
     expect(rankings.cognitiveComplexity.map((e) => e.ref.name)).toEqual(["hi"]);
   });
 
-  test("tsSuppressionsFamily sums ts-ignore/expect-error/nocheck and drops zero", () => {
-    const entries: FunctionEntry[] = [
-      fn({
-        file: "a.ts",
-        name: "sum6",
-        tsIgnore: 2,
-        tsExpectError: 3,
-        tsNocheck: 1,
-      }),
-      fn({ file: "b.ts", name: "sum4", tsIgnore: 4 }),
-      fn({ file: "c.ts", name: "sum0" }),
-    ];
-    const rankings = rankFunctions(entries, { topN: 5 });
-    expect(
-      rankings.tsSuppressionsFamily.map((e) => [e.ref.name, e.value]),
-    ).toEqual([
-      ["sum6", 6],
-      ["sum4", 4],
-    ]);
-  });
-
   test("empty input returns empty arrays for all axes", () => {
     const rankings = rankFunctions([], { topN: 5 });
     expect(rankings.cognitiveComplexity).toEqual([]);
-    expect(rankings.tsSuppressionsFamily).toEqual([]);
+    expect(rankings.parameterCount).toEqual([]);
   });
 
   test("all-zero input returns empty array for each axis", () => {
@@ -149,7 +118,7 @@ describe("rankFunctions", () => {
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     expect(rankings.cognitiveComplexity).toEqual([]);
-    expect(rankings.tsSuppressionsFamily).toEqual([]);
+    expect(rankings.parameterCount).toEqual([]);
   });
 });
 
@@ -157,7 +126,7 @@ describe("dedup collectors", () => {
   test("collectFunctionRefKeys dedups across axes", () => {
     const entries: FunctionEntry[] = [
       fn({ file: "a.ts", name: "x", cognitive: 5, cyclomatic: 5 }),
-      fn({ file: "b.ts", name: "y", cognitive: 2, anyCount: 7 }),
+      fn({ file: "b.ts", name: "y", cognitive: 2, paramCount: 7 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const keys = collectFunctionRefKeys(rankings);
@@ -173,8 +142,8 @@ describe("computeFunctionCoOccurrence", () => {
         name: "hot",
         cognitive: 10,
         cyclomatic: 9,
-        anyCount: 4,
-        tsIgnore: 3,
+        paramCount: 4,
+        mutationSiteCount: 3,
       }),
       fn({ file: "b.ts", name: "two", cognitive: 8, cyclomatic: 7 }),
       fn({ file: "c.ts", name: "solo", cognitive: 6 }),
@@ -188,8 +157,8 @@ describe("computeFunctionCoOccurrence", () => {
     expect(co[0]?.axes).toEqual([
       "cognitiveComplexity",
       "cyclomaticComplexity",
-      "anyCount",
-      "tsSuppressionsFamily",
+      "parameterCount",
+      "mutationSiteCount",
     ]);
   });
 
@@ -207,9 +176,9 @@ describe("computeFunctionCoOccurrence", () => {
       fn({
         file: "a.ts",
         name: "x",
-        anyCount: 5,
+        paramCount: 5,
         cognitive: 5,
-        tsIgnore: 5,
+        mutationSiteCount: 5,
         cyclomatic: 5,
       }),
     ];
@@ -218,8 +187,8 @@ describe("computeFunctionCoOccurrence", () => {
     expect(co[0]?.axes).toEqual([
       "cognitiveComplexity",
       "cyclomaticComplexity",
-      "anyCount",
-      "tsSuppressionsFamily",
+      "parameterCount",
+      "mutationSiteCount",
     ]);
   });
 
@@ -255,18 +224,18 @@ describe("computeFunctionCoOccurrence", () => {
         name: "wide",
         cognitive: 10,
         cyclomatic: 10,
-        anyCount: 10,
+        paramCount: 10,
       }),
     ];
     const full = rankFunctions(entries, { topN: 5 });
     const narrowed = filterFunctionRankings(full, [
       "cognitiveComplexity",
-      "anyCount",
+      "parameterCount",
     ]);
     const co = computeFunctionCoOccurrence(narrowed);
     expect(co).toHaveLength(1);
     expect(co[0]?.axisHitCount).toBe(2);
-    expect(co[0]?.axes).toEqual(["cognitiveComplexity", "anyCount"]);
+    expect(co[0]?.axes).toEqual(["cognitiveComplexity", "parameterCount"]);
   });
 
   test("empty rankings produce empty co-occurrence", () => {
@@ -281,12 +250,12 @@ describe("computeFunctionAxisMeta", () => {
       fn({ file: "a.ts", name: "a", cognitive: 5 }),
       fn({ file: "b.ts", name: "b", cognitive: 3 }),
       fn({ file: "c.ts", name: "c", cognitive: 0 }),
-      fn({ file: "d.ts", name: "d", cognitive: 0, anyCount: 2 }),
+      fn({ file: "d.ts", name: "d", cognitive: 0, paramCount: 2 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const meta = computeFunctionAxisMeta(entries, rankings);
     expect(meta.cognitiveComplexity.nonZeroCount).toBe(2);
-    expect(meta.anyCount.nonZeroCount).toBe(1);
+    expect(meta.parameterCount.nonZeroCount).toBe(1);
   });
 
   test("maxTieLength finds the longest run of equal values in top-N", () => {
@@ -337,18 +306,6 @@ describe("computeFunctionAxisMeta", () => {
     expect(meta.cognitiveComplexity.uniqueTopNValues).toBe(0);
   });
 
-  test("tsSuppressionsFamily nonZeroCount sums across the three counters", () => {
-    const entries: FunctionEntry[] = [
-      fn({ file: "a.ts", name: "a", tsIgnore: 1 }),
-      fn({ file: "b.ts", name: "b", tsExpectError: 2 }),
-      fn({ file: "c.ts", name: "c", tsNocheck: 3 }),
-      fn({ file: "d.ts", name: "d" }),
-    ];
-    const rankings = rankFunctions(entries, { topN: 5 });
-    const meta = computeFunctionAxisMeta(entries, rankings);
-    expect(meta.tsSuppressionsFamily.nonZeroCount).toBe(3);
-  });
-
   test("single-value top-N has spread 0 and tie length 1", () => {
     const entries: FunctionEntry[] = [
       fn({ file: "a.ts", name: "a", cognitive: 7 }),
@@ -369,7 +326,7 @@ describe("computeFunctionHotspotCandidates", () => {
         name: "hot",
         cognitive: 10,
         cyclomatic: 9,
-        anyCount: 4,
+        paramCount: 4,
       }),
       fn({ file: "b.ts", name: "two", cognitive: 8, cyclomatic: 7 }),
       fn({ file: "c.ts", name: "solo", cognitive: 6 }),
@@ -388,7 +345,7 @@ describe("computeFunctionHotspotCandidates", () => {
     expect(Object.keys(hot?.metrics ?? {})).toEqual([
       "cognitiveComplexity",
       "cyclomaticComplexity",
-      "anyCount",
+      "parameterCount",
     ]);
     // "two" has only 2 axes → not in A; only 1 axis is discriminative so it
     // can still appear via B.
@@ -398,9 +355,9 @@ describe("computeFunctionHotspotCandidates", () => {
 
   test("B set: top-3 of each discriminative axis become candidates", () => {
     const entries: FunctionEntry[] = [
-      fn({ file: "a.ts", name: "a", anyCount: 10 }),
-      fn({ file: "b.ts", name: "b", anyCount: 5 }),
-      fn({ file: "c.ts", name: "c", anyCount: 1 }),
+      fn({ file: "a.ts", name: "a", paramCount: 10 }),
+      fn({ file: "b.ts", name: "b", paramCount: 5 }),
+      fn({ file: "c.ts", name: "c", paramCount: 1 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const meta = computeFunctionAxisMeta(entries, rankings);
@@ -420,7 +377,7 @@ describe("computeFunctionHotspotCandidates", () => {
 
   test("B set: non-discriminative axes (topNSpread=0 or uniqueTopNValues=1) are skipped", () => {
     const entries: FunctionEntry[] = [
-      fn({ file: "a.ts", name: "solo", anyCount: 5 }),
+      fn({ file: "a.ts", name: "solo", paramCount: 5 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const meta = computeFunctionAxisMeta(entries, rankings);
@@ -436,7 +393,11 @@ describe("computeFunctionHotspotCandidates", () => {
 
   test("B set: only top-3 per axis even when --top is larger", () => {
     const entries: FunctionEntry[] = Array.from({ length: 5 }, (_, i) =>
-      fn({ file: `f${String(i)}.ts`, name: `n${String(i)}`, anyCount: 10 - i }),
+      fn({
+        file: `f${String(i)}.ts`,
+        name: `n${String(i)}`,
+        paramCount: 10 - i,
+      }),
     );
     const rankings = rankFunctions(entries, { topN: 5 });
     const meta = computeFunctionAxisMeta(entries, rankings);
@@ -460,10 +421,22 @@ describe("computeFunctionHotspotCandidates", () => {
         name: "hot",
         cognitive: 10,
         cyclomatic: 10,
-        anyCount: 10,
+        paramCount: 10,
       }),
-      fn({ file: "b.ts", name: "b", cognitive: 5, cyclomatic: 4, anyCount: 3 }),
-      fn({ file: "c.ts", name: "c", cognitive: 1, cyclomatic: 1, anyCount: 1 }),
+      fn({
+        file: "b.ts",
+        name: "b",
+        cognitive: 5,
+        cyclomatic: 4,
+        paramCount: 3,
+      }),
+      fn({
+        file: "c.ts",
+        name: "c",
+        cognitive: 1,
+        cyclomatic: 1,
+        paramCount: 1,
+      }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const meta = computeFunctionAxisMeta(entries, rankings);
@@ -479,7 +452,7 @@ describe("computeFunctionHotspotCandidates", () => {
     expect(Object.keys(hot?.metrics ?? {})).toEqual([
       "cognitiveComplexity",
       "cyclomaticComplexity",
-      "anyCount",
+      "parameterCount",
     ]);
   });
 
@@ -490,22 +463,22 @@ describe("computeFunctionHotspotCandidates", () => {
         name: "three",
         cognitive: 5,
         cyclomatic: 5,
-        anyCount: 5,
+        paramCount: 5,
       }),
       fn({
         file: "a.ts",
         name: "also-three",
         cognitive: 4,
         cyclomatic: 4,
-        anyCount: 4,
+        paramCount: 4,
       }),
       fn({
         file: "a.ts",
         name: "four",
         cognitive: 3,
         cyclomatic: 3,
-        anyCount: 3,
-        tsIgnore: 3,
+        paramCount: 3,
+        mutationSiteCount: 3,
       }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
@@ -525,17 +498,29 @@ describe("computeFunctionHotspotCandidates", () => {
     ]);
   });
 
-  test("metrics: includes only keys for hit axes; tsSuppressionsFamily fans out to 3 keys", () => {
+  test("metrics: includes only keys for hit axes", () => {
     const entries: FunctionEntry[] = [
       fn({
         file: "a.ts",
         name: "hot",
         cognitive: 10,
         cyclomatic: 9,
-        tsIgnore: 5,
+        mutationSiteCount: 5,
       }),
-      fn({ file: "b.ts", name: "b", cognitive: 5, cyclomatic: 4, tsIgnore: 2 }),
-      fn({ file: "c.ts", name: "c", cognitive: 1, cyclomatic: 1, tsIgnore: 1 }),
+      fn({
+        file: "b.ts",
+        name: "b",
+        cognitive: 5,
+        cyclomatic: 4,
+        mutationSiteCount: 2,
+      }),
+      fn({
+        file: "c.ts",
+        name: "c",
+        cognitive: 1,
+        cyclomatic: 1,
+        mutationSiteCount: 1,
+      }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const meta = computeFunctionAxisMeta(entries, rankings);
@@ -550,12 +535,10 @@ describe("computeFunctionHotspotCandidates", () => {
     expect(hot?.metrics).toEqual({
       cognitiveComplexity: 10,
       cyclomaticComplexity: 9,
-      tsIgnoreCount: 5,
-      tsExpectErrorCount: 0,
-      tsNocheckCount: 0,
+      mutationSiteCount: 5,
     });
-    // anyCount axis was not hit → key must not be present.
-    expect(Object.hasOwn(hot?.metrics ?? {}, "anyCount")).toBe(false);
+    // parameterCount axis was not hit → key must not be present.
+    expect(Object.hasOwn(hot?.metrics ?? {}, "parameterCount")).toBe(false);
   });
 
   test("--metrics filter closes candidate computation over the filtered axis set", () => {
@@ -565,10 +548,22 @@ describe("computeFunctionHotspotCandidates", () => {
         name: "hot",
         cognitive: 10,
         cyclomatic: 9,
-        anyCount: 4,
+        paramCount: 4,
       }),
-      fn({ file: "b.ts", name: "b", cognitive: 5, cyclomatic: 4, anyCount: 2 }),
-      fn({ file: "c.ts", name: "c", cognitive: 1, cyclomatic: 1, anyCount: 1 }),
+      fn({
+        file: "b.ts",
+        name: "b",
+        cognitive: 5,
+        cyclomatic: 4,
+        paramCount: 2,
+      }),
+      fn({
+        file: "c.ts",
+        name: "c",
+        cognitive: 1,
+        cyclomatic: 1,
+        paramCount: 1,
+      }),
     ];
     const full = rankFunctions(entries, { topN: 5 });
     const narrowed = filterFunctionRankings(full, [
@@ -583,16 +578,16 @@ describe("computeFunctionHotspotCandidates", () => {
       meta,
       co,
     );
-    // With anyCount filtered out: "hot" has 2 axes → not in A. B still picks
-    // it (and "b", "c") because cognitive/cyclomatic are discriminative.
+    // With parameterCount filtered out: "hot" has 2 axes → not in A. B still
+    // picks it (and "b", "c") because cognitive/cyclomatic are discriminative.
     const hot = candidates.find((c) => c.ref.name === "hot");
     expect(hot).toBeDefined();
     expect(Object.keys(hot?.metrics ?? {})).toEqual([
       "cognitiveComplexity",
       "cyclomaticComplexity",
     ]);
-    // anyCount raw value must not leak into metrics.
-    expect(Object.hasOwn(hot?.metrics ?? {}, "anyCount")).toBe(false);
+    // parameterCount raw value must not leak into metrics.
+    expect(Object.hasOwn(hot?.metrics ?? {}, "parameterCount")).toBe(false);
   });
 
   test("empty inputs produce empty candidates", () => {
@@ -626,8 +621,7 @@ describe("computeFunctionHotspotCandidates", () => {
 
   test("co-occurrence entry with no quality axis is rejected", () => {
     // Synthetic: a leverage-only co-occurrence entry is skipped even if
-    // axisHitCount clears the min-axes gate. (Currently unreachable via real
-    // rankings because there is only 1 leverage axis, but guards future growth.)
+    // axisHitCount clears the min-axes gate.
     const ref = {
       location: "a.ts:1",
       name: "solo",
@@ -657,7 +651,7 @@ describe("computeFunctionHotspotCandidates", () => {
         name: "quality-only",
         cognitive: 10,
         cyclomatic: 10,
-        anyCount: 10,
+        paramCount: 10,
       }),
       fn({
         file: "b.ts",
@@ -671,7 +665,7 @@ describe("computeFunctionHotspotCandidates", () => {
         name: "all-four",
         cognitive: 1,
         cyclomatic: 1,
-        anyCount: 1,
+        paramCount: 1,
         callerCount: 1,
       }),
     ];
@@ -684,8 +678,8 @@ describe("computeFunctionHotspotCandidates", () => {
       meta,
       co,
     );
-    // all-four: totalHits=4 (cog+cyc+any+callerCount), qualityHits=3
-    // quality-only: totalHits=3 (cog+cyc+any), qualityHits=3
+    // all-four: totalHits=4 (cog+cyc+param+callerCount), qualityHits=3
+    // quality-only: totalHits=3 (cog+cyc+param), qualityHits=3
     // quality-plus-leverage: totalHits=3 (cog+cyc+callerCount), qualityHits=2
     // Sort: totalHits desc → all-four first. Then totalHits=3 tied, qualityHits
     // desc breaks in favor of quality-only over quality-plus-leverage.

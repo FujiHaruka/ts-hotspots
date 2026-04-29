@@ -15,14 +15,6 @@ export interface FunctionMetrics {
   parameterCount: number;
   maxNestingDepth: number;
   returnCount: number;
-  anyCount: number;
-  anyTaintedExpressionCount: number;
-  typeAssertionCount: number;
-  unsafeCastCount: number;
-  nonNullAssertionCount: number;
-  tsIgnoreCount: number;
-  tsExpectErrorCount: number;
-  tsNocheckCount: number;
   callerCount: number;
   calleeCount: number;
   tryCatchCount: number;
@@ -39,12 +31,6 @@ export type FunctionAxisId =
   | "statementCount"
   | "parameterCount"
   | "returnCount"
-  | "anyCount"
-  | "anyTaintedExpressionCount"
-  | "typeAssertionCount"
-  | "unsafeCastCount"
-  | "nonNullAssertionCount"
-  | "tsSuppressionsFamily"
   | "callerCount"
   | "calleeCount"
   | "tryCatchCount"
@@ -60,12 +46,6 @@ export const FUNCTION_AXIS_IDS: readonly FunctionAxisId[] = [
   "statementCount",
   "parameterCount",
   "returnCount",
-  "anyCount",
-  "anyTaintedExpressionCount",
-  "typeAssertionCount",
-  "unsafeCastCount",
-  "nonNullAssertionCount",
-  "tsSuppressionsFamily",
   "callerCount",
   "calleeCount",
   "tryCatchCount",
