@@ -1,10 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { PhaseTimingsCollector } from "../../src/cli/perfLog.ts";
-import { runDetector } from "../../src/cli/runDetector.ts";
-import type { Config } from "../../src/config/index.ts";
-import { defaultConfig } from "../../src/config/index.ts";
+import { PhaseTimingsCollector } from "../../src/dedup/cli/perfLog.ts";
+import { runDetector } from "../../src/dedup/cli/runDetector.ts";
+import type { Config } from "../../src/dedup/config/index.ts";
+import { defaultConfig } from "../../src/dedup/config/index.ts";
 import { formatJson } from "./formatJson.ts";
 import { formatMarkdown } from "./formatMarkdown.ts";
 import { groupsToPairs } from "./groupsToPairs.ts";
@@ -187,7 +187,7 @@ async function runVariant(
 export async function runBench(argv: readonly string[]): Promise<number> {
   const cli = parseCli(argv);
 
-  const suiteRoot = resolve("test/fixtures/suite");
+  const suiteRoot = resolve("test/dedup/fixtures/suite");
   const fixtures = loadFixtures(suiteRoot, cli.only);
   if (fixtures.length === 0) {
     process.stderr.write(`no fixtures found in ${suiteRoot}\n`);

@@ -1,6 +1,6 @@
 # ts-dedup bench harness
 
-Runs the detector against every scenario in `test/fixtures/suite/` and
+Runs the detector against every scenario in `test/dedup/fixtures/suite/` and
 reports recall / precision / ablation numbers.
 
 ## Usage

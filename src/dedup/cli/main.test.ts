@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createTempRepo,
   type TempRepo,
-} from "../../test/e2e/helpers/tempRepo.ts";
+} from "../../../test/dedup/e2e/helpers/tempRepo.ts";
 import { type MainIO, main } from "./main.ts";
 
 interface CapturedIO {

@@ -1,4 +1,4 @@
-import type { CloneGroup, FragmentView } from "../../src/domain/index.ts";
+import type { CloneGroup, FragmentView } from "../../src/dedup/domain/index.ts";
 
 /**
  * Flat (anchor, member) view of a `CloneGroup`. Bench / eval tooling

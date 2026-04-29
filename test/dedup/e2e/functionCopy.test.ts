@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { runDetector } from "../../src/cli/runDetector.ts";
-import { defaultConfig } from "../../src/config/index.ts";
-import { nonNull } from "../../src/util/nonNull.ts";
+import { runDetector } from "../../../src/dedup/cli/runDetector.ts";
+import { defaultConfig } from "../../../src/dedup/config/index.ts";
+import { nonNull } from "../../../src/dedup/util/nonNull.ts";
 import { createTempRepo, type TempRepo } from "./helpers/tempRepo.ts";
 
 describe("e2e: whole-function copy", () => {

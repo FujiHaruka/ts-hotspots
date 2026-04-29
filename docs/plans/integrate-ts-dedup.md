@@ -70,7 +70,7 @@ ts-hotspots undismiss <id>                  # 既存
 | # | 名称 | 主な成果物 |
 |---|---|---|
 | M0 | ✅ 統合前準備 (oxlint / fixture) | コミットが通る状態 |
-| M1 | コードツリー統合 | `ts-dedup/` を `src/dedup/` 等へ移し、テスト/型チェックが両方を網羅 |
+| M1 | ✅ コードツリー統合 | `ts-dedup/` を `src/dedup/` 等へ移し、テスト/型チェックが両方を網羅 |
 | M2 | CLI サブコマンド化 | `ts-hotspots dedup` が PR / whole-repo 両モードで動く |
 | M3 | リント・lint-staged・pre-commit の一本化 | `pnpm check:strip-only` を含む CI チェックを統合 |
 | M4 | ドキュメント統合とリリース | README / requirements を書き直し、`ts-dedup/` 完全消去、版上げ |

@@ -4,9 +4,9 @@ import { parseArgs } from "node:util";
 import {
   PhaseTimingsCollector,
   type PhaseTimingsRecord,
-} from "../../src/cli/perfLog.ts";
-import { runDetector } from "../../src/cli/runDetector.ts";
-import { defaultConfig } from "../../src/config/index.ts";
+} from "../../src/dedup/cli/perfLog.ts";
+import { runDetector } from "../../src/dedup/cli/runDetector.ts";
+import { defaultConfig } from "../../src/dedup/config/index.ts";
 
 type PhaseTimings = PhaseTimingsRecord;
 

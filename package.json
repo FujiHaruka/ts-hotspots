@@ -26,7 +26,13 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "biome check --write .",
-    "format:check": "biome check ."
+    "format:check": "biome check .",
+    "bench": "node tools/bench/index.ts",
+    "bench:scale": "node tools/bench/scale.ts",
+    "bench:sweep": "node tools/bench/sweep.ts",
+    "bench:sweep-self": "node tools/bench/sweepSelf.ts",
+    "bench:ngram": "node tools/bench/microNgramBuild.ts",
+    "check:strip-only": "node tools/check-strip-only.ts"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged && pnpm typecheck"
@@ -48,12 +54,12 @@
     "oxlint": "1.61.0",
     "oxlint-tsgolint": "0.21.1",
     "simple-git-hooks": "2.13.1",
-    "typescript": "6.0.2",
     "vitest": "4.1.4"
   },
   "dependencies": {
     "commander": "14.0.3",
     "minimatch": "10.2.5",
-    "ts-morph": "27.0.2"
+    "ts-morph": "27.0.2",
+    "typescript": "6.0.2"
   }
 }
