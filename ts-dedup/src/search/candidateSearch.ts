@@ -181,6 +181,7 @@ function topKByMinHeap(
     }
   }
   // Drain in ascending order, then reverse to descending (best-first).
+  // oxlint-disable-next-line unicorn/no-new-array -- typed pre-allocation for fixed-size heap drain
   const out = new Array<Candidate>(heap.length);
   for (let i = heap.length - 1; i >= 0; i--) {
     out[i] = heapPop(heap);

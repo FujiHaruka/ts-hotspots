@@ -29,7 +29,7 @@ describe("globToRegExp", () => {
     expect(re.test("src/nested/a.ts")).toBe(false);
   });
 
-  it("?" + " matches exactly one char within a segment", () => {
+  it("? matches exactly one char within a segment", () => {
     const re = globToRegExp("a?.ts");
     expect(re.test("ab.ts")).toBe(true);
     expect(re.test("abc.ts")).toBe(false);

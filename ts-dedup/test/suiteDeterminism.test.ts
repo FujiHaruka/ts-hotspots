@@ -14,17 +14,17 @@ import { setupRepo, type SetupRepoResult } from "../tools/bench/setupRepo.ts";
  * to catch accidental parallelism or missing tie-breaks introduced during
  * future refactors, not to re-verify what unit tests already cover.
  */
-const SUBSET_IDS = [
+const SUBSET_IDS = new Set([
   "001-exact-fn-copy",
   "004-renamed-locals",
   "008-extra-log-stmt",
   "017-tsx-component-copy",
   "021-neg-shared-domain",
-];
+]);
 
 const suiteRoot = resolve(__dirname, "fixtures/suite");
 const fixtures = loadFixtures(suiteRoot).filter((f) =>
-  SUBSET_IDS.includes(f.id),
+  SUBSET_IDS.has(f.id),
 );
 
 describe("fixture suite determinism", () => {

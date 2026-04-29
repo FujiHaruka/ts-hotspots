@@ -77,6 +77,7 @@ export async function listBaseSources(
   for (const path of paths) {
     let text: string;
     try {
+      // oxlint-disable-next-line no-await-in-loop -- sequential git show keeps child-process count bounded
       text = await gitShow(repoPath, baseSha, path);
     } catch {
       continue;

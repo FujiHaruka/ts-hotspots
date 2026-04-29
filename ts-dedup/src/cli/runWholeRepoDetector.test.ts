@@ -61,8 +61,8 @@ describe("runWholeRepoDetector", () => {
     // Whole-repo clusters have no anchor; both files should appear as
     // members of the same group.
     const matched = result.groups.some((g) => {
-      const paths = g.members.map((m) => m.fragment.filePath).sort();
-      return paths.includes("src/math.ts") && paths.includes("src/util.ts");
+      const paths = new Set(g.members.map((m) => m.fragment.filePath).sort());
+      return paths.has("src/math.ts") && paths.has("src/util.ts");
     });
     expect(matched).toBe(true);
   });

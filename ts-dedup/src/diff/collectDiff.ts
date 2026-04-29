@@ -71,6 +71,7 @@ export async function collectDiff(req: DiffRequest): Promise<CollectDiffResult> 
 
   const result: ChangedFile[] = [];
   for (const p of filtered) {
+    // oxlint-disable-next-line no-await-in-loop -- sequential git show keeps child-process count bounded
     const text = await gitShow(repoPath, headSha, p.filePath);
     result.push({
       filePath: p.filePath,

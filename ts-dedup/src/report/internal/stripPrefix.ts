@@ -10,7 +10,7 @@
  */
 export function stripPrefix(key: string): string {
   if (key.startsWith("token:")) {
-    return key.slice("token:".length).replace(/\x00/g, " ");
+    return key.slice("token:".length).replaceAll("\x00", " ");
   }
   if (key.startsWith("statement:")) {
     return key.slice("statement:".length);

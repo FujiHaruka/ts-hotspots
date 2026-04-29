@@ -20,7 +20,7 @@
   "env": {
     "builtin": true
   },
-  "ignorePatterns": ["node_modules/**", "dist/**", "test/fixtures/**"],
+  "ignorePatterns": ["**/node_modules/**", "**/dist/**", "**/test/fixtures/**"],
   "rules": {
     "no-array-constructor": "error",
     "no-unused-expressions": "error",
@@ -143,7 +143,17 @@
         "no-await-in-loop": "off",
         "unicorn/consistent-function-scoping": "off",
         "jest/no-conditional-expect": "off",
-        "jest/require-to-throw-message": "off"
+        "jest/require-to-throw-message": "off",
+        "jest/valid-expect": "off"
+      }
+    },
+    {
+      "files": ["**/tools/**"],
+      "rules": {
+        "no-await-in-loop": "off",
+        "unicorn/consistent-function-scoping": "off",
+        "unicorn/no-new-array": "off",
+        "import/no-unassigned-import": "off"
       }
     },
     {
