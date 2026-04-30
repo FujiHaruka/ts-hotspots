@@ -200,3 +200,48 @@ Intentionally excluded:
 - File axes (`callerCount` leverage substitutes well enough that neither a separate command nor composition is worthwhile)
 - MCP server packaging (CLI is sufficient)
 - Web dashboard / time-series DB / result cache (except the dismissal registry; see §9.1)
+
+---
+
+## Part B. Dedup feature
+
+## B.1 Vision
+
+A duplication-candidate detector tuned for **recall over precision**. Type-3 clones — copy-pasted regions with light edits (renamed identifiers, reordered statements, slightly different argument shapes) — are the target. Output is meant for downstream judgment, not a strict pass/fail verdict.
+
+Two modes, sharing the same back-end pipeline:
+
+- **PR mode**: given a git revrange (`A...B` / `A..B`), surface duplications between the head-side changed code and the rest of the tree.
+- **Whole-repo mode**: at one ref, surface every cluster of fragments that look like the same code.
+
+## B.2 Pipeline
+
+A 7-stage pipeline. PR / whole-repo only differ in how the front-end builds the input set; everything from feature extraction onward is shared.
+
+```
+[1] Diff Collector / Source Lister
+    ↓
+[2] Fragment Extractor    (functions, blocks, statement windows)
+    ↓
+[3] Feature Extractor     (3 axes: token n-gram / statement-kind n-gram / call-property fingerprint)
+    ↓
+[4] Inverted Index
+    ↓
+[5] Candidate Search      (union of feature axes — recall-first)
+    ↓
+[6] Similarity Scorer     (token / statement-kind / call / size, OR-gated)
+    ↓
+[7] Report Generator      (clone groups with shared evidence)
+```
+
+The index is built in memory per run; nothing is persisted. See `docs/dedup/algorithms/` for the full algorithm specification.
+
+## B.3 Fragment Granularity
+
+A duplication unit is a **fragment**, one of:
+
+- function / method / arrow function
+- control-structure block (`if` / `for` / `while` / `try` / `catch` / `switch`)
+- a sliding window of consecutive statements (to catch partial overlap that does not align with a function or block boundary)
+
+Each fragment carries the file path, line range, kind, and source text it was extracted from.
