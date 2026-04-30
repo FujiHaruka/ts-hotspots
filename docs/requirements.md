@@ -245,3 +245,26 @@ A duplication unit is a **fragment**, one of:
 - a sliding window of consecutive statements (to catch partial overlap that does not align with a function or block boundary)
 
 Each fragment carries the file path, line range, kind, and source text it was extracted from.
+
+## B.4 Features
+
+Three orthogonal feature kinds, extracted per fragment:
+
+- **Normalized token n-gram** — TypeScript tokens after normalizing identifiers / strings / numbers / booleans, dropping comments, and (optionally) dropping type annotations. Catches structural similarity that survives renaming.
+- **Statement-kind n-gram** — only the AST statement-kind sequence (`VariableStatement`, `IfStatement`, `ReturnStatement`, ...). Identifier-agnostic.
+- **Call / property fingerprint** — call-expression names and property accesses kept as-is, not normalized. High-information signal that cuts across rename-resistant noise.
+
+n-gram lengths and inclusion of each kind are configurable.
+
+## B.5 Candidate Search and Scoring
+
+Candidates are looked up via inverted indexes built per feature kind. Hits are merged across kinds with **set union**, not intersection — recall-first.
+
+Each candidate pair is then re-scored on:
+
+- token overlap
+- statement-kind similarity
+- call / property overlap
+- size compatibility (length-aware penalty for very different fragment sizes)
+
+A weighted combined score is produced. Final reporting is gated by an **OR** condition: a pair clears if the combined score crosses its threshold *or* any single axis crosses its axis-specific threshold. This keeps the false-negative rate low.
