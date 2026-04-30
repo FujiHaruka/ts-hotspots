@@ -84,7 +84,7 @@ describe("main", () => {
     const code = await main(["--repo", r.path, `${sha}..${sha}`], cap.io);
     expect(code).toBe(0);
     const out = cap.stdout();
-    expect(out).toContain("# ts-dedup report");
+    expect(out).toContain("# ts-hotspots dedup report");
     expect(out).toContain("groups: 0");
   });
 

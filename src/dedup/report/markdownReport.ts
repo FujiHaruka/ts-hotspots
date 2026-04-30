@@ -27,7 +27,7 @@ import type {
  */
 export function buildMarkdownReport(report: CloneCandidateReport): string {
   const lines: string[] = [];
-  lines.push("# ts-dedup report");
+  lines.push("# ts-hotspots dedup report");
   lines.push("");
   lines.push(`mode: ${report.summary.mode}`);
   if (report.summary.mode === "pr") {
