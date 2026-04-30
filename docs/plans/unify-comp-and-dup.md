@@ -105,7 +105,7 @@
 | D2 | `--json` の扱い | (a) `--json` を完全廃止 (b) `--format json` の別名として残す (c) 残す (恒久) | **決定: (a)**。M1 は元々破壊変更マイルストーンなので互換シムを増やさない。CHANGELOG と移行ノートで `--json → --format json` を案内 |
 | D3 | 位置引数の意味 | (a) `[path]` = tsconfig を内包するディレクトリ (両コマンド共通) (b) `[path]` = git repo ルート (c) コマンドごとに意味を変える (現状維持) | **決定: (a)**。`comp` 現挙動を踏襲し、`dup` 側は positional path から git repo root を上方探索する。サブパッケージの tsconfig を直接渡す運用も許容 (monorepo 対応)。`path` 直下に tsconfig が無い場合の子ディレクトリ探索は将来拡張として保留 |
 | D4 | `--exclude` のセマンティクス | (a) 既定に追加 (`dup` 現挙動) (b) 既定を置換 (`comp` 現挙動) (c) (a) + `--no-default-exclude` でエスケープ | **決定: (a)**。両コマンドで「ユーザー指定 glob は組み込みデフォルトに追加」で統一。`comp` の現挙動 (test 除外を置換可能) は失われるが、エスケープハッチは必要になってから追加する。test 含めたい既存ユーザー向けの移行ノートを M1 リリースに添える |
-| D5 | エラー封筒の形 | (a) `comp` 側の `{ status: "error", error: { code, message } }` を `dup` にも導入 (b) 既存の `summary` ベースの dup スキーマに `error?` を埋める | (a)。スキーマ進化のしやすさ優先 |
+| D5 | エラー封筒の形 | (a) `comp` 側の `{ status: "error", error: { code, message } }` を `dup` にも導入 (b) 既存 `summary` ベースの dup スキーマに `error?` を埋める (c) 現状維持 (`dup` は stderr のみ) | **決定: (a)**。`dup --format json` 失敗時は stdout に `{ status: "error", error: { code, message } }`、`--format markdown` 失敗時は `# ts-hotspots error` ボディを stdout に出す。stderr には人間向け詳細。エラーコード語彙 (`INVALID_REVRANGE` / `GIT_FAILED` / 等) は M2 実装時に確定。streaming 中の失敗は head 出力後に続きとしてエラーボディを追記 (`comp` の現挙動踏襲) |
 | D6 | 座標の primary 表現 | (a) `{ file, startLine, endLine }` 構造体を一次にし `location` 文字列を派生 (b) 文字列のみ | (a)。エージェントが Read tool に直接渡せるため |
 | D7 | Markdown prompt prelude | (a) `comp` と同じ "instruction + fenced JSON" 形式を `dup` にも (b) `dup` は対人 Markdown のまま、`--agent` で wrap | (a)。両コマンドで `\| claude --permission-mode plan` にパイプして同じ振る舞いになる |
 | D8 | Streaming preamble | (a) `dup` にも head 先出しを導入 (b) `dup` は処理が長い分、遅延フィードバックが許容される | (a)。`claude --permission-mode plan` の 3s detect 窓に間に合わせる |
@@ -188,3 +188,4 @@
 - **D4 (`--exclude` のセマンティクス)**: ユーザー指定 glob は組み込みデフォルトリストに追加 (案 A)。`comp` 側の "デフォルトを置換可能" な現挙動は失われる。エスケープハッチ (`--no-default-exclude` 等) は必要になってから追加する YAGNI 方針。
 - **D1 (件数制限フラグ名)**: `--limit` に統一 (案 A)。`comp` の現 `--top` は CLI から外して内部定数化 (A1)。`--full` 時の `--limit` 適用範囲は `functionHotspotCandidates[]` のみで、他の配列 (`functionRankings` / `functions[]` / `functionCoOccurrence`) は内部定数の支配下に置く (X)。`--file <path>` モードでは `--limit` を無視し stderr に警告を出す (P+warn)。`--top` の内部既定値 5 が小さすぎる件は M1 実装時に再検討する。
 - **D2 (`--json` の扱い)**: `comp --json` は M1 で完全廃止 (案 A)。互換シムは置かない。CHANGELOG に `--json → --format json` の移行ガイドを記載。
+- **D5 (エラー封筒の形)**: `comp` の `{ status: "error", error: { code, message } }` 形を `dup` にも展開 (案 A)。json モードでは stdout に JSON 封筒、markdown モードでは stdout に `# ts-hotspots error` ボディ、stderr には人間向け詳細。エラーコード体系は M2 実装時に整理 (`INVALID_REVRANGE` / `GIT_FAILED` 等の追加)。
