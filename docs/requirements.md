@@ -1,5 +1,16 @@
 # ts-hotspots — Requirements
 
+ts-hotspots is a CLI with two complementary features:
+
+- **Hotspots** (default `ts-hotspots [path]`): per-function metrics ranked into a small set of refactor-candidate coordinates. Specified in Part A below.
+- **Dedup** (`ts-hotspots dedup`): Type-3 duplication candidates, in PR mode (changed code vs. the rest of the tree) or whole-repo mode. Specified in Part B; the implementation-level algorithms live under `docs/dedup/`.
+
+Both features share a single guiding principle: **return coordinates and evidence, not verdicts.** The downstream coding agent or reviewer decides what to do.
+
+---
+
+## Part A. Hotspots feature
+
 ## 1. Vision
 
 A CLI tool that statically analyzes a TypeScript project with ts-morph and emits **coordinates and evidence** pointing out "where in the codebase the refactor-candidate hotspots live" — output shaped for handoff to coding agents (Claude Code, etc.).
