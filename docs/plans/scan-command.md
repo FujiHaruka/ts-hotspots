@@ -130,7 +130,200 @@ ts-hotspots scan [path] [options]
 
 ## 5. 統合 JSON スキーマ案
 
-> TODO
+### 5.1 設計判断
+
+スキーマ全体を貫く 4 つの判断を先に固定する。
+
+1. **座標は構造化表現を正とする**。`{ file, startLine, endLine }` を一次表現とし、`location: "file:start-end"` 文字列は人間表示用の派生フィールドとして併記する。エージェントは `Read` tool に行範囲を直接渡すため、文字列を再パースさせない方が摩擦が少ない。
+2. **スコア軸は正規化しない**。hotspot 軸 (`cognitiveComplexity`, `sloc` など) は原始指標で値域がばらばら、dedup 軸 (`combined`, `tokenOverlap` など) は 0..1 の類似度確信度。両者は意味論が違うので 0..1 への揃え込みは行わず、それぞれ native な形のまま保持する。代わりに各候補に `priority: "high" | "medium" | "low"` の **粗い順序情報** を付与し、両軸間の相対比較が必要な場面のための寄せ集め指標とする。`priority` は dedup / hotspot 各々のゲート判定からの派生で、軸合成ではないことに注意 (詳細は §5.3 / §5.4)。
+3. **hotspots と duplications は別配列で並べる**。両軸を 1 本の `items[]` に混ぜると統一順序キーが要るが、自然な比較軸が無い (hotspot は co-occurrence, dedup は群サイズ × 類似度)。読み手が必要なら統合できる形を維持しつつ、デフォルト出力は分離する。
+4. **既存スキーマの語彙は流用する**。`HotspotCandidate` / `CloneGroup` の名前は段階1 で定着しているので、`scan` の中でもそのまま使う。新規導入は最小限。
+
+### 5.2 トップレベル形状
+
+```ts
+type ScanReport = {
+  status: "ok";
+  tool: { name: "ts-hotspots"; version: string };
+
+  // どのスコープで走ったか
+  scope: ScanScope;
+
+  project: {
+    tsconfigPath: string;
+    rootDir: string;
+    sourceFileCount: number;
+    functionCount: number;
+  };
+
+  // 関数 hotspot 軸。--only dedup なら省略
+  hotspots?: HotspotsSection;
+
+  // 重複検出軸。--only hotspots、または whole-repo で --include-dedup なし時は省略
+  duplications?: DuplicationsSection;
+
+  // dismissal レジストリの状態 (両軸共通レジストリ案。§8 で論点扱い)。空なら省略
+  dismissed?: DismissedSummary;
+};
+
+type ScanScope =
+  | { mode: "default"; path: string }
+  | { mode: "pr"; baseRef: string; headRef: string; threeDot: boolean }
+  | { mode: "whole-repo"; ref: string };
+```
+
+省略可能な top-level フィールドの規則:
+
+- `--only` で除外された側の section は **キーごと存在しない** (空オブジェクトでもない)。消費側は `if (report.hotspots) ...` で分岐しやすくする。
+- 計測されたが結果が 0 件の場合は section は **存在し**、内部の配列が空になる (例: `duplications.groups = []`)。
+- 「該当なし」と「未計測」を JSON 側で区別できる、という不変条件を保つ。
+
+### 5.3 `hotspots` セクション
+
+```ts
+type HotspotsSection = {
+  candidates: ScanHotspot[];
+  // --full 相当の追加は v1 では含めない。必要なら後で `--full` を scan にも引き継ぐ
+};
+
+type ScanHotspot = {
+  priority: "high" | "medium" | "low";
+  ref: {
+    location: string;            // "file:start-end" 派生表記
+    coords: Coordinate;          // 一次表現
+    name: string;
+    kind: string;                // "FunctionDeclaration" | "MethodDeclaration" | ...
+  };
+  axes: FunctionAxisId[];        // hit した軸の配列
+  metrics: Partial<Record<FunctionAxisId, number>>;
+  dismissalId: string;
+};
+
+type Coordinate = { file: string; startLine: number; endLine: number };
+```
+
+`priority` の付け方:
+
+- **high**: 既存の co-occurrence ゲート (quality 軸 ≥ 1 を含む 3 軸以上) を満たす。
+- **medium**: discriminative top-3 救済 (quality 軸単独で top-3 入り、軸が degenerate でない) を満たす。
+- **low**: scan の `--top` を緩める将来拡張のためのプレースホルダ。v1 では出さない。
+
+これは段階1 の `HotspotCandidate.source` (`coOccurrence` / `discriminativeTop` / `both`) に 1:1 対応する写像で、新規ゲートを足しているわけではない。
+
+### 5.4 `duplications` セクション
+
+```ts
+type DuplicationsSection = {
+  mode: "pr" | "whole-repo";
+  scope: {
+    base: ScopeStats;
+    changed?: ScopeStats;        // mode === "pr" のときのみ
+  };
+  pipeline: { candidatePairs: number; reportedPairs: number };
+  groups: ScanCloneGroup[];
+};
+
+type ScanCloneGroup = {
+  priority: "high" | "medium" | "low";
+  anchor?: ScanFragment;         // PR モードのみ; whole-repo は undefined
+  members: ScanGroupMember[];
+  size: number;                  // anchor + members.length (PR) / members.length (whole-repo)
+  aggregateScores: AggregateScores;   // 既存 CloneGroup と同じ
+  sharedEvidence: Evidence;
+  recommendationHint: RecommendationHint;
+};
+
+type ScanFragment = {
+  location: string;              // "file:start-end"
+  coords: Coordinate;
+  kind: string;                  // "function" | "block" | "window"
+  code?: string;                 // --no-code で省略
+};
+
+type ScanGroupMember = {
+  fragment: ScanFragment;
+  scores: PairScores;            // 既存
+  evidence: Evidence;            // 既存
+};
+```
+
+`priority` の付け方:
+
+- **high**: `aggregateScores.combined.median ≥ 0.6` かつ `size ≥ 3`、もしくは `combined.max ≥ 0.8`。
+- **medium**: それ以外で `shouldReport` を通過したもの (= 既存 dedup の出力と同じ)。
+- **low**: v1 では出さない。
+
+閾値は M6 実装時に dogfooding で調整する前提。
+
+### 5.5 `dismissed` セクション
+
+段階1 の `DismissedSummary` と互換:
+
+```ts
+type DismissedSummary = {
+  active: number;
+  filteredThisRun: number;
+  prunedThisRun: number;
+};
+```
+
+ただし「dedup 群を dismiss できるか」は §8 の論点に残す。v1 では hotspot 軸の dismissal だけが反映される (= 既存挙動と一致)。
+
+### 5.6 サンプル出力 (PR モード, `--only` なし)
+
+```json
+{
+  "status": "ok",
+  "tool": { "name": "ts-hotspots", "version": "0.3.0" },
+  "scope": {
+    "mode": "pr",
+    "baseRef": "origin/main",
+    "headRef": "HEAD",
+    "threeDot": true
+  },
+  "project": {
+    "tsconfigPath": "/repo/tsconfig.json",
+    "rootDir": "/repo",
+    "sourceFileCount": 412,
+    "functionCount": 2871
+  },
+  "hotspots": {
+    "candidates": [
+      {
+        "priority": "high",
+        "ref": {
+          "location": "src/billing/charge.ts:120-188",
+          "coords": { "file": "src/billing/charge.ts", "startLine": 120, "endLine": 188 },
+          "name": "applyDiscount",
+          "kind": "FunctionDeclaration"
+        },
+        "axes": ["cognitiveComplexity", "maxNestingDepth", "callerCount"],
+        "metrics": { "cognitiveComplexity": 38, "maxNestingDepth": 6, "callerCount": 14 },
+        "dismissalId": "a3f9c2..."
+      }
+    ]
+  },
+  "duplications": {
+    "mode": "pr",
+    "scope": { "base": { "files": 410, "fragments": 4012, "lines": 38291, "fragmentsByKind": { "function": 1812, "block": 1421, "window": 779 }, "excludedFiles": 12 }, "changed": { "files": 5, "fragments": 47, "lines": 612, "fragmentsByKind": { "function": 12, "block": 19, "window": 16 }, "excludedFiles": 0 } },
+    "pipeline": { "candidatePairs": 134, "reportedPairs": 6 },
+    "groups": [
+      {
+        "priority": "medium",
+        "anchor": { "location": "src/billing/charge.ts:50-110", "coords": { "file": "src/billing/charge.ts", "startLine": 50, "endLine": 110 }, "kind": "function" },
+        "members": [
+          { "fragment": { "location": "src/billing/legacyCharge.ts:80-140", "coords": { "file": "src/billing/legacyCharge.ts", "startLine": 80, "endLine": 140 }, "kind": "function" }, "scores": { "combined": 0.71, "tokenOverlap": 0.78, "statementKindSimilarity": 0.81, "callOverlap": 0.55, "sizeCompatibility": 0.9, "lengthScore": 0.5 }, "evidence": { "sharedCalls": ["CALL:findCustomer"], "sharedProperties": ["PROP:user.tier"], "matchedStatementKinds": ["IfStatement|ReturnStatement"], "matchedTokenNgramsSample": ["ID DOT ID", "IF ID DOT ID"] } }
+        ],
+        "size": 2,
+        "aggregateScores": { "combined": { "min": 0.71, "median": 0.71, "max": 0.71 }, "tokenOverlap": { "min": 0.78, "median": 0.78, "max": 0.78 }, "statementKindSimilarity": { "min": 0.81, "median": 0.81, "max": 0.81 }, "callOverlap": { "min": 0.55, "median": 0.55, "max": 0.55 } },
+        "sharedEvidence": { "sharedCalls": ["CALL:findCustomer"], "sharedProperties": ["PROP:user.tier"], "matchedStatementKinds": ["IfStatement|ReturnStatement"], "matchedTokenNgramsSample": ["ID DOT ID", "IF ID DOT ID"] },
+        "recommendationHint": { "confidence": "medium", "likelyRefactoring": "extract-function", "riskFlags": [] }
+      }
+    ]
+  },
+  "dismissed": { "active": 3, "filteredThisRun": 1, "prunedThisRun": 0 }
+}
+```
 
 ## 6. ユースケース別の充足確認
 
