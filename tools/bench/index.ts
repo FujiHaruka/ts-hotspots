@@ -1,10 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { PhaseTimingsCollector } from "../../src/dedup/cli/perfLog.ts";
-import { runDetector } from "../../src/dedup/cli/runDetector.ts";
-import type { Config } from "../../src/dedup/config/index.ts";
-import { defaultConfig } from "../../src/dedup/config/index.ts";
+import { PhaseTimingsCollector } from "../../src/duplication/cli/perfLog.ts";
+import { runDetector } from "../../src/duplication/cli/runDetector.ts";
+import type { Config } from "../../src/duplication/config/index.ts";
+import { defaultConfig } from "../../src/duplication/config/index.ts";
 import { formatJson } from "./formatJson.ts";
 import { formatMarkdown } from "./formatMarkdown.ts";
 import { groupsToPairs } from "./groupsToPairs.ts";

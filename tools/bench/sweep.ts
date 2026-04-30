@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { runDetector } from "../../src/dedup/cli/runDetector.ts";
-import type { Config } from "../../src/dedup/config/index.ts";
-import { defaultConfig } from "../../src/dedup/config/index.ts";
+import { runDetector } from "../../src/duplication/cli/runDetector.ts";
+import type { Config } from "../../src/duplication/config/index.ts";
+import { defaultConfig } from "../../src/duplication/config/index.ts";
 import { groupsToPairs } from "./groupsToPairs.ts";
 import { type Fixture, loadFixtures } from "./loadFixtures.ts";
 import { matchReport } from "./matchReport.ts";

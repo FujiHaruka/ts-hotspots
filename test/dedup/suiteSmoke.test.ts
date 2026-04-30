@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runDetector } from "../../src/dedup/cli/runDetector.ts";
-import { defaultConfig } from "../../src/dedup/config/index.ts";
+import { runDetector } from "../../src/duplication/cli/runDetector.ts";
+import { defaultConfig } from "../../src/duplication/config/index.ts";
 import { groupsToPairs } from "../../tools/bench/groupsToPairs.ts";
 import { loadFixtures } from "../../tools/bench/loadFixtures.ts";
 import { matchReport } from "../../tools/bench/matchReport.ts";
