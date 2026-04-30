@@ -18,6 +18,7 @@ import { collectChurn } from "./collectors/churn/commit-count.ts";
 import { main as runDuplicationMain } from "./duplication/cli/main.ts";
 import { enumerateDeclarations } from "./collectors/enumerate-declarations.ts";
 import { enumerateSourceFiles } from "./collectors/enumerate-source-files.ts";
+import { DEFAULT_EXCLUDE_GLOBS } from "./defaults.ts";
 import {
   loadRegistry,
   pruneRegistry,
@@ -46,12 +47,17 @@ export interface WritableLike {
   write: (chunk: string) => void;
 }
 
-export const DEFAULT_EXCLUDE: readonly string[] = [
-  "**/*.{test,spec}.{ts,tsx,mts,cts}",
-];
-export const DEFAULT_TOP = 5;
+// Per-axis ranking depth used internally to seed hotspot candidate
+// computation. Not user-facing — bumping this widens the candidate pool
+// before `--limit` truncation.
+const INTERNAL_AXIS_TOP_N = 10;
+
+export const DEFAULT_LIMIT = 20;
+export const DEFAULT_FORMAT = "markdown" as const;
 export const DEFAULT_CHURN_WINDOW = 200;
 export const DEFAULT_CHURN_REF = "HEAD";
+
+type ReportFormat = "markdown" | "json";
 
 interface ChurnCliOptions {
   churnWindow?: number;
@@ -61,11 +67,11 @@ interface ChurnCliOptions {
 
 interface FunctionCliOptions extends ChurnCliOptions {
   exclude?: string[];
-  top?: number;
+  limit?: number;
   metrics?: string[];
   file?: string;
   full?: boolean;
-  json?: boolean;
+  format?: ReportFormat;
 }
 
 interface DismissCliOptions {
@@ -90,8 +96,27 @@ function parsePositiveInt(label: string, value: string): number {
   return n;
 }
 
-function parseTop(value: string): number {
-  return parsePositiveInt("--top", value);
+function parseLimit(value: string): number {
+  const trimmed = value.trim();
+  if (trimmed.toLowerCase() === "all") return Number.POSITIVE_INFINITY;
+  const n = Number.parseInt(trimmed, 10);
+  if (
+    !Number.isFinite(n) ||
+    n <= 0 ||
+    !/^\d+$/.test(trimmed)
+  ) {
+    throw new InvalidArgumentError(
+      "--limit must be a positive integer or 'all'",
+    );
+  }
+  return n;
+}
+
+function parseFormat(value: string): ReportFormat {
+  if (value === "markdown" || value === "json") return value;
+  throw new InvalidArgumentError(
+    "--format must be 'markdown' or 'json'",
+  );
 }
 
 function parseChurnWindow(value: string): number {
@@ -148,10 +173,13 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     )
     .option(
       "-e, --exclude <glob...>",
-      "exclude files matching glob(s); repeat or space-separate (defaults to test files)",
-      [...DEFAULT_EXCLUDE],
+      "extra path glob(s) to exclude on top of the built-in defaults (node_modules, dist, generated files, test files, ...)",
     )
-    .option("-t, --top <N>", "top entries per axis", parseTop, DEFAULT_TOP)
+    .option(
+      "--limit <N|all>",
+      "max entries in functionHotspotCandidates[] (default: 20). Pass 'all' to keep every candidate.",
+      parseLimit,
+    )
     .option(
       "-m, --metrics <list>",
       "comma-separated axis ids to include",
@@ -174,7 +202,11 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
       DEFAULT_CHURN_REF,
     )
     .option("--no-churn", "disable git churn collection")
-    .option("--json", "emit raw JSON instead of the default Markdown prompt")
+    .option(
+      "--format <markdown|json>",
+      "report format (default: markdown)",
+      parseFormat,
+    )
     .action((pathArg: string | undefined, opts: FunctionCliOptions) => {
       onInvoke({ kind: "complexity", positional: pathArg, options: opts });
     });
@@ -422,8 +454,20 @@ function runFunctions(
   stdout: WritableLike,
   stderr: WritableLike,
 ): number {
-  const streaming = options.json !== true;
-  const exclude = options.exclude ?? [...DEFAULT_EXCLUDE];
+  const format = options.format ?? DEFAULT_FORMAT;
+  const streaming = format !== "json";
+  const userLimit = options.limit;
+  const limit = userLimit ?? DEFAULT_LIMIT;
+  const userExclude = options.exclude ?? [];
+  const exclude = [...DEFAULT_EXCLUDE_GLOBS, ...userExclude];
+
+  // Warn (not fail) when --limit is supplied alongside a mode that ignores
+  // it, so users do not silently assume their cap was honoured.
+  if (options.file !== undefined && userLimit !== undefined) {
+    stderr.write(
+      "ts-hotspots complexity: --limit is ignored in --file mode\n",
+    );
+  }
 
   // Pre-stream validation: fast checks that can fail with a clear error before
   // we commit to streaming output. Emitting the preamble early lets `claude`
@@ -476,8 +520,9 @@ function runFunctions(
       return 0;
     }
 
-    const topN = options.top ?? DEFAULT_TOP;
-    let functionRankings = rankFunctions(functions, { topN });
+    let functionRankings = rankFunctions(functions, {
+      topN: INTERNAL_AXIS_TOP_N,
+    });
 
     if (functionAxes !== undefined) {
       functionRankings = filterFunctionRankings(functionRankings, functionAxes);
@@ -496,8 +541,11 @@ function runFunctions(
     );
 
     const bodyHashes = new Set(functions.map((f) => f.bodyHash));
-    const { candidates: functionHotspotCandidates, summary: dismissed } =
+    const { candidates: filteredCandidates, summary: dismissed } =
       applyDismissalRegistry(rootDir, rawCandidates, bodyHashes, stderr);
+    const functionHotspotCandidates = Number.isFinite(limit)
+      ? filteredCandidates.slice(0, limit)
+      : filteredCandidates;
 
     if (options.full === true) {
       const usedFunctionKeys = collectFunctionRefKeys(functionRankings);

@@ -21,13 +21,10 @@ export interface ListBaseSourcesResult {
 /**
  * Enumerate `.ts` / `.tsx` sources on the base side of the PR for indexing.
  *
- * Resolves `repoPath` to its position inside the working tree via
- * `git rev-parse --show-prefix`. When `repoPath` is the repo root the prefix
- * is empty and the whole tree is scanned; when it points at a subdirectory
- * (e.g. `packages/workflow/src`) the prefix scopes the scan to that
- * subdirectory via a pathspec. This keeps `--repo <subdir>` faithful to the
- * natural reading "look inside this path" instead of silently expanding to
- * the entire repo.
+ * `repoPath` is the git repo root (resolved by `findGitRoot` in `main.ts`),
+ * so `git rev-parse --show-prefix` returns empty and the whole tree is
+ * scanned. The pathspec branch below is kept for callers that hand in a
+ * subdirectory directly (e.g. test helpers).
  *
  * Output paths from `git ls-tree --full-tree` are repo-root-relative
  * regardless of where `repoPath` points; this matches `git show <sha>:<path>`,

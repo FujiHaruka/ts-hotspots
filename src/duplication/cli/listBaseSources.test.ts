@@ -79,9 +79,10 @@ describe("listBaseSources", () => {
     // failed for every file, silently producing an empty source list.
     //
     // Now we resolve the cwd prefix via `git rev-parse --show-prefix` and
-    // pass it as a pathspec, so `--repo <subdir>` faithfully scopes the
-    // scan to that subdirectory while still reporting paths from the repo
-    // root (which is what `git show <sha>:<path>` expects).
+    // pass it as a pathspec, so a subdir repoPath (e.g. handed in directly
+    // by a caller) faithfully scopes the scan to that subdirectory while
+    // still reporting paths from the repo root (which is what `git show
+    // <sha>:<path>` expects).
     const r = newRepo();
     r.write("packages/workflow/src/a.ts", "export const a = 1;\n");
     r.write("packages/workflow/src/b.ts", "export const b = 2;\n");

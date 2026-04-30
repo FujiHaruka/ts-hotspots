@@ -12,7 +12,11 @@ export interface PrModeArgs {
   headRef: string;
   /** `true` for `A...B` (merge-base semantics). `false` for `A..B`. */
   threeDot: boolean;
-  repoPath: string;
+  /**
+   * Optional `[path]` positional. `undefined` means "use cwd". The resolver
+   * in `main.ts` walks this path up to a git repository root.
+   */
+  path: string | undefined;
   format: ReportFormat;
   /** User-supplied glob patterns added on top of the built-in defaults. */
   excludeGlobs: string[];
@@ -38,7 +42,8 @@ export interface WholeRepoModeArgs {
   mode: "whole-repo";
   /** Commit / branch / tag to scan. */
   ref: string;
-  repoPath: string;
+  /** See `PrModeArgs.path`. */
+  path: string | undefined;
   format: ReportFormat;
   excludeGlobs: string[];
   /** See `PrModeArgs.phaseTimings`. */
@@ -64,13 +69,17 @@ export class ArgParseError extends Error {
 }
 
 export const USAGE = `Usage:
-  ts-hotspots duplication <revrange> [options]                   (PR mode)
-  ts-hotspots duplication --whole-repo [--ref <ref>] [options]   (whole-repo mode)
+  ts-hotspots duplication <revrange> [path] [options]                 (PR mode)
+  ts-hotspots duplication --whole-repo [--ref <ref>] [path] [options] (whole-repo mode)
 
 PR mode compares the head side of <revrange> against the rest of the
 codebase on the base side. Whole-repo mode scans every fragment at one
 ref and reports duplicate pairs across the whole tree. The report is
 written to stdout; redirect it to a file if you want to keep it.
+
+[path] points at a directory inside a git repository. The repo root is
+discovered by walking up from [path] until a .git entry is found
+(default: cwd).
 
 <revrange> is a git-style revision range:
   A...B   diff from merge-base(A, B) to B (PR semantics; recommended)
@@ -83,7 +92,6 @@ Options:
                            <revrange>).
   --ref <ref>              Commit/branch/tag to scan in --whole-repo mode
                            (default: HEAD).
-  --repo <path>            Path to the git repository (default: cwd)
   --format markdown|json   Report format (default: markdown)
   --exclude <glob>         Extra path glob to exclude (repeatable). Added on
                            top of the built-in defaults (node_modules,
@@ -104,7 +112,7 @@ Options:
 Examples:
   ts-hotspots duplication origin/main... > report.md
   ts-hotspots duplication origin/main...HEAD --format json > report.json
-  ts-hotspots duplication main..feature --repo ./my-repo
+  ts-hotspots duplication main..feature ./my-repo
   ts-hotspots duplication origin/main... --exclude 'src/legacy/**' --exclude '**/*.gen.ts'
   ts-hotspots duplication --whole-repo --format json > report.json
   ts-hotspots duplication --whole-repo --ref release/v2 --exclude 'src/legacy/**'
@@ -146,22 +154,21 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
   const ref = values.ref;
   const format = parseFormat(values.format);
   const excludeGlobs = parseExcludeGlobs(values.exclude);
-  const repoPath = values.repo ?? process.cwd();
   const phaseTimings = parsePhaseTimingsLevel(values["phase-timings"]);
   const limit = parseLimit(values.limit);
   const includeCode = values["no-code"] !== true;
 
   if (wholeRepo) {
-    if (positionals.length > 0) {
+    if (positionals.length > 1) {
       throw new ArgParseError(
-        "<revrange> cannot be combined with --whole-repo",
+        `expected at most one positional [path], got: ${positionals.join(" ")}`,
       );
     }
     return {
       kind: "run",
       mode: "whole-repo",
       ref: ref ?? "HEAD",
-      repoPath,
+      path: positionals[0],
       format,
       excludeGlobs,
       phaseTimings,
@@ -179,9 +186,9 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
       "missing revrange argument (e.g. origin/main...) or pass --whole-repo",
     );
   }
-  if (positionals.length > 1) {
+  if (positionals.length > 2) {
     throw new ArgParseError(
-      `expected a single revrange, got: ${positionals.join(" ")}`,
+      `expected at most <revrange> and [path], got: ${positionals.join(" ")}`,
     );
   }
 
@@ -205,7 +212,7 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
     baseRef: revRange.baseRef,
     headRef: revRange.headRef,
     threeDot: revRange.threeDot,
-    repoPath,
+    path: positionals[1],
     format,
     excludeGlobs,
     phaseTimings,
@@ -298,7 +305,6 @@ function parseExcludeGlobs(values: string[] | undefined): string[] {
 }
 
 const OPTIONS = {
-  repo: { type: "string" },
   format: { type: "string" },
   exclude: { type: "string", multiple: true },
   "whole-repo": { type: "boolean" },
@@ -310,7 +316,6 @@ const OPTIONS = {
 } as const;
 
 interface ParsedValues {
-  repo?: string;
   format?: string;
   exclude?: string[];
   "whole-repo"?: boolean;

@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { defaultConfig } from "../config/index.ts";
 import type { CloneCandidateReport } from "../domain/index.ts";
 import { buildMarkdownReport } from "../report/index.ts";
@@ -6,6 +7,23 @@ import { ArgParseError, parseCliArgs, USAGE } from "./args.ts";
 import { JsonlPerfLogger, type PerfLogger } from "./perfLog.ts";
 import { runDetector } from "./runDetector.ts";
 import { runWholeRepoDetector } from "./runWholeRepoDetector.ts";
+
+/**
+ * Walk up from `start` until a `.git` entry is found, returning that
+ * directory. `.git` may be a directory (normal repo) or a file (worktree
+ * / submodule), so we test for either via `existsSync`.
+ */
+function findGitRoot(start: string): string {
+  let cur = resolve(start);
+  while (true) {
+    if (existsSync(join(cur, ".git"))) return cur;
+    const parent = dirname(cur);
+    if (parent === cur) {
+      throw new Error(`not in a git repository: ${start}`);
+    }
+    cur = parent;
+  }
+}
 
 export interface DuplicationWritable {
   write: (chunk: string) => unknown;
@@ -59,7 +77,14 @@ export async function main(
     return 0;
   }
 
-  const repoPath = resolve(args.repoPath || io.cwd());
+  let repoPath: string;
+  try {
+    repoPath = findGitRoot(args.path ?? io.cwd());
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    io.stderr.write(`ts-hotspots duplication: ${msg}\n`);
+    return 1;
+  }
 
   const config =
     args.excludeGlobs.length === 0
