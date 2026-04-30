@@ -64,8 +64,8 @@ export class ArgParseError extends Error {
 }
 
 export const USAGE = `Usage:
-  ts-hotspots dedup <revrange> [options]                   (PR mode)
-  ts-hotspots dedup --whole-repo [--ref <ref>] [options]   (whole-repo mode)
+  ts-hotspots duplication <revrange> [options]                   (PR mode)
+  ts-hotspots duplication --whole-repo [--ref <ref>] [options]   (whole-repo mode)
 
 PR mode compares the head side of <revrange> against the rest of the
 codebase on the base side. Whole-repo mode scans every fragment at one
@@ -102,18 +102,18 @@ Options:
   -h, --help               Show this help and exit
 
 Examples:
-  ts-hotspots dedup origin/main... > report.md
-  ts-hotspots dedup origin/main...HEAD --format json > report.json
-  ts-hotspots dedup main..feature --repo ./my-repo
-  ts-hotspots dedup origin/main... --exclude 'src/legacy/**' --exclude '**/*.gen.ts'
-  ts-hotspots dedup --whole-repo --format json > report.json
-  ts-hotspots dedup --whole-repo --ref release/v2 --exclude 'src/legacy/**'
-  ts-hotspots dedup --whole-repo --phase-timings 2> perf.log
-  ts-hotspots dedup --whole-repo --phase-timings=verbose 2> perf.log
+  ts-hotspots duplication origin/main... > report.md
+  ts-hotspots duplication origin/main...HEAD --format json > report.json
+  ts-hotspots duplication main..feature --repo ./my-repo
+  ts-hotspots duplication origin/main... --exclude 'src/legacy/**' --exclude '**/*.gen.ts'
+  ts-hotspots duplication --whole-repo --format json > report.json
+  ts-hotspots duplication --whole-repo --ref release/v2 --exclude 'src/legacy/**'
+  ts-hotspots duplication --whole-repo --phase-timings 2> perf.log
+  ts-hotspots duplication --whole-repo --phase-timings=verbose 2> perf.log
 `;
 
 /**
- * Parse ts-hotspots dedup argv. Throws `ArgParseError` with a user-facing message on
+ * Parse ts-hotspots duplication argv. Throws `ArgParseError` with a user-facing message on
  * missing or malformed positional, unknown flags, etc. Returns a `"help"`
  * variant for `--help` / `-h` so the caller can render usage and exit 0.
  */

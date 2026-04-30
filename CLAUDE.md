@@ -6,12 +6,12 @@ ts-hotspots is a CLI that statically analyzes a TypeScript project and hands cod
 
 It exposes two parallel features as subcommands of one binary:
 
-- **Hotspots** (default): per-function metrics ranked into refactor-candidate coordinates. ts-morph backed (TypeChecker enabled). The primary ranking unit is the function (including methods, arrow functions, and TSX components); file-level rankings are returned alongside.
-- **Dedup** (`ts-hotspots dedup`): Type-3 duplication candidates in PR mode (`<revrange>`) or whole-repo mode (`--whole-repo`). Uses the `typescript` compiler API directly (no ts-morph) and shells out to git for diff/source listing.
+- **Complexity** (`ts-hotspots complexity`, alias `comp`): per-function metrics ranked into refactor-candidate coordinates. ts-morph backed (TypeChecker enabled). The primary ranking unit is the function (including methods, arrow functions, and TSX components); file-level rankings are returned alongside.
+- **Duplication** (`ts-hotspots duplication`, alias `dup`): Type-3 duplication candidates in PR mode (`<revrange>`) or whole-repo mode (`--whole-repo`). Uses the `typescript` compiler API directly (no ts-morph) and shells out to git for diff/source listing. Internally referred to as "dedup" in module/directory names (`src/dedup/`).
 
-See `docs/requirements.md` for the full spec (Part A = hotspots, Part B = dedup). Dedup algorithm internals live under `docs/dedup/algorithms/` and mirror the pipeline stages in `src/dedup/`.
+See `docs/requirements.md` for the full spec (Part A = complexity, Part B = duplication). Duplication algorithm internals live under `docs/dedup/algorithms/` and mirror the pipeline stages in `src/dedup/`.
 
-## Dedup maintenance notes
+## Duplication maintenance notes
 
 - **Module layout mirrors the pipeline.** `src/dedup/{diff,indexer,features,index_,search,scoring,report,cli}/` map to the 7-stage pipeline. The trailing underscore in `index_/` is intentional — Node's loader treats `index.ts` specially when adjacent to `index/`, and the underscore avoids the collision.
 - **Determinism is a hard invariant.** Same input ⇒ bit-identical output, including ordering of groups, members, and evidence keys. If you add a new feature kind, sort it through every aggregation seam.

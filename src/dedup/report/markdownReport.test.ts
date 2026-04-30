@@ -69,7 +69,7 @@ describe("buildMarkdownReport", () => {
       summary: STUB_PR_SUMMARY,
       groups: [],
     });
-    expect(md).toContain("# ts-hotspots dedup report");
+    expect(md).toContain("# ts-hotspots duplication report");
     expect(md).toContain("base: deadbeef");
     expect(md).toContain("head: cafef00d");
     expect(md).toContain("groups: 0");
