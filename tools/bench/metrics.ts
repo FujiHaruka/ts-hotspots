@@ -1,4 +1,4 @@
-import type { PhaseTimingsRecord } from "../../src/dedup/cli/perfLog.ts";
+import type { PhaseTimingsRecord } from "../../src/duplication/cli/perfLog.ts";
 import type { MatchResult } from "./matchReport.ts";
 
 /** Re-export for the rest of the bench tool chain. */

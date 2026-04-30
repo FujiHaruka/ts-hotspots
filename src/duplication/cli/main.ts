@@ -7,13 +7,13 @@ import { JsonlPerfLogger, type PerfLogger } from "./perfLog.ts";
 import { runDetector } from "./runDetector.ts";
 import { runWholeRepoDetector } from "./runWholeRepoDetector.ts";
 
-export interface DedupWritable {
+export interface DuplicationWritable {
   write: (chunk: string) => unknown;
 }
 
 export interface MainIO {
-  stdout: DedupWritable;
-  stderr: DedupWritable;
+  stdout: DuplicationWritable;
+  stderr: DuplicationWritable;
   cwd: () => string;
 }
 

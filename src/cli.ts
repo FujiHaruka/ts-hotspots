@@ -15,7 +15,7 @@ import {
 } from "./aggregator/rank.ts";
 import { runDismiss, runListDismissed, runUndismiss } from "./cli/dismiss.ts";
 import { collectChurn } from "./collectors/churn/commit-count.ts";
-import { main as runDedupMain } from "./dedup/cli/main.ts";
+import { main as runDuplicationMain } from "./duplication/cli/main.ts";
 import { enumerateDeclarations } from "./collectors/enumerate-declarations.ts";
 import { enumerateSourceFiles } from "./collectors/enumerate-source-files.ts";
 import {
@@ -613,7 +613,7 @@ export async function run(
   }
 
   if (invocation.kind === "duplication") {
-    return await runDedupMain(invocation.argv, {
+    return await runDuplicationMain(invocation.argv, {
       stdout,
       stderr,
       cwd: () => process.cwd(),

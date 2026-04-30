@@ -1,8 +1,8 @@
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runDetector } from "../../src/dedup/cli/runDetector.ts";
-import { runWholeRepoDetector } from "../../src/dedup/cli/runWholeRepoDetector.ts";
-import { defaultConfig } from "../../src/dedup/config/index.ts";
+import { runDetector } from "../../src/duplication/cli/runDetector.ts";
+import { runWholeRepoDetector } from "../../src/duplication/cli/runWholeRepoDetector.ts";
+import { defaultConfig } from "../../src/duplication/config/index.ts";
 import { loadFixtures } from "../../tools/bench/loadFixtures.ts";
 import { setupRepo, type SetupRepoResult } from "../../tools/bench/setupRepo.ts";
 

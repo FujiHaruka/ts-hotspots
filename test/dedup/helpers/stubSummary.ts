@@ -1,7 +1,7 @@
 import type {
   AnalysisSummary,
   ScopeStats,
-} from "../../../src/dedup/domain/report.ts";
+} from "../../../src/duplication/domain/report.ts";
 
 /**
  * Zero-filled `ScopeStats` for tests that don't exercise the analysis
