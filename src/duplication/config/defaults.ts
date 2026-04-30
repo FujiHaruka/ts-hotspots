@@ -1,35 +1,9 @@
+import { DEFAULT_EXCLUDE_GLOBS } from "../../defaults.ts";
 import type { Config } from "./config.ts";
-
-export const defaultExcludeGlobs: string[] = [
-  "node_modules/**",
-  "dist/**",
-  "build/**",
-  "out/**",
-  "coverage/**",
-  "**/*.generated.ts",
-  "**/*.generated.tsx",
-  "**/__generated__/**",
-  "**/vendor/**",
-  "**/*.lock",
-  "pnpm-lock.yaml",
-  "package-lock.json",
-  "yarn.lock",
-  "**/__snapshots__/**",
-  "**/*.snap",
-  "**/migrations/**",
-  "**/fixtures/**",
-  // Test files: structurally similar describe/it blocks otherwise dominate
-  // the candidate list and drown out real refactor opportunities.
-  "**/*.test.ts",
-  "**/*.test.tsx",
-  "**/*.spec.ts",
-  "**/*.spec.tsx",
-  "**/__tests__/**",
-];
 
 export const defaultConfig: Config = {
   exclude: {
-    globs: defaultExcludeGlobs,
+    globs: [...DEFAULT_EXCLUDE_GLOBS],
   },
   fragment: {
     statementWindowSizes: [5, 10],

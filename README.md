@@ -45,10 +45,10 @@ Solution-style monorepos (root `tsconfig.json` with `references`) are supported 
 
 Options:
 
-- `--json` emit raw JSON instead of the default Markdown prompt
-- `--top <N>` top N entries per axis (default: 5)
+- `--format markdown|json` output format (default: markdown)
+- `--limit <N|all>` cap `functionHotspotCandidates[]` at the top N (default: 20). Pass `all` to keep every candidate.
 - `--metrics <list>` comma-separated axis ids to include
-- `--exclude <glob...>` files to exclude
+- `--exclude <glob...>` extra path globs to drop (repeatable; built-in defaults already cover `node_modules`, `dist`, generated files, and tests)
 - `--file <path>` single-file drill-down (returns raw metrics for every function in the file)
 - `--full` include `functionRankings`, `functionAxisMeta`, `functionCoOccurrence`, and `functions[]` alongside the candidates
 
@@ -78,10 +78,12 @@ Stale entries (function deleted or edited) are pruned automatically on each run.
 It runs in two modes:
 
 ```
-ts-hotspots duplication <revrange>            # PR mode: changed code vs. the rest of the tree
-ts-hotspots duplication --whole-repo          # whole-repo mode: every duplicate cluster at one ref
-ts-hotspots dup --whole-repo                  # short alias
+ts-hotspots duplication <revrange> [path]            # PR mode: changed code vs. the rest of the tree
+ts-hotspots duplication --whole-repo [path]          # whole-repo mode: every duplicate cluster at one ref
+ts-hotspots dup --whole-repo                         # short alias
 ```
+
+`[path]` points at a directory inside a git repository; the repo root is discovered by walking up until a `.git` entry is found (defaults to the current directory).
 
 `<revrange>` is the standard git form: `A...B` (merge-base vs. head, recommended for PRs), `A..B` (direct), `A...` / `...B` (HEAD on the open side).
 
@@ -98,7 +100,6 @@ Output is a clone-group report. Each group bundles a set of fragments that look 
 
 Common options:
 
-- `--repo <path>` repository root (default: current directory)
 - `--format markdown|json` output format (default: markdown)
 - `--exclude <glob>` extra path glob to drop (repeatable; built-in defaults already cover `node_modules`, `dist`, generated files, and tests)
 - `--limit <N|all>` cap the group list at the top N groups by combined score (default: 20)

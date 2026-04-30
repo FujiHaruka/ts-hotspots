@@ -81,7 +81,7 @@ describe("main", () => {
     const sha = r.commit("only");
 
     const cap = captureIO();
-    const code = await main(["--repo", r.path, `${sha}..${sha}`], cap.io);
+    const code = await main([`${sha}..${sha}`, r.path], cap.io);
     expect(code).toBe(0);
     const out = cap.stdout();
     expect(out).toContain("# ts-hotspots duplication report");
@@ -95,7 +95,7 @@ describe("main", () => {
 
     const cap = captureIO();
     const code = await main(
-      ["--repo", r.path, "--format", "json", `${sha}..${sha}`],
+      [`${sha}..${sha}`, r.path, "--format", "json"],
       cap.io,
     );
     expect(code).toBe(0);
@@ -139,7 +139,7 @@ describe("main", () => {
 
     const baseline = captureIO();
     const baselineCode = await main(
-      ["--repo", r.path, "--format", "json", `${baseSha}..${headSha}`],
+      [`${baseSha}..${headSha}`, r.path, "--format", "json"],
       baseline.io,
     );
     expect(baselineCode).toBe(0);
@@ -151,13 +151,12 @@ describe("main", () => {
     const filtered = captureIO();
     const filteredCode = await main(
       [
-        "--repo",
+        `${baseSha}..${headSha}`,
         r.path,
         "--format",
         "json",
         "--exclude",
         "base/**",
-        `${baseSha}..${headSha}`,
       ],
       filtered.io,
     );
@@ -168,14 +167,15 @@ describe("main", () => {
     expect(filteredReport.groups).toEqual([]);
   });
 
-  it("returns 1 and writes an error to stderr when the repo path is invalid", async () => {
+  it("returns 1 and writes an error to stderr when the path is not in a git repo", async () => {
     const cap = captureIO();
     const code = await main(
-      ["main..feature", "--repo", "/path/does/not/exist"],
+      ["main..feature", "/path/does/not/exist"],
       cap.io,
     );
     expect(code).toBe(1);
     expect(cap.stderr()).toMatch(/ts-hotspots duplication:/);
+    expect(cap.stderr()).toContain("not in a git repository");
   });
 
   it("--phase-timings emits a JSON Lines perf log on stderr", async () => {
@@ -185,7 +185,7 @@ describe("main", () => {
 
     const cap = captureIO();
     const code = await main(
-      ["--repo", r.path, "--phase-timings", `${sha}..${sha}`],
+      [`${sha}..${sha}`, r.path, "--phase-timings"],
       cap.io,
     );
     expect(code).toBe(0);
@@ -223,7 +223,7 @@ describe("main", () => {
     const sha = r.commit("only");
 
     const cap = captureIO();
-    await main(["--repo", r.path, `${sha}..${sha}`], cap.io);
+    await main([`${sha}..${sha}`, r.path], cap.io);
     const stderr = cap.stderr();
     for (const line of stderr.split("\n")) {
       expect(line.startsWith("{")).toBe(false);
@@ -267,7 +267,7 @@ describe("main", () => {
 
     const unlimited = captureIO();
     const codeAll = await main(
-      ["--repo", r.path, "--whole-repo", "--format", "json", "--limit", "all"],
+      ["--whole-repo", r.path, "--format", "json", "--limit", "all"],
       unlimited.io,
     );
     expect(codeAll).toBe(0);
@@ -279,7 +279,7 @@ describe("main", () => {
 
     const capped = captureIO();
     const codeCap = await main(
-      ["--repo", r.path, "--whole-repo", "--format", "json", "--limit", "1"],
+      ["--whole-repo", r.path, "--format", "json", "--limit", "1"],
       capped.io,
     );
     expect(codeCap).toBe(0);
@@ -300,7 +300,7 @@ describe("main", () => {
     const sha = r.commit("only");
 
     const cap = captureIO();
-    await main(["--repo", r.path, `${sha}..${sha}`], cap.io);
+    await main([`${sha}..${sha}`, r.path], cap.io);
     expect(cap.stderr()).toMatch(/displayed=\d+(?! of)/);
   });
 
@@ -331,7 +331,7 @@ describe("main", () => {
 
     const cap = captureIO();
     const code = await main(
-      ["--repo", r.path, "--whole-repo", "--format", "json"],
+      ["--whole-repo", r.path, "--format", "json"],
       cap.io,
     );
     expect(code).toBe(0);

@@ -2,10 +2,9 @@ import { describe, expect, it } from "vitest";
 import { ArgParseError, parseCliArgs } from "./args.ts";
 
 describe("parseCliArgs", () => {
-  it("parses a three-dot revrange with options", () => {
+  it("parses a three-dot revrange with options and positional [path]", () => {
     const r = parseCliArgs([
       "origin/main...feature",
-      "--repo",
       "/tmp/x",
       "--format",
       "json",
@@ -16,7 +15,7 @@ describe("parseCliArgs", () => {
       baseRef: "origin/main",
       headRef: "feature",
       threeDot: true,
-      repoPath: "/tmp/x",
+      path: "/tmp/x",
       format: "json",
       excludeGlobs: [],
       phaseTimings: undefined,
@@ -53,12 +52,12 @@ describe("parseCliArgs", () => {
     expect(r.threeDot).toBe(true);
   });
 
-  it("falls back to process.cwd() when --repo is omitted", () => {
+  it("leaves path undefined when no positional [path] is given", () => {
     const r = parseCliArgs(["main..feature"]);
     if (r.kind !== "run" || r.mode !== "pr") {
       throw new Error("expected pr mode");
     }
-    expect(r.repoPath).toBe(process.cwd());
+    expect(r.path).toBeUndefined();
   });
 
   it("returns help when --help is passed", () => {
@@ -74,10 +73,18 @@ describe("parseCliArgs", () => {
     expect(() => parseCliArgs(["main"])).toThrow(ArgParseError);
   });
 
-  it("throws ArgParseError when more than one positional is given", () => {
-    expect(() => parseCliArgs(["main..feature", "extra"])).toThrow(
-      ArgParseError,
-    );
+  it("accepts a second positional as [path]", () => {
+    const r = parseCliArgs(["main..feature", "/tmp/repo"]);
+    if (r.kind !== "run" || r.mode !== "pr") {
+      throw new Error("expected pr mode");
+    }
+    expect(r.path).toBe("/tmp/repo");
+  });
+
+  it("throws ArgParseError when more than two positionals are given", () => {
+    expect(() =>
+      parseCliArgs(["main..feature", "/tmp/repo", "extra"]),
+    ).toThrow(ArgParseError);
   });
 
   it("throws ArgParseError on unknown flags", () => {
@@ -126,13 +133,21 @@ describe("parseCliArgs", () => {
       kind: "run",
       mode: "whole-repo",
       ref: "HEAD",
-      repoPath: process.cwd(),
+      path: undefined,
       format: "markdown",
       excludeGlobs: [],
       phaseTimings: undefined,
       limit: 20,
       includeCode: true,
     });
+  });
+
+  it("accepts a positional [path] in whole-repo mode", () => {
+    const r = parseCliArgs(["--whole-repo", "/tmp/repo"]);
+    if (r.kind !== "run" || r.mode !== "whole-repo") {
+      throw new Error("expected whole-repo mode");
+    }
+    expect(r.path).toBe("/tmp/repo");
   });
 
   it("treats bare --phase-timings as level 'summary'", () => {
@@ -185,9 +200,9 @@ describe("parseCliArgs", () => {
     expect(r.ref).toBe("release/v2");
   });
 
-  it("rejects --whole-repo combined with a positional revrange", () => {
+  it("rejects more than one positional alongside --whole-repo", () => {
     expect(() =>
-      parseCliArgs(["origin/main...", "--whole-repo"]),
+      parseCliArgs(["--whole-repo", "/tmp/a", "/tmp/b"]),
     ).toThrow(ArgParseError);
   });
 
