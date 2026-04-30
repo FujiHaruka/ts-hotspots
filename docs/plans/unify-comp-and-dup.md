@@ -1,8 +1,18 @@
 ## `comp` / `dup` 段階的統合 計画
 
-> Status: Draft
+> Status: Decisions finalized, implementation pending
 > Goal: `complexity` (`comp`) と `duplication` (`dup`) は別コマンドのまま、ユーザー体験 (CLI シェイプ・出力スキーマ・エージェント向け表現) を一貫させる。
 > 非 Goal: `scan` のような単一コマンドへの再統合 (検討済み・採用しない。`docs/plans/scan-command.md` を削除した経緯はこの文書で吸収する)。
+
+## 0. Progress
+
+このセクションは進捗トラッカ。各 M 完了時にチェックを埋める。"次のマイルストーン" は最初の未チェック項目を指す。
+
+- [ ] **M1** — フラグ語彙の統一 (破壊変更含): `--limit` / `--format` / `[path]` / `--exclude` / `--json` 廃止 / `--repo` 廃止 / `--top` CLI 削除 / help text 揃え
+- [ ] **M2** — JSON 封筒の統一 (破壊変更含): `status` / `tool` / エラー envelope / 座標文字列化 / `comp:` prefix 先取り + registry migration
+- [ ] **M3** — Markdown 表現の統一 (加算): agent-first wrap を `dup` にも / streaming head / stderr stats line
+- [ ] **M4** — `comp --pr <revrange>` 追加 (加算): changed files に絞った hotspot 出力 / `parseRevRange` 共有
+- [ ] **M5** — `dup` の dismissal 追加 (加算): 群正規化 hash + `dup:` prefix routing
 
 ## 1. 経緯
 
