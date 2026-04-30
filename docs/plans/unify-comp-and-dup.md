@@ -78,7 +78,7 @@
 | プロジェクト位置指定 | 位置引数 `[path]` を両コマンドで受け、内部で tsconfig / git repo を導出 |
 | `--exclude` セマンティクス | 既定リストへの **追加** で統一 (`dup` の現挙動に寄せる) |
 | エラー封筒 | stdout に `{ status: "error", error: { code, message } }` を JSON / Markdown それぞれの形で吐く |
-| `tool: { name, version }` | 両コマンドの JSON / Markdown 双方の先頭に出す |
+| `tool: { name, version }` | JSON 出力の先頭、Markdown body 冒頭 (head の instruction セクションには含まない; D8/B1 と整合) |
 | 座標一次表現 | `location: "file:start-end"` 文字列のみ (`comp` 形に統一; LLM トークン経済優先) |
 | Markdown プロンプト wrap | `dup` にも agent-first 冒頭プロンプトを入れる |
 | ストリーミング先頭出力 | 重い処理前に Markdown head を flush する挙動を両者で揃える |
@@ -115,16 +115,17 @@
 
 ## 5. マイルストーン
 
-各 M は独立してリリース可能。M1+M2 は破壊変更を含むため 0.x 系のバージョンを 1 段上げる想定。M3 以降は加算的。
+各 M は基本的に独立してリリース可能。例外として M5 は M2 (envelope) 後を前提とする — M5 で `comp` の `dismissalId` 形式変更が `comp:<sha256>` 形に入り、これが M2 の envelope 破壊変更に続く 2 段目の軽微な破壊変更となる。M1 + M2 + M5 は破壊変更を含むため 0.x 系のバージョンを段階的に上げる。M3 / M4 は加算的。
 
 ### M1 — フラグ語彙の統一 (破壊変更含)
 
 決定: D1 / D2 / D3 / D4。
 
-- 両コマンドで `--format markdown|json` を採用。`comp --json` は別名として残す (D2)。
-- `dup` で位置引数 `[path]` を受け付け、git repo root を上方探索する (D3)。`--repo` も別名として残す。
-- `--exclude` は両コマンドで「既定リストに追加」セマンティクスに統一 (D4)。`comp` の現挙動 (test 除外を置換可能) は失われるので、test も含めたいときは `--exclude '!**/*.test.ts'` 等のネガティブ glob 追加も同時に検討する (mod 案: 別 flag `--no-default-exclude`)。
-- 件数制限フラグ名 (D1) を確定し、片方は alias として残す。
+- 件数制限フラグを `--limit` に統一 (D1)。`comp` の `--top` は CLI から完全削除 (内部定数化)。`--full` モードでの `--limit` は `functionHotspotCandidates[]` のみに適用、`--file <path>` モードでは無視 + stderr 警告。
+- 出力形式フラグを `--format markdown|json` に統一 (D2)。`comp --json` は完全廃止、互換 alias は置かない。
+- 位置引数 `[path]` を `dup` でも受け付け、tsconfig 親ディレクトリ意味論に統一 (D3)。`dup` 側は path から git repo root を上方探索する。`--repo` 既存フラグの去就 (廃止 / 別名残し / 恒久) は §7 で要決定。
+- `--exclude` を両コマンドで「組み込みデフォルトに追加」セマンティクスに統一 (D4)。統一後のデフォルトは `dup` 現在の 17 件 (`node_modules/**`, `dist/**`, `**/*.{test,spec}.*` 等) をベースにする。`comp` の現デフォルト (`**/*.{test,spec}.{ts,tsx,mts,cts}`) は dup 側に内包されるので merge は二重定義にならない。エスケープハッチ (`--no-default-exclude` 等) は YAGNI で足さない。
+- ヘルプテキスト (commander auto / 手書き USAGE) を新フラグ語彙に揃える。両コマンドで help format の "形" が揃って見えることを目視確認する。
 
 検証: 既存 e2e テスト + `tools/check-strip-only.ts` + 新規追加の "両コマンドが同じフラグを同じ意味で受ける" cross-CLI テスト。
 
@@ -134,10 +135,10 @@
 
 決定: D5 / D6。
 
-- 両コマンドの JSON 出力に `{ status: "ok" \| "error", tool: { name, version }, ...}` の共通封筒を導入。
-- 失敗時は stdout に `{ status: "error", error: { code, message } }` を出し、stderr には人間向け詳細を出す (`comp` の現行挙動を `dup` にも展開)。
-- 座標の一次表現を `{ file, startLine, endLine }` 構造体に揃える (`comp` 側の `location` 文字列を併記する派生フィールドにする)。
-- スキーマ型 (`schema.ts` / `domain/`) を更新し、両側で同名の `Coordinate` 型を共有する (両者の出力 JSON が `Coordinate` の同一形を持つ、というレベルの共有。型は重複定義してよい)。
+- 両コマンドの JSON 出力に `{ status: "ok" | "error", tool: { name, version }, ... }` の共通封筒を導入 (D5)。
+- 失敗時は stdout に `{ status: "error", error: { code, message } }` を出し、stderr には人間向け詳細 (`comp` 現挙動を `dup` にも展開)。エラーコード語彙 (`INVALID_REVRANGE` / `GIT_FAILED` / 等) は実装時に確定。streaming 中の失敗は head 出力後に body にエラーを追記する `comp` パターンを踏襲。
+- 座標の一次表現を `location: "file:start-end"` 文字列に統一 (D6)。`dup` の `{ file, startLine, endLine }` 構造体は出力 JSON / Markdown から削除し、文字列のみを露出。reporter 内部で line 情報が必要な場面は構造体を保持してよいが、表面には出さない。
+- `comp` の `dismissalId` を `comp:<sha256>` 形式に M2 で先取り変更するかは要決定 (M5 の registry migration 範囲との trade-off; §7 で議論)。
 
 検証: snapshot テスト 2 種 (`comp` / `dup` ともに ok / error の 2 ケース)。`docs/dogfooding-prompt.md` の手順を更新し、エージェントが両出力を同じ envelope ロジックで扱えることを確認。
 
@@ -145,9 +146,10 @@
 
 決定: D7 / D8。
 
-- `dup` の Markdown 出力に agent-first 冒頭プロンプトを差し込む。`comp` 側の prelude を抽象化し、feature 名と入力概要だけ差し替える形にする。
-- `dup` でも長時間ジョブ前に Markdown head を flush し、`\| claude --permission-mode plan` の検出窓に間に合わせる (D8)。
-- `src/reporter/render.ts` から共通 helper を抽出 (`renderHead({ feature, scope })` / `renderErrorBody`)、`comp` / `dup` の reporter から呼ぶ。実装の重複は許容、共通化は表面文言と構造だけ。
+- `dup` の Markdown 出力を agent-first wrap (instruction + fenced JSON) に置き換える (D7)。`comp` 側の prelude を抽象化し、feature 名と入力概要だけ差し替える形にする。`dup` の現対人 Markdown レンダラ (`buildMarkdownReport`) は廃止。
+- `dup` でも処理開始前に Markdown head を flush し、`| claude --permission-mode plan` の 3s detect 窓に間に合わせる (D8)。head は instruction のみ (B1; scope 情報は body 側)。
+- stderr 統計行を両コマンドで共通フォーマット (`ts-hotspots <cmd>: ...`) に揃える。`comp` 側 (現状 stats 行なし) にも同形の 1 行サマリを追加する。
+- `src/reporter/render.ts` から共通 helper を抽出 (`renderHead({ feature })` / `renderErrorBody` / `renderStatsLine`)、`comp` / `dup` の reporter から呼ぶ。実装の重複は許容、共通化は表面文言と構造だけ。
 
 検証: snapshot テスト + `docs/dogfooding-prompt.md` を 1 リポで実機回し、両コマンドの prelude が同じ "形" になっていることを目視確認。
 
@@ -155,13 +157,14 @@
 
 決定: D9。
 
-- `comp --pr <revrange>` を新規追加。意味論は scan §8.1 の (c) を採用: 既定は changed files に属する関数のみ、`--full-tree-hotspots` で従来の repo 全体に戻せる。
+- `comp --pr <revrange>` を新規追加 (D9)。出力は changed files に属する関数のみ。`--full-tree-hotspots` 等のエスケープは設けない (`--pr` を外せば従来挙動)。
+- ranking 計算は head ref 全体で走らせ、出力段でフィルタする (分布が壊れないように)。これは D9 で確定済みの実装方針。
 - diff の解決は `dup` の `parseRevRange` / git 周りロジックを `src/util/git/` に切り出し、両コマンドから呼ぶ。これは "薄い共有" の数少ない例外。
-- churn 軸の振る舞いを PR モードでも維持 (PR の影響で churn が高まったケースは `--pr` 出力で強調表示)。
+- churn 軸の振る舞いは PR モードでもそのまま (PR 由来 churn の特別強調 = scan §8.1 の Z 案は後続改善扱い)。
 
 検証: PR モードと whole-repo モードで結果が変わることを示す e2e テスト + 1 件の dogfooding。
 
-リスク: hotspot ranking は tree 全体の分布に依存しているので、changed files に絞ると軸の正規化基準がぶれる可能性。先に `--pr` で計測を絞らず、出力で絞る方式に倒すのが無難。
+リスク: changed files に該当する関数が 1 件もない PR (typo fix, 設定ファイル変更だけ) では出力が空になる。"changes have no scoring functions" 旨を Markdown body / JSON status に明示するハンドリングが必要。
 
 ### M5 — `dup` の dismissal (cross-feature)
 
@@ -177,9 +180,9 @@
 
 ## 6. リスク / 横断論点
 
-- **0.x 利用者への影響**: M1 + M2 は flag / スキーマの破壊変更。CHANGELOG 一本にまとめ、移行ノート (旧フラグ → 新フラグ表) を README ではなく `docs/` 側に置く (CLAUDE.md の "user docs は first-time reader 向け" 指針に従う)。
+- **0.x 利用者への影響**: M1 + M2 + M5 は flag / スキーマ / dismissalId 形式の破壊変更。CHANGELOG 一本にまとめ、移行ノート (旧フラグ → 新フラグ表、旧 dismissalId → prefix 付き) を README ではなく `docs/` 側に置く (CLAUDE.md の "user docs は first-time reader 向け" 指針に従う)。
 - **共有コードの肥大化**: M3 / M4 で `src/util/` 系に共通モジュールを置くと、両機能から強い依存を受けて実装の独立性が崩れる懸念がある。共有は「envelope, render head, git rev parse」の 3 点に限定し、それ以上は片方の実装にローカル化する。
-- **CLI パーサの混在**: commander と parseArgs の両立は内部だけの問題だが、ヘルプの見た目が違うので "ツールの一体感" を損なう。M1 の派生として「ヘルプテキストを共通フォーマットに揃える」だけは検討。本格的な統一 (どちらかに寄せる) は別計画。
+- **CLI パーサの混在**: commander と parseArgs の両立は内部だけの問題だが、ヘルプの見た目が違うので "ツールの一体感" を損なう。M1 でヘルプテキストの "形" は揃える (M1 bullet 5)。本格的な統一 (どちらかに寄せる) は本計画のスコープ外。
 - **`scan` 復活の誘惑**: 本計画を進めると "もう envelope も Markdown も同じなんだから 1 コマンドにすればいい" という議論が再燃する可能性がある。本計画では `scan` 復活は明示的に non-goal とする。再検討するなら新計画を立てる。
 
 ## 7. 決定済み事項
