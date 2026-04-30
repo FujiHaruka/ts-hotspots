@@ -327,7 +327,88 @@ type DismissedSummary = {
 
 ## 6. ユースケース別の充足確認
 
-> TODO
+§2 で挙げた 3 ユースケースが §5 のスキーマで過不足なく応えられるかを確認する。
+
+### UC1. エージェントへの初期コンテキスト投入
+
+**実行**: `ts-hotspots scan --whole-repo --include-dedup | claude --permission-mode plan`
+
+**消費側のロジック (擬似)**:
+```
+top = []
+top.push(...hotspots.candidates.filter(h => h.priority === "high"))
+top.push(...duplications.groups.filter(g => g.priority === "high"))
+sort top by some heuristic (例: hotspot は axes.length, dedup は size + aggregateScores.combined.median)
+read each ref/anchor via Read tool using `coords.{file,startLine,endLine}`
+```
+
+**スキーマで足りるか**:
+
+- ✓ `priority` で粗ふるい
+- ✓ `coords` で `Read` tool 直接呼び出し
+- ✓ `axes` / `metrics` (hotspot) と `recommendationHint` / `sharedEvidence` (dedup) で「なぜ気になるか」の根拠を提示できる
+- ✓ `dismissed` が空でなければ「過去に dismiss した同種の判断」の存在を示せる
+
+**過不足**: なし。`location` 文字列は冗長だがエージェント向け Markdown レンダリングで活躍する想定なので残置。
+
+### UC2. PR レビュー時の CI レポート
+
+**実行**: `ts-hotspots scan --pr "$BASE...$HEAD" --format markdown > report.md` を CI で実行し、PR コメントに貼る。
+
+**消費側のロジック (擬似)**:
+```
+header: scope.mode + scope.baseRef + scope.headRef を冒頭に
+section A: hotspots.candidates から high のみ表示
+section B: duplications.groups から PR モード anchor を持つもののみ表示
+footer: project.functionCount / duplications.pipeline.{candidatePairs, reportedPairs} で情報密度を要約
+```
+
+**スキーマで足りるか**:
+
+- ✓ `scope.mode === "pr"` と `baseRef` / `headRef` でヘッダ生成
+- ✓ `duplications.mode === "pr"` のとき `anchor` が必ず付くので「変更側 fragment」を識別できる
+- ✓ `duplications.scope.changed` が PR モード限定で同居するので scope サマリも作れる
+- ✓ `--no-code` を渡せば PR コメント長を抑えられる (大きな fragment ソースの転載を避ける)
+
+**過不足**: PR モードでの hotspot 側の挙動 (「変更ファイル周辺のみ候補化するか、tree 全体を候補化するか」) はスキーマでなくセマンティクスの判断で、§8 の論点に残す。**スキーマ自体は変更不要**。
+
+### UC3. 手動レビュー / 引き継ぎ時の repo オンボーディング
+
+**実行**: `ts-hotspots scan --whole-repo --include-dedup --format markdown > overview.md` を一度だけ。
+
+**消費側のロジック (擬似)**:
+```
+人間が overview.md を読む。
+hotspot は "axes hit が多い順", dedup は "size 大きい順" にざっと眺める。
+気になるところだけエディタで開く。
+JSON も並行に出力 (`--format json`) しておけば、後日カテゴリ別集計などに使える。
+```
+
+**スキーマで足りるか**:
+
+- ✓ `project.functionCount` / `duplications.scope.base` で全体規模が把握できる
+- ✓ `duplications.groups[].size` で「N 箇所コピーがある巨大クラスタ」が一目で見える
+- ✓ `aggregateScores.{min,median,max}` で群内のバラツキ (= 緩い類似と固い類似の混在) を把握できる
+- ✓ Markdown 出力時に `recommendationHint.likelyRefactoring` を 1 行サマリとして使える
+
+**過不足**: なし。ただしこのユースケースでは "重複群が同じファイル内に集中している" ような構造が見えるとオンボーディングに役立つ。これは新フィールドではなく Markdown レンダラー側の集計で対応する想定。
+
+### 横断確認
+
+3 ユースケースに共通して必要なフィールドが揃っているかをチェックリスト化する。
+
+| 必要事項 | スキーマ位置 | 状態 |
+|---|---|---|
+| 「どのスコープで走ったか」の同定 | `scope` | ✓ |
+| 行範囲付き座標 | `*.coords` | ✓ |
+| 人間表示用のラベル | `*.location` | ✓ |
+| 軸ごとの根拠 | `axes` / `metrics` (hotspot), `evidence` / `sharedEvidence` (dedup) | ✓ |
+| 群サマリ統計 | `aggregateScores` | ✓ |
+| 統合フィルタ用の粗いランク | `priority` | ✓ |
+| dismiss の状態 | `dismissed` | △ (dedup 群の dismissal は §8 で要決定) |
+| 計測されなかったことを判別 | section の有無で判別 | ✓ |
+
+**結論**: §5 のスキーマで主要 3 ユースケースを過不足なくカバーする。残課題は dismissal の取り扱いと PR モード hotspot のセマンティクス (両方とも §8 で扱う)。
 
 ## 7. エージェント誘導文サンプル
 
