@@ -1,7 +1,18 @@
 {
   "name": "ts-hotspots",
-  "version": "0.1.0",
-  "description": "A CLI that statically analyzes a TypeScript project and returns hotspots (likely refactor candidates) as JSON.",
+  "version": "0.2.0",
+  "description": "A CLI that statically analyzes a TypeScript project and surfaces refactor-candidate coordinates: per-function hotspots and Type-3 duplication groups.",
+  "keywords": [
+    "typescript",
+    "static-analysis",
+    "code-metrics",
+    "hotspots",
+    "duplication",
+    "clone-detection",
+    "refactoring",
+    "cli",
+    "ai-agent"
+  ],
   "type": "module",
   "bin": {
     "ts-hotspots": "./dist/index.js"

@@ -1,5 +1,16 @@
 # ts-hotspots — Requirements
 
+ts-hotspots is a CLI with two complementary features:
+
+- **Hotspots** (default `ts-hotspots [path]`): per-function metrics ranked into a small set of refactor-candidate coordinates. Specified in Part A below.
+- **Dedup** (`ts-hotspots dedup`): Type-3 duplication candidates, in PR mode (changed code vs. the rest of the tree) or whole-repo mode. Specified in Part B; the implementation-level algorithms live under `docs/dedup/`.
+
+Both features share a single guiding principle: **return coordinates and evidence, not verdicts.** The downstream coding agent or reviewer decides what to do.
+
+---
+
+## Part A. Hotspots feature
+
 ## 1. Vision
 
 A CLI tool that statically analyzes a TypeScript project with ts-morph and emits **coordinates and evidence** pointing out "where in the codebase the refactor-candidate hotspots live" — output shaped for handoff to coding agents (Claude Code, etc.).
@@ -189,3 +200,104 @@ Intentionally excluded:
 - File axes (`callerCount` leverage substitutes well enough that neither a separate command nor composition is worthwhile)
 - MCP server packaging (CLI is sufficient)
 - Web dashboard / time-series DB / result cache (except the dismissal registry; see §9.1)
+
+---
+
+## Part B. Dedup feature
+
+## B.1 Vision
+
+A duplication-candidate detector tuned for **recall over precision**. Type-3 clones — copy-pasted regions with light edits (renamed identifiers, reordered statements, slightly different argument shapes) — are the target. Output is meant for downstream judgment, not a strict pass/fail verdict.
+
+Two modes, sharing the same back-end pipeline:
+
+- **PR mode**: given a git revrange (`A...B` / `A..B`), surface duplications between the head-side changed code and the rest of the tree.
+- **Whole-repo mode**: at one ref, surface every cluster of fragments that look like the same code.
+
+## B.2 Pipeline
+
+A 7-stage pipeline. PR / whole-repo only differ in how the front-end builds the input set; everything from feature extraction onward is shared.
+
+```
+[1] Diff Collector / Source Lister
+    ↓
+[2] Fragment Extractor    (functions, blocks, statement windows)
+    ↓
+[3] Feature Extractor     (3 axes: token n-gram / statement-kind n-gram / call-property fingerprint)
+    ↓
+[4] Inverted Index
+    ↓
+[5] Candidate Search      (union of feature axes — recall-first)
+    ↓
+[6] Similarity Scorer     (token / statement-kind / call / size, OR-gated)
+    ↓
+[7] Report Generator      (clone groups with shared evidence)
+```
+
+The index is built in memory per run; nothing is persisted. See `docs/dedup/algorithms/` for the full algorithm specification.
+
+## B.3 Fragment Granularity
+
+A duplication unit is a **fragment**, one of:
+
+- function / method / arrow function
+- control-structure block (`if` / `for` / `while` / `try` / `catch` / `switch`)
+- a sliding window of consecutive statements (to catch partial overlap that does not align with a function or block boundary)
+
+Each fragment carries the file path, line range, kind, and source text it was extracted from.
+
+## B.4 Features
+
+Three orthogonal feature kinds, extracted per fragment:
+
+- **Normalized token n-gram** — TypeScript tokens after normalizing identifiers / strings / numbers / booleans, dropping comments, and (optionally) dropping type annotations. Catches structural similarity that survives renaming.
+- **Statement-kind n-gram** — only the AST statement-kind sequence (`VariableStatement`, `IfStatement`, `ReturnStatement`, ...). Identifier-agnostic.
+- **Call / property fingerprint** — call-expression names and property accesses kept as-is, not normalized. High-information signal that cuts across rename-resistant noise.
+
+n-gram lengths and inclusion of each kind are configurable.
+
+## B.5 Candidate Search and Scoring
+
+Candidates are looked up via inverted indexes built per feature kind. Hits are merged across kinds with **set union**, not intersection — recall-first.
+
+Each candidate pair is then re-scored on:
+
+- token overlap
+- statement-kind similarity
+- call / property overlap
+- size compatibility (length-aware penalty for very different fragment sizes)
+
+A weighted combined score is produced. Final reporting is gated by an **OR** condition: a pair clears if the combined score crosses its threshold *or* any single axis crosses its axis-specific threshold. This keeps the false-negative rate low.
+
+## B.6 Output: Clone Groups
+
+The reporting unit is a **clone group**, not a pair. When the same pattern appears in N places, the report contains one group with N members, not `N(N−1)/2` pairs.
+
+A group carries:
+
+- `pr.baseSha` / `pr.headSha` — same sha twice in whole-repo mode; the schema stays uniform across modes.
+- `summary` — mode (`pr` / `whole-repo`), per-side scope stats (files / fragments / lines / `fragmentsByKind` / `excludedFiles`), and pipeline counters (`candidatePairs` / `reportedPairs`).
+- `anchor` — the changed-side fragment in PR mode; `undefined` in whole-repo mode where no side is privileged.
+- `members[]` — each entry has the existing-side fragment view, per-pair scores, and per-pair evidence (which calls / properties / statement kinds / token n-grams matched).
+- `aggregateScores` — group-level `min` / `median` / `max` over members, per axis.
+- `sharedEvidence` — keys present in *every* pair of the group.
+- `recommendationHint` — `extract-function` / `parameterize` / `manual-review`, plus a confidence level computed from the weakest pair.
+
+The exit code is `0` even when zero groups are found — detection is the tool's responsibility, decision-making is downstream. Default output is Markdown (`--format markdown`); `--format json` emits the same data as JSON.
+
+## B.7 Non-functional
+
+- **Recall over precision**: union-on-search, OR-on-decision (B.5).
+- **Determinism**: same repo state + same revrange / ref ⇒ bit-identical output, including ordering.
+- **Performance**: every run is a full analysis; the index is rebuilt in memory. CI runtime is the sizing target. Whole-repo mode on very large trees may need `--exclude` tuning.
+- **Evidence everywhere**: every reported group is backed by structured evidence. No score-only output.
+- **No persistence, no daemon**: nothing is written between runs.
+
+## B.8 Out of Scope for v1 (dedup)
+
+- Program Dependence Graph (PDG) analysis.
+- Type-checker–dependent semantic similarity.
+- Embedding-model or LLM-based similarity.
+- Persistent index databases.
+- Full O(N²) pairwise comparison.
+- Automatic refactoring application.
