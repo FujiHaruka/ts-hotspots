@@ -115,7 +115,7 @@
 
 ## 5. マイルストーン
 
-各 M は基本的に独立してリリース可能。例外として M5 は M2 (envelope) 後を前提とする — M5 で `comp` の `dismissalId` 形式変更が `comp:<sha256>` 形に入り、これが M2 の envelope 破壊変更に続く 2 段目の軽微な破壊変更となる。M1 + M2 + M5 は破壊変更を含むため 0.x 系のバージョンを段階的に上げる。M3 / M4 は加算的。
+各 M は基本的に独立してリリース可能。例外として M5 は M2 後を前提とする — M2 で `comp` の `dismissalId` を `comp:<sha256>` 形式に先取り変更し registry migration も済ませるため、M5 は `dup` 側を加算するだけになる。M1 + M2 が破壊変更を含むため 0.x 系のバージョンをここで上げる。M3 / M4 / M5 は加算的。
 
 ### M1 — フラグ語彙の統一 (破壊変更含)
 
@@ -123,7 +123,7 @@
 
 - 件数制限フラグを `--limit` に統一 (D1)。`comp` の `--top` は CLI から完全削除 (内部定数化)。`--full` モードでの `--limit` は `functionHotspotCandidates[]` のみに適用、`--file <path>` モードでは無視 + stderr 警告。
 - 出力形式フラグを `--format markdown|json` に統一 (D2)。`comp --json` は完全廃止、互換 alias は置かない。
-- 位置引数 `[path]` を `dup` でも受け付け、tsconfig 親ディレクトリ意味論に統一 (D3)。`dup` 側は path から git repo root を上方探索する。`--repo` 既存フラグの去就 (廃止 / 別名残し / 恒久) は §7 で要決定。
+- 位置引数 `[path]` を `dup` でも受け付け、tsconfig 親ディレクトリ意味論に統一 (D3)。`dup` 側は path から git repo root を上方探索する。`--repo` 既存フラグは互換 alias を置かず M1 で完全廃止 (D2 と同じ姿勢)。
 - `--exclude` を両コマンドで「組み込みデフォルトに追加」セマンティクスに統一 (D4)。統一後のデフォルトは `dup` 現在の 17 件 (`node_modules/**`, `dist/**`, `**/*.{test,spec}.*` 等) をベースにする。`comp` の現デフォルト (`**/*.{test,spec}.{ts,tsx,mts,cts}`) は dup 側に内包されるので merge は二重定義にならない。エスケープハッチ (`--no-default-exclude` 等) は YAGNI で足さない。
 - ヘルプテキスト (commander auto / 手書き USAGE) を新フラグ語彙に揃える。両コマンドで help format の "形" が揃って見えることを目視確認する。
 
@@ -138,7 +138,7 @@
 - 両コマンドの JSON 出力に `{ status: "ok" | "error", tool: { name, version }, ... }` の共通封筒を導入 (D5)。
 - 失敗時は stdout に `{ status: "error", error: { code, message } }` を出し、stderr には人間向け詳細 (`comp` 現挙動を `dup` にも展開)。エラーコード語彙 (`INVALID_REVRANGE` / `GIT_FAILED` / 等) は実装時に確定。streaming 中の失敗は head 出力後に body にエラーを追記する `comp` パターンを踏襲。
 - 座標の一次表現を `location: "file:start-end"` 文字列に統一 (D6)。`dup` の `{ file, startLine, endLine }` 構造体は出力 JSON / Markdown から削除し、文字列のみを露出。reporter 内部で line 情報が必要な場面は構造体を保持してよいが、表面には出さない。
-- `comp` の `dismissalId` を `comp:<sha256>` 形式に M2 で先取り変更するかは要決定 (M5 の registry migration 範囲との trade-off; §7 で議論)。
+- `comp` の `dismissalId` を `comp:<sha256>` 形式に M2 で先取り変更し、registry 読み込み時の migration (旧 prefix 無し entry を `feature: "comp"` で補完) も M2 で入れる。これにより M5 では `dup:` 系を追加するだけで registry スキーマには触らず、破壊変更を M1+M2 ウィンドウに集約できる。
 
 検証: snapshot テスト 2 種 (`comp` / `dup` ともに ok / error の 2 ケース)。`docs/dogfooding-prompt.md` の手順を更新し、エージェントが両出力を同じ envelope ロジックで扱えることを確認。
 
@@ -172,7 +172,7 @@
 
 - `dup` 群の dismissal ID = members `bodyHash` をソート → 連結 → SHA-256 (D10 / 案 P)。群構成が変われば自動失効するバイアス (recall over precision の dismissal 版)。
 - dismissal subcommands は `ts-hotspots dismiss <id>` のフラット配置を維持し、ID 自体に feature プレフィックスを埋め込む (D11 / 案 C)。`dismissalId` 形式: `comp:<sha256>` / `dup:<sha256>`。routing は prefix から行うので `--feature` 不要。
-- registry は単一 `dismissed.json`、各 entry に `feature` フィールドを追加 (D11 / 案 X)。既存の `comp` 専用 entry は prefix 無しで保存されているので、初回読み込みで `feature: "comp"` 補完して migration。`comp` の出力 `dismissalId` も M5 で `comp:` prefix 付きに変わる (M2 の envelope 変更に続く軽微な破壊変更)。
+- registry の `feature` フィールド対応と `comp:` prefix 化は M2 で先取り済みなので、M5 では `dup` 用の dismiss / list-dismissed / undismiss 経路と `dup:` prefix の registry entry を追加するだけ。registry スキーマは触らない。
 
 検証: dismissal の round-trip (dismiss → 次回 run で消える → undismiss で戻る) が両機能で同じ挙動になる e2e テスト。
 
@@ -180,7 +180,7 @@
 
 ## 6. リスク / 横断論点
 
-- **0.x 利用者への影響**: M1 + M2 + M5 は flag / スキーマ / dismissalId 形式の破壊変更。CHANGELOG 一本にまとめ、移行ノート (旧フラグ → 新フラグ表、旧 dismissalId → prefix 付き) を README ではなく `docs/` 側に置く (CLAUDE.md の "user docs は first-time reader 向け" 指針に従う)。
+- **0.x 利用者への影響**: M1 + M2 は flag / スキーマ / dismissalId 形式の破壊変更を集約 (M2 で `comp:` prefix 化を先取り)。CHANGELOG 一本にまとめ、移行ノート (旧フラグ → 新フラグ表、旧 dismissalId → prefix 付き) を README ではなく `docs/` 側に置く (CLAUDE.md の "user docs は first-time reader 向け" 指針に従う)。
 - **共有コードの肥大化**: M3 / M4 で `src/util/` 系に共通モジュールを置くと、両機能から強い依存を受けて実装の独立性が崩れる懸念がある。共有は「envelope, render head, git rev parse」の 3 点に限定し、それ以上は片方の実装にローカル化する。
 - **CLI パーサの混在**: commander と parseArgs の両立は内部だけの問題だが、ヘルプの見た目が違うので "ツールの一体感" を損なう。M1 でヘルプテキストの "形" は揃える (M1 bullet 5)。本格的な統一 (どちらかに寄せる) は本計画のスコープ外。
 - **`scan` 復活の誘惑**: 本計画を進めると "もう envelope も Markdown も同じなんだから 1 コマンドにすればいい" という議論が再燃する可能性がある。本計画では `scan` 復活は明示的に non-goal とする。再検討するなら新計画を立てる。
@@ -197,4 +197,6 @@
 - **D8 (Streaming preamble)**: `dup --format markdown` でも処理前に head を先出し (案 A)。`claude --permission-mode plan` の 3s detect 窓に間に合わせる。head は instruction のみで scope 情報は body 側 (B1; `comp` と一貫)。head 後に致命エラーが起きたら body にエラーを追記する `comp` 現挙動を踏襲。
 - **D9 (`comp` の PR モード)**: シンプル版 Y (案 A)。`comp --pr <revrange>` は changed files に属する関数のみを出力。ranking 計算は分布が壊れないよう head ref 全体で走らせ、出力段でフィルタ。`--full-tree-hotspots` 等のエスケープは YAGNI で足さない (必要なら `--pr` を外せばよい)。PR 由来 churn の強調も後続改善扱い。
 - **D10 (`dup` の dismissal ID 戦略)**: 案 P (群正規化 hash; members `bodyHash` をソート → 連結 → SHA-256)。失効しやすい方にバイアスし `dup` 検出側の "recall over precision" と一貫させる。再 dismiss コストは許容。後付けで fuzzy match レイヤや "失効しました" stderr ヒントを足す余地は残す。
-- **D11 (dismissal subcommands の所属 / registry 形)**: トップレベル `ts-hotspots dismiss <id>` を維持し、ID 自体に feature prefix を埋め込む形で routing (案 C)。`dismissalId` は `comp:<sha256>` / `dup:<sha256>` 形式。`--feature` フラグは不要。registry は単一 `dismissed.json`、entry に `feature` フィールドを追加 (案 X)。既存 entry は prefix 無し = `comp` として自動 migration。`comp` の出力 `dismissalId` も M5 で `comp:` 付きに変わる (M2 envelope 変更に続く軽微な破壊変更)。
+- **D11 (dismissal subcommands の所属 / registry 形)**: トップレベル `ts-hotspots dismiss <id>` を維持し、ID 自体に feature prefix を埋め込む形で routing (案 C)。`dismissalId` は `comp:<sha256>` / `dup:<sha256>` 形式。`--feature` フラグは不要。registry は単一 `dismissed.json`、entry に `feature` フィールドを追加 (案 X)。既存 entry は prefix 無し = `comp` として自動 migration。
+- **D3 派生 (`--repo` フラグの去就)**: M1 で完全廃止 (互換 alias 無し)。`--json` 廃止 (D2) と同じ姿勢で、M1 の破壊変更ウィンドウに集約する。
+- **D11 派生 (`comp:` prefix 化のタイミング)**: M5 ではなく M2 で先取り。`comp` の `dismissalId` を `comp:<sha256>` 化 + registry migration を M2 で完了させ、M5 は `dup` 側の加算のみに縮める。破壊変更を M1+M2 ウィンドウに集約してユーザー摩擦を最小化。
