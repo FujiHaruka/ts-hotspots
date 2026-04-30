@@ -268,3 +268,36 @@ Each candidate pair is then re-scored on:
 - size compatibility (length-aware penalty for very different fragment sizes)
 
 A weighted combined score is produced. Final reporting is gated by an **OR** condition: a pair clears if the combined score crosses its threshold *or* any single axis crosses its axis-specific threshold. This keeps the false-negative rate low.
+
+## B.6 Output: Clone Groups
+
+The reporting unit is a **clone group**, not a pair. When the same pattern appears in N places, the report contains one group with N members, not `N(N−1)/2` pairs.
+
+A group carries:
+
+- `pr.baseSha` / `pr.headSha` — same sha twice in whole-repo mode; the schema stays uniform across modes.
+- `summary` — mode (`pr` / `whole-repo`), per-side scope stats (files / fragments / lines / `fragmentsByKind` / `excludedFiles`), and pipeline counters (`candidatePairs` / `reportedPairs`).
+- `anchor` — the changed-side fragment in PR mode; `undefined` in whole-repo mode where no side is privileged.
+- `members[]` — each entry has the existing-side fragment view, per-pair scores, and per-pair evidence (which calls / properties / statement kinds / token n-grams matched).
+- `aggregateScores` — group-level `min` / `median` / `max` over members, per axis.
+- `sharedEvidence` — keys present in *every* pair of the group.
+- `recommendationHint` — `extract-function` / `parameterize` / `manual-review`, plus a confidence level computed from the weakest pair.
+
+The exit code is `0` even when zero groups are found — detection is the tool's responsibility, decision-making is downstream. Default output is Markdown (`--format markdown`); `--format json` emits the same data as JSON.
+
+## B.7 Non-functional
+
+- **Recall over precision**: union-on-search, OR-on-decision (B.5).
+- **Determinism**: same repo state + same revrange / ref ⇒ bit-identical output, including ordering.
+- **Performance**: every run is a full analysis; the index is rebuilt in memory. CI runtime is the sizing target. Whole-repo mode on very large trees may need `--exclude` tuning.
+- **Evidence everywhere**: every reported group is backed by structured evidence. No score-only output.
+- **No persistence, no daemon**: nothing is written between runs.
+
+## B.8 Out of Scope for v1 (dedup)
+
+- Program Dependence Graph (PDG) analysis.
+- Type-checker–dependent semantic similarity.
+- Embedding-model or LLM-based similarity.
+- Persistent index databases.
+- Full O(N²) pairwise comparison.
+- Automatic refactoring application.
