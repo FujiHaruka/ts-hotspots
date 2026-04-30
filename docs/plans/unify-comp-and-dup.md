@@ -103,7 +103,7 @@
 |---|---|---|---|
 | D1 | 件数制限フラグ名 | (a) `--limit` に統一 (b) `--top` に統一 (c) `--top` (`comp`) と `--limit` (`dup`) のまま、両方を別名で受け付ける | (a) 推奨。`comp --top 5` は "軸ごと top-N"、`dup --limit 20` は "群の上限" と意味が違うが、ユーザーから見て "出力件数の上限" としては同じ。ただし `comp --top` の方が「軸ごと」が明確なので議論余地あり |
 | D2 | `--json` の扱い | (a) `--json` を完全廃止 (b) `--format json` の別名として残す | (b)。0.x の互換ヒントとして残し、deprecation は将来 |
-| D3 | 位置引数の意味 | (a) `[path]` = tsconfig を内包するディレクトリ (両コマンド共通) (b) `[path]` は省略可、`dup` は `--repo` 必須のまま | (a)。`dup` 側は positional path から git repo root を上方探索 |
+| D3 | 位置引数の意味 | (a) `[path]` = tsconfig を内包するディレクトリ (両コマンド共通) (b) `[path]` = git repo ルート (c) コマンドごとに意味を変える (現状維持) | **決定: (a)**。`comp` 現挙動を踏襲し、`dup` 側は positional path から git repo root を上方探索する。サブパッケージの tsconfig を直接渡す運用も許容 (monorepo 対応)。`path` 直下に tsconfig が無い場合の子ディレクトリ探索は将来拡張として保留 |
 | D4 | `--exclude` のセマンティクス | (a) 既定に追加 (`dup` 現挙動) (b) 既定を置換 (`comp` 現挙動) (c) `--exclude-add` と `--exclude` を分ける | (a)。test 除外がデフォルト挙動として失われる人には移行ノートを出す |
 | D5 | エラー封筒の形 | (a) `comp` 側の `{ status: "error", error: { code, message } }` を `dup` にも導入 (b) 既存の `summary` ベースの dup スキーマに `error?` を埋める | (a)。スキーマ進化のしやすさ優先 |
 | D6 | 座標の primary 表現 | (a) `{ file, startLine, endLine }` 構造体を一次にし `location` 文字列を派生 (b) 文字列のみ | (a)。エージェントが Read tool に直接渡せるため |
@@ -182,4 +182,6 @@
 - **CLI パーサの混在**: commander と parseArgs の両立は内部だけの問題だが、ヘルプの見た目が違うので "ツールの一体感" を損なう。M1 の派生として「ヘルプテキストを共通フォーマットに揃える」だけは検討。本格的な統一 (どちらかに寄せる) は別計画。
 - **`scan` 復活の誘惑**: 本計画を進めると "もう envelope も Markdown も同じなんだから 1 コマンドにすればいい" という議論が再燃する可能性がある。本計画では `scan` 復活は明示的に non-goal とする。再検討するなら新計画を立てる。
 
-気づき: `dup` 側の `--repo` と `comp` 側の位置引数 `[path]` が指す概念がずれている (前者は git ルート、後者は tsconfig を含むディレクトリ)。M1 で位置引数を共通化するときに、両機能とも "プロジェクトルート (= tsconfig + git repo の双方を含む親ディレクトリ)" と定義し直さないと、monorepo 構成でずれが顕在化する。
+## 7. 決定済み事項
+
+- **D3 (位置引数の意味)**: `[path]` = tsconfig を内包するディレクトリ (案 A)。`dup` 側は path から git repo root を上方探索する。サブパッケージ tsconfig の直接指定で monorepo 部分スコープに対応。`path` 直下に tsconfig が無い場合の子ディレクトリ探索は将来拡張。
