@@ -16,5 +16,6 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*", "vitest.config.ts"]
+  "include": ["src/**/*", "test/**/*", "tools/**/*", "vitest.config.ts"],
+  "exclude": ["test/fixtures/**", "test/dedup/fixtures/**"]
 }
