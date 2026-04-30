@@ -15,6 +15,7 @@ import {
 } from "./aggregator/rank.ts";
 import { runDismiss, runListDismissed, runUndismiss } from "./cli/dismiss.ts";
 import { collectChurn } from "./collectors/churn/commit-count.ts";
+import { main as runDedupMain } from "./dedup/cli/main.ts";
 import { enumerateDeclarations } from "./collectors/enumerate-declarations.ts";
 import { enumerateSourceFiles } from "./collectors/enumerate-source-files.ts";
 import {
@@ -125,6 +126,10 @@ type PendingInvocation =
       kind: "undismiss";
       id: string;
       path: string | undefined;
+    }
+  | {
+      kind: "dedup";
+      argv: string[];
     };
 
 export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
@@ -219,6 +224,18 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
         id,
         path: opts.path,
       });
+    });
+
+  program
+    .command("dedup")
+    .description(
+      "detect Type-3 duplication candidates (run `ts-hotspots dedup --help` for details)",
+    )
+    .helpOption(false)
+    .allowUnknownOption(true)
+    .argument("[args...]", "forwarded to dedup")
+    .action((args: string[]) => {
+      onInvoke({ kind: "dedup", argv: args });
     });
 
   return program;
@@ -572,6 +589,14 @@ export async function run(
       stdout,
       stderr,
     );
+  }
+
+  if (invocation.kind === "dedup") {
+    return await runDedupMain(invocation.argv, {
+      stdout,
+      stderr,
+      cwd: () => process.cwd(),
+    });
   }
 
   try {

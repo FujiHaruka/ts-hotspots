@@ -756,3 +756,43 @@ describe("dismissal registry subcommands", () => {
     expect(stderr.text).toContain("not found");
   });
 });
+
+describe("dedup subcommand routing", () => {
+  test("`dedup --help` shows dedup usage and returns 0", async () => {
+    const stdout = new StringSink();
+    const stderr = new StringSink();
+    const code = await run(
+      [...ARGV_PREFIX, "dedup", "--help"],
+      stdout,
+      stderr,
+    );
+    expect(code).toBe(0);
+    expect(stdout.text).toBe("");
+    expect(stderr.text).toContain("Usage:");
+    expect(stderr.text).toContain("ts-hotspots dedup <revrange>");
+  });
+
+  test("`dedup` with no args returns 1 with a missing-revrange hint", async () => {
+    const stdout = new StringSink();
+    const stderr = new StringSink();
+    const code = await run([...ARGV_PREFIX, "dedup"], stdout, stderr);
+    expect(code).toBe(1);
+    expect(stderr.text).toContain("missing revrange");
+  });
+
+  test("`dedup` forwards unknown flags to dedup's parser (commander does not reject them)", async () => {
+    const stdout = new StringSink();
+    const stderr = new StringSink();
+    const code = await run(
+      [...ARGV_PREFIX, "dedup", "--no-such-flag"],
+      stdout,
+      stderr,
+    );
+    // dedup's parser raises ArgParseError for unknown flag, not commander.
+    // The stderr message therefore comes from dedup, prefixed with
+    // "ts-hotspots dedup:" and ending with the dedup USAGE block.
+    expect(code).toBe(1);
+    expect(stderr.text).toContain("ts-hotspots dedup:");
+    expect(stderr.text).toContain("Usage:");
+  });
+});
