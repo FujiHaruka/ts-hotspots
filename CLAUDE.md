@@ -2,9 +2,22 @@
 
 ## Overview
 
-ts-hotspots is a CLI that statically analyzes a TypeScript project via ts-morph and returns hotspots (likely refactor candidates) as JSON. Its job is to hand coding agents like Claude Code a rough "where should I read first?" — it does not propose refactors itself, only coordinates (`file:line`) and metric facts.
+ts-hotspots is a CLI that statically analyzes a TypeScript project and hands coding agents like Claude Code a "where should I read first?" — it does not propose refactors, only coordinates (`file:line`) and metric facts.
 
-The primary ranking unit is the function (including methods, arrow functions, and TSX components); file-level rankings are returned alongside. See `docs/requirements.md` for detailed requirements.
+It exposes two parallel features as subcommands of one binary:
+
+- **Hotspots** (default): per-function metrics ranked into refactor-candidate coordinates. ts-morph backed (TypeChecker enabled). The primary ranking unit is the function (including methods, arrow functions, and TSX components); file-level rankings are returned alongside.
+- **Dedup** (`ts-hotspots dedup`): Type-3 duplication candidates in PR mode (`<revrange>`) or whole-repo mode (`--whole-repo`). Uses the `typescript` compiler API directly (no ts-morph) and shells out to git for diff/source listing.
+
+See `docs/requirements.md` for the full spec (Part A = hotspots, Part B = dedup). Dedup algorithm internals live under `docs/dedup/algorithms/` and mirror the pipeline stages in `src/dedup/`.
+
+## Dedup maintenance notes
+
+- **Module layout mirrors the pipeline.** `src/dedup/{diff,indexer,features,index_,search,scoring,report,cli}/` map to the 7-stage pipeline. The trailing underscore in `index_/` is intentional — Node's loader treats `index.ts` specially when adjacent to `index/`, and the underscore avoids the collision.
+- **Determinism is a hard invariant.** Same input ⇒ bit-identical output, including ordering of groups, members, and evidence keys. If you add a new feature kind, sort it through every aggregation seam.
+- **Strip-only TS execution.** The repo runs under Node 24+ with type stripping (`pnpm start`). `tools/check-strip-only.ts` imports `src/cli.ts`, which transitively pulls in every dedup module, so strip-only violations (`enum`, `namespace`, parameter properties) surface as a single check. Runs in `pre-commit`.
+- **`perfLog` must stay zero-cost when disabled.** The pipeline only allocates timing events / hot-path measurements when `--phase-timings` is set; do not add unconditional `performance.now()` calls.
+- **Recall over precision.** Search is a union over feature kinds; final reporting is OR-gated. When in doubt about a tradeoff, bias toward false positives — the downstream agent decides.
 
 ## Development workflow
 
