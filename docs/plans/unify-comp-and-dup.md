@@ -104,7 +104,7 @@
 | D1 | 件数制限フラグ名 | (a) `--limit` に統一 (b) `--top` に統一 (c) `--top` (`comp`) と `--limit` (`dup`) のまま、両方を別名で受け付ける | (a) 推奨。`comp --top 5` は "軸ごと top-N"、`dup --limit 20` は "群の上限" と意味が違うが、ユーザーから見て "出力件数の上限" としては同じ。ただし `comp --top` の方が「軸ごと」が明確なので議論余地あり |
 | D2 | `--json` の扱い | (a) `--json` を完全廃止 (b) `--format json` の別名として残す | (b)。0.x の互換ヒントとして残し、deprecation は将来 |
 | D3 | 位置引数の意味 | (a) `[path]` = tsconfig を内包するディレクトリ (両コマンド共通) (b) `[path]` = git repo ルート (c) コマンドごとに意味を変える (現状維持) | **決定: (a)**。`comp` 現挙動を踏襲し、`dup` 側は positional path から git repo root を上方探索する。サブパッケージの tsconfig を直接渡す運用も許容 (monorepo 対応)。`path` 直下に tsconfig が無い場合の子ディレクトリ探索は将来拡張として保留 |
-| D4 | `--exclude` のセマンティクス | (a) 既定に追加 (`dup` 現挙動) (b) 既定を置換 (`comp` 現挙動) (c) `--exclude-add` と `--exclude` を分ける | (a)。test 除外がデフォルト挙動として失われる人には移行ノートを出す |
+| D4 | `--exclude` のセマンティクス | (a) 既定に追加 (`dup` 現挙動) (b) 既定を置換 (`comp` 現挙動) (c) (a) + `--no-default-exclude` でエスケープ | **決定: (a)**。両コマンドで「ユーザー指定 glob は組み込みデフォルトに追加」で統一。`comp` の現挙動 (test 除外を置換可能) は失われるが、エスケープハッチは必要になってから追加する。test 含めたい既存ユーザー向けの移行ノートを M1 リリースに添える |
 | D5 | エラー封筒の形 | (a) `comp` 側の `{ status: "error", error: { code, message } }` を `dup` にも導入 (b) 既存の `summary` ベースの dup スキーマに `error?` を埋める | (a)。スキーマ進化のしやすさ優先 |
 | D6 | 座標の primary 表現 | (a) `{ file, startLine, endLine }` 構造体を一次にし `location` 文字列を派生 (b) 文字列のみ | (a)。エージェントが Read tool に直接渡せるため |
 | D7 | Markdown prompt prelude | (a) `comp` と同じ "instruction + fenced JSON" 形式を `dup` にも (b) `dup` は対人 Markdown のまま、`--agent` で wrap | (a)。両コマンドで `\| claude --permission-mode plan` にパイプして同じ振る舞いになる |
@@ -185,3 +185,4 @@
 ## 7. 決定済み事項
 
 - **D3 (位置引数の意味)**: `[path]` = tsconfig を内包するディレクトリ (案 A)。`dup` 側は path から git repo root を上方探索する。サブパッケージ tsconfig の直接指定で monorepo 部分スコープに対応。`path` 直下に tsconfig が無い場合の子ディレクトリ探索は将来拡張。
+- **D4 (`--exclude` のセマンティクス)**: ユーザー指定 glob は組み込みデフォルトリストに追加 (案 A)。`comp` 側の "デフォルトを置換可能" な現挙動は失われる。エスケープハッチ (`--no-default-exclude` 等) は必要になってから追加する YAGNI 方針。
