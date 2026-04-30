@@ -111,7 +111,7 @@
 | D8 | Streaming preamble | (a) `dup` にも head 先出しを導入 (b) `dup` は遅延フィードバック許容 (c) (a) + `--no-head` opt-out | **決定: (a)**。`dup --format markdown` でも処理開始前に head (instruction のみ; scope 情報は body 側) を flush し、`claude --permission-mode plan` の 3s detect 窓に間に合わせる。head 後の致命エラーは `renderMarkdownErrorBody` と同じパターンで body に追記 (`comp` 現挙動踏襲)。head の内容は `comp` と同じ "instruction only" (B1) で、scope 情報は body 側に置く |
 | D9 | `comp` の PR モード (M4) | (a) 案 Y: 計測は head ref 全体・出力は changed files の関数のみ (b) 案 X: tree 全体 (c) 案 W: 既定 Y / `--full-tree-hotspots` で X (旧 scan §8.1 結論) (d) 案 Z: Y + PR 由来 churn 強調 | **決定: (a) シンプル版 Y**。`comp --pr` は changed files に属する関数のみを出力。ranking 計算は分布が壊れないよう head ref 全体で走らせ、出力段でフィルタ。`--full-tree-hotspots` は YAGNI で足さず、必要なら `--pr` を外せばよい。Z (churn 強調) は後続改善 |
 | D10 | `dup` の dismissal ID 戦略 (M5) | (a) 案 P: 群正規化 hash (members `bodyHash` をソート → 連結 → hash) (b) 案 Q: anchor bodyHash (c) 案 R: M5 で見送り (d) 案 S: pair-level (e) 案 T: モード別 P/Q | **決定: (a) 案 P**。失効しやすい方にバイアス (= "false expiration を許容、false persistence は避ける")。これは `dup` 検出側の "recall over precision" と整合。再 dismiss コストは許容。fuzzy match (`dismiss された members の N% 以上を含む新群は同一視`) や stderr ヒント (`過去に dismiss された群が失効しました`) は後付けの拡張余地として残す |
-| D11 | dismissal subcommands の所属 | (a) トップレベル維持 (`ts-hotspots dismiss <id>`) (b) feature 配下 (`ts-hotspots comp dismiss <id>` / `ts-hotspots dup dismiss <id>`) | M5 で `dup` 側にも dismissal を入れる場合 (b) 検討。それまで (a) |
+| D11 | dismissal subcommands の所属 | (a) トップレベル維持 + ID から内部 lookup (b) feature 配下 (`comp dismiss` / `dup dismiss`) (c) (a) + ID に feature プレフィックス (`comp:abc...` / `dup:def...`) で曖昧解消 | **決定: (c)**。`ts-hotspots dismiss <id>` のフラットな配置を維持。`dismissalId` は `<feature>:<hash>` 形式 (例: `comp:a3f9c2...` / `dup:b8d4e1...`) にして prefix から routing。`--feature` フラグは不要。registry レイアウトは案 X (1 ファイル `dismissed.json`、entry に `feature` フィールドを追加)。既存 entry は prefix 無し = `comp` とみなして自動 migration |
 
 ## 5. マイルストーン
 
@@ -168,8 +168,8 @@
 決定: D10 / D11。
 
 - `dup` 群の dismissal ID = members `bodyHash` をソート → 連結 → SHA-256 (D10 / 案 P)。群構成が変われば自動失効するバイアス (recall over precision の dismissal 版)。
-- dismissal subcommands の API を `comp` / `dup` 両対応にする (D11)。トップレベル維持なら ID から feature を判定するロジックを足す。feature 配下に降ろすなら `comp dismiss` / `dup dismiss` を作って既存 `dismiss` を deprecate alias にする。
-- registry ファイル名 / レイアウトは現行 `dismissed.json` に feature キーを足して 1 ファイルで管理する案を初期検討する。
+- dismissal subcommands は `ts-hotspots dismiss <id>` のフラット配置を維持し、ID 自体に feature プレフィックスを埋め込む (D11 / 案 C)。`dismissalId` 形式: `comp:<sha256>` / `dup:<sha256>`。routing は prefix から行うので `--feature` 不要。
+- registry は単一 `dismissed.json`、各 entry に `feature` フィールドを追加 (D11 / 案 X)。既存の `comp` 専用 entry は prefix 無しで保存されているので、初回読み込みで `feature: "comp"` 補完して migration。`comp` の出力 `dismissalId` も M5 で `comp:` prefix 付きに変わる (M2 の envelope 変更に続く軽微な破壊変更)。
 
 検証: dismissal の round-trip (dismiss → 次回 run で消える → undismiss で戻る) が両機能で同じ挙動になる e2e テスト。
 
@@ -194,3 +194,4 @@
 - **D8 (Streaming preamble)**: `dup --format markdown` でも処理前に head を先出し (案 A)。`claude --permission-mode plan` の 3s detect 窓に間に合わせる。head は instruction のみで scope 情報は body 側 (B1; `comp` と一貫)。head 後に致命エラーが起きたら body にエラーを追記する `comp` 現挙動を踏襲。
 - **D9 (`comp` の PR モード)**: シンプル版 Y (案 A)。`comp --pr <revrange>` は changed files に属する関数のみを出力。ranking 計算は分布が壊れないよう head ref 全体で走らせ、出力段でフィルタ。`--full-tree-hotspots` 等のエスケープは YAGNI で足さない (必要なら `--pr` を外せばよい)。PR 由来 churn の強調も後続改善扱い。
 - **D10 (`dup` の dismissal ID 戦略)**: 案 P (群正規化 hash; members `bodyHash` をソート → 連結 → SHA-256)。失効しやすい方にバイアスし `dup` 検出側の "recall over precision" と一貫させる。再 dismiss コストは許容。後付けで fuzzy match レイヤや "失効しました" stderr ヒントを足す余地は残す。
+- **D11 (dismissal subcommands の所属 / registry 形)**: トップレベル `ts-hotspots dismiss <id>` を維持し、ID 自体に feature prefix を埋め込む形で routing (案 C)。`dismissalId` は `comp:<sha256>` / `dup:<sha256>` 形式。`--feature` フラグは不要。registry は単一 `dismissed.json`、entry に `feature` フィールドを追加 (案 X)。既存 entry は prefix 無し = `comp` として自動 migration。`comp` の出力 `dismissalId` も M5 で `comp:` 付きに変わる (M2 envelope 変更に続く軽微な破壊変更)。
