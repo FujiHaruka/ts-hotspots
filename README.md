@@ -1,8 +1,23 @@
 # ts-hotspots
 
-A CLI that statically analyzes a TypeScript project and surfaces likely refactor candidates (hotspots). Built to hand coding agents like Claude Code a starting point for "where should I read first?"
+A CLI that statically analyzes a TypeScript project and points coding agents at the spots most worth reading first. It returns coordinates and metric facts as JSON (or a Markdown prompt wrap), and leaves the judgment of *what to do* to the agent or reviewer downstream.
 
-## Quick start
+Two complementary readings of "worth reading first" are supported as subcommands of the same binary:
+
+- `ts-hotspots` — per-function metrics (cognitive complexity, churn, caller count, …) ranked into a small set of **hotspot candidates**. Best for "where in this codebase should I refactor?"
+- `ts-hotspots dedup` — Type-3 **duplication candidates** found across the tree or against a PR diff. Best for "is this change copy-pasting something we already have?"
+
+Both commands take a TypeScript project as input and emit machine-readable output. Neither tool proposes refactors itself — they hand the agent coordinates and evidence.
+
+## Install
+
+```
+npm i -D ts-hotspots          # or pnpm add -D, yarn add -D
+```
+
+Requires Node.js 24+.
+
+## Hotspot candidates: `ts-hotspots`
 
 Pipe the report straight into Claude:
 
@@ -10,9 +25,9 @@ Pipe the report straight into Claude:
 npx ts-hotspots | claude --permission-mode plan
 ```
 
-By default `ts-hotspots` emits a Markdown document that contains a short instruction block telling Claude what the data is and what to do with it, followed by the hotspot data inside a fenced JSON code block. The result is that Claude opens in plan mode already knowing it should read the top candidates' code and propose a refactor plan.
+By default the tool emits a Markdown document containing a short instruction block followed by the hotspot data inside a fenced JSON code block. Claude opens in plan mode already knowing it should read the top candidates and propose a refactor plan.
 
-## Usage
+### Usage
 
 ```
 ts-hotspots                  # scans tsconfig.json in the current directory
@@ -21,11 +36,11 @@ ts-hotspots <path>           # directory or tsconfig.json
 
 The output is a `FunctionReport` focused on hotspot candidates — the coordinates an agent should read first. By default it contains only the primary signal:
 
-- `functionHotspotCandidates` — refs that co-occur across multiple axes, or that rank near the top of a discriminative axis. Each candidate has a `ref` whose `location` is `file:start-end` (or `file:line` for single-line functions), and a `metrics` map containing the raw values for the axes that triggered the candidate. Results are ordered so that refs flagged by more axes come first.
+- `functionHotspotCandidates` — refs that co-occur across multiple metric axes, or that rank near the top of a discriminative axis. Each candidate has a `ref` whose `location` is `file:start-end` (or `file:line` for single-line functions), and a `metrics` map with the raw values for the axes that triggered it. Candidates flagged by more axes come first.
 
-Pass `--full` to also get `functionRankings` (top-N per axis, all axes), `functionAxisMeta` (per-axis dispersion metadata such as spread and unique top-N values), `functionCoOccurrence` (raw co-occurrence entries), and `functions[]` (every function with its full metrics).
+Pass `--full` to also get `functionRankings` (top-N per axis), `functionAxisMeta` (per-axis dispersion metadata), `functionCoOccurrence` (raw co-occurrence entries), and `functions[]` (every function with its full metrics).
 
-Solution-style monorepos (root `tsconfig.json` with `references`) are supported — all referenced projects are walked transitively and loaded into a single TypeChecker, so cross-package analysis works out of the box.
+Solution-style monorepos (root `tsconfig.json` with `references`) are supported — referenced projects are walked transitively and loaded into a single TypeChecker, so cross-package analysis works out of the box.
 
 Options:
 
@@ -33,10 +48,10 @@ Options:
 - `--top <N>` top N entries per axis (default: 5)
 - `--metrics <list>` comma-separated axis ids to include
 - `--exclude <glob...>` files to exclude
-- `--file <path>` single-file drill-down mode (returns raw metrics for every function in the file)
+- `--file <path>` single-file drill-down (returns raw metrics for every function in the file)
 - `--full` include `functionRankings`, `functionAxisMeta`, `functionCoOccurrence`, and `functions[]` alongside the candidates
 
-## Dismissing false positives
+### Dismissing false positives
 
 Hotspot candidates are heuristics — some will be fine as-is (intentional state-machine dispatchers, generated code, config tables). To keep the agent from re-evaluating the same false positives on every run, each candidate carries a `dismissalId`. Record a judgment with:
 
@@ -44,7 +59,7 @@ Hotspot candidates are heuristics — some will be fine as-is (intentional state
 ts-hotspots dismiss <dismissalId> --reason "<why it's fine>"
 ```
 
-Entries are stored per machine under `~/.config/ts-hotspots/<projectKey>/dismissed.json` (honoring `XDG_CONFIG_HOME` if set). This is a personal cache — nothing is written into your repository, and dismissals are not shared across machines or teammates. Subsequent runs on the same project filter that candidate out. The id is a hash of the function's source, so any meaningful edit to the function auto-expires the dismissal and the candidate re-surfaces for re-evaluation.
+Entries are stored per machine under `~/.config/ts-hotspots/<projectKey>/dismissed.json` (honoring `XDG_CONFIG_HOME` if set). This is a personal cache — nothing is written into your repository, and dismissals are not shared across machines or teammates. Subsequent runs filter that candidate out. The id is a hash of the function's source, so any meaningful edit auto-expires the dismissal and the candidate re-surfaces.
 
 Supporting subcommands:
 
@@ -53,7 +68,45 @@ ts-hotspots list-dismissed [--json]    # inspect the registry
 ts-hotspots undismiss <dismissalId>    # remove an entry
 ```
 
-Stale entries (the function was deleted or edited) are pruned automatically on each run. If you have a leftover `.ts-hotspots/` directory inside the repo from an earlier version, it is no longer used and can be removed.
+Stale entries (function deleted or edited) are pruned automatically on each run.
+
+## Duplication candidates: `ts-hotspots dedup`
+
+`dedup` finds Type-3 duplicates: copy-pasted regions that have been lightly edited (renamed identifiers, reordered statements, slightly different argument shape). It is tuned for **recall** — the goal is to surface every spot worth a second look, not to declare a strict clone verdict.
+
+It runs in two modes:
+
+```
+ts-hotspots dedup <revrange>            # PR mode: changed code vs. the rest of the tree
+ts-hotspots dedup --whole-repo          # whole-repo mode: every duplicate cluster at one ref
+```
+
+`<revrange>` is the standard git form: `A...B` (merge-base vs. head, recommended for PRs), `A..B` (direct), `A...` / `...B` (HEAD on the open side).
+
+Examples:
+
+```
+ts-hotspots dedup origin/main... > report.md
+ts-hotspots dedup origin/main...HEAD --format json > report.json
+ts-hotspots dedup --whole-repo --format json > report.json
+ts-hotspots dedup --whole-repo --exclude 'src/legacy/**'
+```
+
+Output is a clone-group report. Each group bundles a set of fragments that look like the same code, with per-pair scores (token overlap, statement-kind similarity, call/property overlap, size compatibility), shared evidence (which calls / properties / statement kinds / token n-grams the members agree on), and a recommendation hint (`extract-function`, `parameterize`, or `manual-review`). Markdown is the default; pass `--format json` for the machine-readable form.
+
+Common options:
+
+- `--repo <path>` repository root (default: current directory)
+- `--format markdown|json` output format (default: markdown)
+- `--exclude <glob>` extra path glob to drop (repeatable; built-in defaults already cover `node_modules`, `dist`, generated files, and tests)
+- `--limit <N|all>` cap the group list at the top N groups by combined score (default: 20)
+- `--no-code` omit fragment source from the report
+- `--ref <ref>` ref to scan in `--whole-repo` mode (default: `HEAD`)
+- `--phase-timings[=summary|verbose]` emit a JSON Lines perf log to stderr
+
+Run `ts-hotspots dedup --help` for the full list.
+
+The exit code is 0 even when zero candidates are reported — detection is the tool's job, deciding what to do is the agent's.
 
 ## Status
 
