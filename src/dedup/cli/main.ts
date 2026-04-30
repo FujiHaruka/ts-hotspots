@@ -48,7 +48,7 @@ export async function main(
     args = parseCliArgs(argv);
   } catch (err) {
     if (err instanceof ArgParseError) {
-      io.stderr.write(`ts-hotspots dedup: ${err.message}\n\n${USAGE}`);
+      io.stderr.write(`ts-hotspots duplication: ${err.message}\n\n${USAGE}`);
       return 1;
     }
     throw err;
@@ -126,13 +126,13 @@ export async function main(
         ? `displayed=${String(displayed)} groups (${String(fragmentsAcross)} fragments)`
         : `displayed=${String(displayed)} of ${String(fullCount)} groups (${String(fragmentsAcross)} fragments)`;
     io.stderr.write(
-      `ts-hotspots dedup: ${sizeLine}, ` +
+      `ts-hotspots duplication: ${sizeLine}, ` +
         `candidates=${String(pipeline.candidatePairs)}, reported=${String(pipeline.reportedPairs)}, ${displayedNote}\n`,
     );
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    io.stderr.write(`ts-hotspots dedup: ${msg}\n`);
+    io.stderr.write(`ts-hotspots duplication: ${msg}\n`);
     return 1;
   }
 }

@@ -2,14 +2,14 @@
 
 ts-hotspots is a CLI with two complementary features:
 
-- **Hotspots** (default `ts-hotspots [path]`): per-function metrics ranked into a small set of refactor-candidate coordinates. Specified in Part A below.
-- **Dedup** (`ts-hotspots dedup`): Type-3 duplication candidates, in PR mode (changed code vs. the rest of the tree) or whole-repo mode. Specified in Part B; the implementation-level algorithms live under `docs/dedup/`.
+- **Complexity** (`ts-hotspots complexity [path]`, alias `comp`): per-function metrics ranked into a small set of refactor-candidate coordinates. Specified in Part A below.
+- **Duplication** (`ts-hotspots duplication`, alias `dup`): Type-3 duplication candidates, in PR mode (changed code vs. the rest of the tree) or whole-repo mode. Specified in Part B; the implementation-level algorithms live under `docs/dedup/`.
 
 Both features share a single guiding principle: **return coordinates and evidence, not verdicts.** The downstream coding agent or reviewer decides what to do.
 
 ---
 
-## Part A. Hotspots feature
+## Part A. Complexity feature
 
 ## 1. Vision
 
@@ -123,11 +123,11 @@ As a result, two intuitions hold simultaneously: "for the same quality footprint
 ### 7.1 Invocation
 
 ```
-ts-hotspots [path]          # function-axis report (FunctionReport)
+ts-hotspots complexity [path]    # function-axis report (FunctionReport); `comp` is a short alias
 ```
 
 - `path` defaults to the current directory. When given, it is either a directory (we look up `tsconfig.json` inside it) or a direct `tsconfig.json` path.
-- No subcommands. Passing an unknown axis ID to `--metrics` produces an `INVALID_METRIC` error.
+- Passing an unknown axis ID to `--metrics` produces an `INVALID_METRIC` error.
 
 ### 7.2 Flags
 
@@ -203,7 +203,7 @@ Intentionally excluded:
 
 ---
 
-## Part B. Dedup feature
+## Part B. Duplication feature
 
 ## B.1 Vision
 
@@ -293,7 +293,7 @@ The exit code is `0` even when zero groups are found — detection is the tool's
 - **Evidence everywhere**: every reported group is backed by structured evidence. No score-only output.
 - **No persistence, no daemon**: nothing is written between runs.
 
-## B.8 Out of Scope for v1 (dedup)
+## B.8 Out of Scope for v1 (duplication)
 
 - Program Dependence Graph (PDG) analysis.
 - Type-checker–dependent semantic similarity.

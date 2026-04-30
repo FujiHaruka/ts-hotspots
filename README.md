@@ -4,8 +4,8 @@ A CLI that statically analyzes a TypeScript project and points coding agents at 
 
 Two complementary readings of "worth reading first" are supported as subcommands of the same binary:
 
-- `ts-hotspots` — per-function metrics (cognitive complexity, churn, caller count, …) ranked into a small set of **hotspot candidates**. Best for "where in this codebase should I refactor?"
-- `ts-hotspots dedup` — Type-3 **duplication candidates** found across the tree or against a PR diff. Best for "is this change copy-pasting something we already have?"
+- `ts-hotspots complexity` (alias `comp`) — per-function metrics (cognitive complexity, churn, caller count, …) ranked into a small set of **hotspot candidates**. Best for "where in this codebase should I refactor?"
+- `ts-hotspots duplication` (alias `dup`) — Type-3 **duplication candidates** found across the tree or against a PR diff. Best for "is this change copy-pasting something we already have?"
 
 Both commands take a TypeScript project as input and emit machine-readable output. Neither tool proposes refactors itself — they hand the agent coordinates and evidence.
 
@@ -17,12 +17,12 @@ npm i -D ts-hotspots          # or pnpm add -D, yarn add -D
 
 Requires Node.js 24+.
 
-## Hotspot candidates: `ts-hotspots`
+## Hotspot candidates: `ts-hotspots complexity`
 
 Pipe the report straight into Claude:
 
 ```
-npx ts-hotspots | claude --permission-mode plan
+npx ts-hotspots complexity | claude --permission-mode plan
 ```
 
 By default the tool emits a Markdown document containing a short instruction block followed by the hotspot data inside a fenced JSON code block. Claude opens in plan mode already knowing it should read the top candidates and propose a refactor plan.
@@ -30,8 +30,9 @@ By default the tool emits a Markdown document containing a short instruction blo
 ### Usage
 
 ```
-ts-hotspots                  # scans tsconfig.json in the current directory
-ts-hotspots <path>           # directory or tsconfig.json
+ts-hotspots complexity                  # scans tsconfig.json in the current directory
+ts-hotspots complexity <path>           # directory or tsconfig.json
+ts-hotspots comp <path>                 # short alias
 ```
 
 The output is a `FunctionReport` focused on hotspot candidates — the coordinates an agent should read first. By default it contains only the primary signal:
@@ -70,15 +71,16 @@ ts-hotspots undismiss <dismissalId>    # remove an entry
 
 Stale entries (function deleted or edited) are pruned automatically on each run.
 
-## Duplication candidates: `ts-hotspots dedup`
+## Duplication candidates: `ts-hotspots duplication`
 
-`dedup` finds Type-3 duplicates: copy-pasted regions that have been lightly edited (renamed identifiers, reordered statements, slightly different argument shape). It is tuned for **recall** — the goal is to surface every spot worth a second look, not to declare a strict clone verdict.
+`duplication` finds Type-3 duplicates: copy-pasted regions that have been lightly edited (renamed identifiers, reordered statements, slightly different argument shape). It is tuned for **recall** — the goal is to surface every spot worth a second look, not to declare a strict clone verdict.
 
 It runs in two modes:
 
 ```
-ts-hotspots dedup <revrange>            # PR mode: changed code vs. the rest of the tree
-ts-hotspots dedup --whole-repo          # whole-repo mode: every duplicate cluster at one ref
+ts-hotspots duplication <revrange>            # PR mode: changed code vs. the rest of the tree
+ts-hotspots duplication --whole-repo          # whole-repo mode: every duplicate cluster at one ref
+ts-hotspots dup --whole-repo                  # short alias
 ```
 
 `<revrange>` is the standard git form: `A...B` (merge-base vs. head, recommended for PRs), `A..B` (direct), `A...` / `...B` (HEAD on the open side).
@@ -86,10 +88,10 @@ ts-hotspots dedup --whole-repo          # whole-repo mode: every duplicate clust
 Examples:
 
 ```
-ts-hotspots dedup origin/main... > report.md
-ts-hotspots dedup origin/main...HEAD --format json > report.json
-ts-hotspots dedup --whole-repo --format json > report.json
-ts-hotspots dedup --whole-repo --exclude 'src/legacy/**'
+ts-hotspots duplication origin/main... > report.md
+ts-hotspots duplication origin/main...HEAD --format json > report.json
+ts-hotspots duplication --whole-repo --format json > report.json
+ts-hotspots duplication --whole-repo --exclude 'src/legacy/**'
 ```
 
 Output is a clone-group report. Each group bundles a set of fragments that look like the same code, with per-pair scores (token overlap, statement-kind similarity, call/property overlap, size compatibility), shared evidence (which calls / properties / statement kinds / token n-grams the members agree on), and a recommendation hint (`extract-function`, `parameterize`, or `manual-review`). Markdown is the default; pass `--format json` for the machine-readable form.
@@ -104,7 +106,7 @@ Common options:
 - `--ref <ref>` ref to scan in `--whole-repo` mode (default: `HEAD`)
 - `--phase-timings[=summary|verbose]` emit a JSON Lines perf log to stderr
 
-Run `ts-hotspots dedup --help` for the full list.
+Run `ts-hotspots duplication --help` for the full list.
 
 The exit code is 0 even when zero candidates are reported — detection is the tool's job, deciding what to do is the agent's.
 

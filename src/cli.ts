@@ -107,7 +107,7 @@ function parseMetrics(value: string): string[] {
 
 type PendingInvocation =
   | {
-      kind: "analyze";
+      kind: "complexity";
       positional: string | undefined;
       options: FunctionCliOptions;
     }
@@ -128,7 +128,7 @@ type PendingInvocation =
       path: string | undefined;
     }
   | {
-      kind: "dedup";
+      kind: "duplication";
       argv: string[];
     };
 
@@ -138,8 +138,14 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
   program
     .name("ts-hotspots")
     .description("TypeScript metrics reporter")
-    .version(pkg.version)
-    .argument("[path]", "path to project directory or tsconfig.json")
+    .version(pkg.version);
+
+  program
+    .command("complexity [path]")
+    .alias("comp")
+    .description(
+      "rank functions and files by complexity / size / churn (per-function hotspot candidates)",
+    )
     .option(
       "-e, --exclude <glob...>",
       "exclude files matching glob(s); repeat or space-separate (defaults to test files)",
@@ -170,7 +176,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     .option("--no-churn", "disable git churn collection")
     .option("--json", "emit raw JSON instead of the default Markdown prompt")
     .action((pathArg: string | undefined, opts: FunctionCliOptions) => {
-      onInvoke({ kind: "analyze", positional: pathArg, options: opts });
+      onInvoke({ kind: "complexity", positional: pathArg, options: opts });
     });
 
   program
@@ -227,15 +233,16 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     });
 
   program
-    .command("dedup")
+    .command("duplication")
+    .alias("dup")
     .description(
-      "detect Type-3 duplication candidates (run `ts-hotspots dedup --help` for details)",
+      "detect Type-3 duplication candidates (run `ts-hotspots duplication --help` for details)",
     )
     .helpOption(false)
     .allowUnknownOption(true)
-    .argument("[args...]", "forwarded to dedup")
+    .argument("[args...]", "forwarded to the duplication subcommand")
     .action((args: string[]) => {
-      onInvoke({ kind: "dedup", argv: args });
+      onInvoke({ kind: "duplication", argv: args });
     });
 
   return program;
@@ -562,8 +569,16 @@ export async function run(
       stderr.write(s);
     },
   };
+  // exitOverride / configureOutput are not inherited by child commands in
+  // Commander.js, so we apply them to every subcommand too — otherwise a
+  // parse error inside a subcommand calls process.exit() instead of throwing
+  // and writes to the real stderr, bypassing our captured sinks.
   program.exitOverride();
   program.configureOutput(output);
+  for (const sub of program.commands) {
+    sub.exitOverride();
+    sub.configureOutput(output);
+  }
 
   try {
     await program.parseAsync(argv);
@@ -575,6 +590,12 @@ export async function run(
     if (code === "commander.helpDisplayed" || code === "commander.version") {
       return 0;
     }
+    if (code === "commander.help") {
+      // Auto-help was emitted because no subcommand was given. The help
+      // text is already on stderr via configureOutput; the throw carries a
+      // sentinel message ("(outputHelp)") that should not surface.
+      return 1;
+    }
     const message = err instanceof Error ? err.message : String(err);
     stderr.write(`${message}\n`);
     return 1;
@@ -582,7 +603,7 @@ export async function run(
 
   if (invocation === undefined) return 0;
 
-  if (invocation.kind === "analyze") {
+  if (invocation.kind === "complexity") {
     return runFunctions(
       invocation.positional,
       invocation.options,
@@ -591,7 +612,7 @@ export async function run(
     );
   }
 
-  if (invocation.kind === "dedup") {
+  if (invocation.kind === "duplication") {
     return await runDedupMain(invocation.argv, {
       stdout,
       stderr,
