@@ -412,6 +412,129 @@ JSON も並行に出力 (`--format json`) しておけば、後日カテゴリ�
 
 ## 7. エージェント誘導文サンプル
 
-> TODO
+`scan` の Markdown 出力に埋め込む想定の冒頭プロンプトと、それを受け取ったエージェントが取るべき手順を定義する。`docs/dogfooding-prompt.md` と同様、コピー可能な形で書く。
+
+### 7.1 Markdown 先頭に埋め込むプロンプト (案)
+
+```
+You have just received a `ts-hotspots scan` report for a TypeScript project.
+
+The report has up to two sections:
+
+- **hotspots.candidates[]** — functions that are likely refactor starting points.
+  Each candidate has `coords` (file + line range you can pass to the Read tool),
+  `axes` (which metric axes triggered it), and `metrics` (raw values on those
+  axes). `priority: "high"` means co-occurrence across multiple axes; `"medium"`
+  means a discriminative top-3 rescue.
+
+- **duplications.groups[]** — clusters of fragments that look like the same
+  code (Type-3 duplicates). Each group has `anchor` (PR mode) or just
+  `members[]` (whole-repo mode), per-pair `scores`, group `aggregateScores`
+  (min/median/max), `sharedEvidence`, and a `recommendationHint`
+  (`extract-function` / `parameterize` / `manual-review`).
+
+Your job:
+
+1. Open every `priority: "high"` entry and read the source via Read.
+2. For hotspots, decide whether the metric values reflect a real code smell or
+   are saturation (state-machine dispatchers, generated tables, library idioms).
+3. For duplication groups, decide whether the shared evidence supports the
+   recommendation, and whether the duplicates should be unified.
+4. Propose a refactor plan as a flat list of "open file X, do Y" steps.
+   Do not edit code unless asked.
+
+Constraints:
+
+- The report is **facts and coordinates**, not verdicts. Some entries will be
+  legitimate. False positives are tolerable; missing real signal is not — if
+  you suspect important coordinates are absent, say so.
+- Do not invent line numbers or files. Only act on coordinates that appear in
+  the JSON.
+```
+
+### 7.2 dogfooding 用の実行プロンプト (案)
+
+`docs/dogfooding-prompt.md` の scan 版。観察対象を「scan の統合出力が UC1〜UC3 に対して本当に役立っているか」に絞る。
+
+```
+Run one dogfooding session of `ts-hotspots scan` against the target below.
+
+- **Target project (absolute path)**: <<fill in>>
+- **Short slug for file names**: <<fill in>>
+
+You are working inside the ts-hotspots repo. From there:
+
+1. Whole-repo overview run:
+   ```
+   node src/index.ts scan --whole-repo --include-dedup <<target>> \
+     > /tmp/ts-hotspots-<<slug>>-scan.json
+   ```
+2. PR run (pick a recent PR's revrange on the target):
+   ```
+   node src/index.ts scan --pr <<base>>...<<head>> <<target>> \
+     > /tmp/ts-hotspots-<<slug>>-scan-pr.json
+   ```
+
+For each output, evaluate:
+
+- Does the union of `hotspots.candidates[]` and `duplications.groups[]` actually
+  concentrate true signal for *this* project? Or is one section drowning the
+  other?
+- Are the `priority` buckets discriminative? If everything is "medium", the
+  bucket is failing.
+- Are the schema sections separately consumable? Could you have got the same
+  insight by running the two existing subcommands instead?
+
+Write meta-observations to `/tmp/ts-hotspots-scan-dogfooding-<<slug>>.md`. The
+goal is feedback on the *integrated* report, not refactor proposals for the
+target.
+```
 
 ## 8. 未解決の論点
+
+M5 の RFC 段階では決め切らず、M6 実装前に dogfooding を 1〜2 周してから判断する論点。
+
+### 8.1 PR モードでの hotspot のセマンティクス
+
+PR モード (`--pr <revrange>`) で `hotspots.candidates[]` をどう絞るかが未決:
+
+- 案 X: head ref のツリー全体を従来どおり計測。出力は repo 全体の hotspot で、PR との関係は問わない。
+- 案 Y: 計測は head ref 全体だが、出力は **changed files にぶら下がる関数のみ**。PR レビュー文脈では PR に関係する hotspot しか興味がない、という発想。
+- 案 Z: 案 Y に加えて、changed files の churn 値が PR 由来で増えていることを軸として強調する。
+
+UC2 (PR レビュー時の CI レポート) を中心に考えると Y が自然だが、UC1 (初期コンテキスト投入) は X の方が役に立つ場面もある。実装は Y を default、`--full-tree-hotspots` で X 切り替え可能、が無難な落とし所か。
+
+### 8.2 dedup 群の dismissal
+
+hotspot は `dismissalId` (関数本文 hash) で安定 ID を持つが、dedup 群は anchor + N members の集合で、自然な単一 ID が無い。
+
+候補:
+
+- 案 P: 群の正規化キー (members の `bodyHash` をソートして連結 → hash) を `groupDismissalId` として吐き、これで dismiss する。group のメンバが入れ替わると ID が変わる = 自動失効する。
+- 案 Q: dismissal は群レベルではなく **anchor の bodyHash** で行う (PR モードは自然だが、whole-repo モードでは anchor が undefined なので不可)。
+- 案 R: scan では dedup の dismissal を実装せず、必要なら段階3 で別解決。
+
+P が筋は良いが、群サイズが大きく入れ替わるリポジトリでは dismissal がほぼ全自動失効してしまう副作用がある。dogfooding で dedup の noise pattern を観察してから決める。
+
+### 8.3 `priority` ゲート閾値
+
+§5.3 / §5.4 の閾値 (`combined.median ≥ 0.6 && size ≥ 3` 等) は v1 RFC の暫定値で、実際の repo に当てたら "high" が空、または逆に "high" だらけ、という事故が想定される。
+
+M6 実装と同時に小規模 dogfooding (本リポ + 中規模 OSS 1〜2 件) で分布を見ながら calibrate する。閾値は config 化せず、まずはハードコードで十分。
+
+### 8.4 `--exclude` の伝播
+
+hotspot 側は `--exclude` がデフォルトで test ファイルを除外し、dedup 側は別の組込み除外リスト (node_modules, dist, generated, ...) を持つ。`scan --exclude` をどちらに渡すか:
+
+- 案: ユーザ指定の `--exclude` は **両側に等しく追加**。組込みデフォルトは各側がそれぞれ持ち続ける。
+- 留意: 一方で test ファイルは hotspot のデフォルト除外だが dedup には除外されない。`scan` 経由でも従来 dedup と同じ挙動になるよう、scan 側で挙動の差を再現する必要がある。
+
+ここはセマンティクスより実装ノートに近いので M6 で確定する。
+
+### 8.5 出力サイズ
+
+PR モードでは問題ないが、`scan --whole-repo --include-dedup` を大規模 repo (1 万ファイル超) に当てると JSON が数 MB を超える可能性がある。`--top` / `--limit` の既定値 (5 / 20) はそのまま継承する想定だが、`--no-code` を whole-repo の既定に倒す案も検討の余地がある。
+
+### 8.6 `scan` の README 露出時期
+
+§3 で「`scan` が安定したら README quick-start を寄せていく」と書いたが、寄せる判断基準は明示していない。「2 件の dogfooding でユースケース 3 つすべてが過不足なく回り、致命的な priority 誤判定が観測されない」を最低条件として、M6 実装後に判断する。
