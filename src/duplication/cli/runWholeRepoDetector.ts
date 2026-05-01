@@ -338,7 +338,7 @@ export async function runWholeRepoDetector(
   const report: CloneCandidateReport = buildJsonReport(
     {
       tool,
-      pr: { baseSha: sha, headSha: sha },
+      pr: { baseSha: sha, headSha: sha, threeDot: false, changedFiles: 0 },
       pairs: scoredPairs,
       config,
       summary: {

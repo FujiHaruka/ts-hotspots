@@ -93,11 +93,12 @@ describe("main", () => {
     const fenceMatch = /```json\n([\s\S]*?)\n```/.exec(out);
     expect(fenceMatch).not.toBeNull();
     const parsed = JSON.parse(fenceMatch?.[1] ?? "") as {
-      status: string;
-      groups: unknown[];
+      status?: string;
+      hotspots: unknown[];
     };
-    expect(parsed.status).toBe("ok");
-    expect(parsed.groups).toEqual([]);
+    // Success envelope omits `status`; only the error path keeps it.
+    expect(parsed.status).toBeUndefined();
+    expect(parsed.hotspots).toEqual([]);
   });
 
   it("streams the Markdown head before running the detector", async () => {
@@ -144,14 +145,26 @@ describe("main", () => {
       cap.io,
     );
     expect(code).toBe(0);
+    // PR mode keeps the `pr` block; the `summary` block is `--verbose`-only
+    // and stays out of the slim default.
     const parsed = JSON.parse(cap.stdout()) as {
-      pr: { baseSha: string; headSha: string };
-      summary: { mode: string };
-      groups: unknown[];
+      pr: {
+        baseSha: string;
+        headSha: string;
+        threeDot: boolean;
+        changedFiles: number;
+      };
+      summary?: unknown;
+      hotspots: unknown[];
     };
-    expect(parsed.pr).toEqual({ baseSha: sha, headSha: sha });
-    expect(parsed.summary.mode).toBe("pr");
-    expect(parsed.groups).toEqual([]);
+    expect(parsed.pr).toEqual({
+      baseSha: sha,
+      headSha: sha,
+      threeDot: false,
+      changedFiles: 0,
+    });
+    expect(parsed.summary).toBeUndefined();
+    expect(parsed.hotspots).toEqual([]);
   });
 
   it("--exclude drops user-listed paths from the candidate set", async () => {
@@ -189,9 +202,9 @@ describe("main", () => {
     );
     expect(baselineCode).toBe(0);
     const baselineReport = JSON.parse(baseline.stdout()) as {
-      groups: unknown[];
+      hotspots: unknown[];
     };
-    expect(baselineReport.groups.length).toBeGreaterThan(0);
+    expect(baselineReport.hotspots.length).toBeGreaterThan(0);
 
     const filtered = captureIO();
     const filteredCode = await main(
@@ -207,9 +220,9 @@ describe("main", () => {
     );
     expect(filteredCode).toBe(0);
     const filteredReport = JSON.parse(filtered.stdout()) as {
-      groups: unknown[];
+      hotspots: unknown[];
     };
-    expect(filteredReport.groups).toEqual([]);
+    expect(filteredReport.hotspots).toEqual([]);
   });
 
   it("returns 1 and writes an error to stderr when the path is not in a git repo", async () => {
@@ -317,9 +330,9 @@ describe("main", () => {
     );
     expect(codeAll).toBe(0);
     const allReport = JSON.parse(unlimited.stdout()) as {
-      groups: unknown[];
+      hotspots: unknown[];
     };
-    const fullCount = allReport.groups.length;
+    const fullCount = allReport.hotspots.length;
     expect(fullCount).toBeGreaterThan(1);
 
     const capped = captureIO();
@@ -329,9 +342,9 @@ describe("main", () => {
     );
     expect(codeCap).toBe(0);
     const cappedReport = JSON.parse(capped.stdout()) as {
-      groups: unknown[];
+      hotspots: unknown[];
     };
-    expect(cappedReport.groups).toHaveLength(1);
+    expect(cappedReport.hotspots).toHaveLength(1);
     expect(capped.stderr()).toContain(
       `displayed=1 of ${String(fullCount)} groups`,
     );
@@ -394,7 +407,7 @@ describe("main", () => {
     }
 
     interface ParsedReport {
-      groups: { dismissalId: string }[];
+      hotspots: { dismissalId: string }[];
       dismissed?: {
         active: number;
         filteredThisRun: number;
@@ -415,8 +428,8 @@ describe("main", () => {
     it("every reported group exposes a dup:<hex> dismissalId", async () => {
       const r = makeDupRepo();
       const report = await runDup(r.path);
-      expect(report.groups.length).toBeGreaterThan(0);
-      for (const g of report.groups) {
+      expect(report.hotspots.length).toBeGreaterThan(0);
+      for (const g of report.hotspots) {
         expect(g.dismissalId.startsWith("dup:")).toBe(true);
         expect(g.dismissalId.length).toBe("dup:".length + 64);
       }
@@ -426,7 +439,7 @@ describe("main", () => {
     it("dismiss → re-run filters the group and reports the summary", async () => {
       const r = makeDupRepo();
       const first = await runDup(r.path);
-      const target = first.groups[0];
+      const target = first.hotspots[0];
       if (target === undefined) throw new Error("fixture has no dup groups");
 
       class StringSink {
@@ -467,7 +480,7 @@ describe("main", () => {
       expect(saved.entries[0]?.feature).toBe("dup");
 
       const second = await runDup(r.path);
-      const stillThere = second.groups.find(
+      const stillThere = second.hotspots.find(
         (g) => g.dismissalId === target.dismissalId,
       );
       expect(stillThere).toBeUndefined();
@@ -493,7 +506,7 @@ describe("main", () => {
 
       const third = await runDup(r.path);
       expect(
-        third.groups.find((g) => g.dismissalId === target.dismissalId),
+        third.hotspots.find((g) => g.dismissalId === target.dismissalId),
       ).toBeDefined();
       expect(third.dismissed).toBeUndefined();
     });
@@ -501,7 +514,7 @@ describe("main", () => {
     it("stale dup entries get pruned automatically when membership shifts", async () => {
       const r = makeDupRepo();
       const first = await runDup(r.path);
-      const target = first.groups[0];
+      const target = first.hotspots[0];
       if (target === undefined) throw new Error("fixture has no dup groups");
 
       class StringSink {
@@ -601,12 +614,12 @@ describe("main", () => {
     expect(code).toBe(0);
 
     const parsed = JSON.parse(cap.stdout()) as {
-      groups: {
-        anchor?: { location: string };
-        members: { fragment: { location: string } }[];
+      hotspots: {
+        anchor?: { ref: { location: string } };
+        members: { ref: { location: string } }[];
       }[];
     };
-    expect(parsed.groups.length).toBeGreaterThan(0);
+    expect(parsed.hotspots.length).toBeGreaterThan(0);
 
     const stderr = cap.stderr();
     expect(stderr).toMatch(

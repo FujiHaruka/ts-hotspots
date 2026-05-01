@@ -50,9 +50,13 @@ export function renderMarkdownPreError(
  * are concatenated. Errors render as a stand-alone block (no JSON fence)
  * because nothing has been emitted yet.
  */
+/**
+ * Success reports omit `status` entirely; only the error envelope keeps
+ * `status: "error"`. The function discriminates on that field's presence.
+ */
 export function renderMarkdown(
   feature: ReportFeature,
-  report: { status: "ok" | "error"; error?: { message: string } } & object,
+  report: { status?: "error"; error?: { message: string } } & object,
 ): string {
   if (report.status === "error") {
     const message = report.error?.message ?? "";

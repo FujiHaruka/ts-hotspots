@@ -87,7 +87,7 @@ function mkPair(
 describe("buildJsonReport", () => {
   it("passes baseSha / headSha through verbatim", () => {
     const input: ReportInput = {
-      pr: { baseSha: "deadbeef", headSha: "cafef00d" },
+      pr: { baseSha: "deadbeef", headSha: "cafef00d", threeDot: true, changedFiles: 5 },
       pairs: [],
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -111,7 +111,7 @@ describe("buildJsonReport", () => {
       mkPair("c3", "b3", 0.3, { intersections: semanticIntersections }),
     ];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -131,7 +131,7 @@ describe("buildJsonReport", () => {
       mkPair("c", "b3", 0.6, { intersections: semanticIntersections }),
     ];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -174,7 +174,7 @@ describe("buildJsonReport", () => {
       intersections: { tokens: [], statements: [], calls: [] },
     };
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [pair],
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -205,7 +205,7 @@ describe("buildJsonReport", () => {
       },
     });
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [pair],
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -231,7 +231,7 @@ describe("buildJsonReport", () => {
     };
     const pair = mkPair("c", "b", 0.5, { intersections });
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [pair],
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -258,7 +258,7 @@ describe("buildJsonReport", () => {
       },
     });
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [pair],
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -280,7 +280,7 @@ describe("buildJsonReport", () => {
   it("deduplicates pairs with the same (changedId, baseId)", () => {
     const pair = mkPair("c", "b", 0.5);
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [pair, pair],
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -301,7 +301,7 @@ describe("buildJsonReport", () => {
       mkPair("c3", "b3", 0.6, { intersections: semanticIntersections }),
     ];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -319,7 +319,7 @@ describe("buildJsonReport", () => {
     };
     const pairs = [mkPair("c1", "b1", 0.6, { intersections })];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -338,7 +338,7 @@ describe("buildJsonReport", () => {
     };
     const pairs = [mkPair("c1", "b1", 0.6, { intersections })];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -360,7 +360,7 @@ describe("buildJsonReport", () => {
     };
     const pairs = [mkPair("c1", "b1", 0.6, { intersections })];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,
@@ -441,7 +441,7 @@ describe("buildJsonReport", () => {
       const a = thinFragment("a", "a.tsx");
       const b = thinFragment("b", "b.tsx");
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "y" },
+        pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
         pairs: [makePair(a, b)],
         config: defaultConfig,
         summary: STUB_PR_SUMMARY,
@@ -454,7 +454,7 @@ describe("buildJsonReport", () => {
       const a = thinFragment("a", "a.tsx");
       const b = thinFragment("b", "b.tsx");
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "y" },
+        pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
         pairs: [makePair(a, b)],
         config: defaultConfig,
         summary: STUB_PR_SUMMARY,
@@ -466,7 +466,7 @@ describe("buildJsonReport", () => {
       const a = thinFragment("a", "a.tsx");
       const b = thinFragment("b", "b.tsx");
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "y" },
+        pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
         pairs: [makePair(a, b)],
         config: {
           ...defaultConfig,
@@ -488,7 +488,7 @@ describe("buildJsonReport", () => {
       const a = thinFragment("a", "a.tsx");
       const b = realFragment("b", "b.tsx");
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "y" },
+        pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
         pairs: [makePair(a, b)],
         config: defaultConfig,
         summary: STUB_PR_SUMMARY,
@@ -506,7 +506,7 @@ describe("buildJsonReport", () => {
       const perfLog = new RecordingPerfLogger();
       buildJsonReport(
         {
-          pr: { baseSha: "x", headSha: "y" },
+          pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
           pairs: [makePair(a, b)],
           config: defaultConfig,
           summary: STUB_PR_SUMMARY,
@@ -525,7 +525,7 @@ describe("buildJsonReport", () => {
       const perfLog = new RecordingPerfLogger();
       buildJsonReport(
         {
-          pr: { baseSha: "x", headSha: "y" },
+          pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
           pairs: [makePair(a, b)],
           config: defaultConfig,
           summary: STUB_PR_SUMMARY,
@@ -552,7 +552,7 @@ describe("buildJsonReport", () => {
         mkPair("b", "c", 0.75, { intersections: semanticIntersections }),
       ];
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "x" },
+        pr: { baseSha: "x", headSha: "x", threeDot: false, changedFiles: 0 },
         pairs,
         config: defaultConfig,
         summary: STUB_WHOLE_REPO_SUMMARY,
@@ -585,7 +585,7 @@ describe("buildJsonReport", () => {
         },
       };
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "x" },
+        pr: { baseSha: "x", headSha: "x", threeDot: false, changedFiles: 0 },
         pairs,
         config,
         summary: STUB_WHOLE_REPO_SUMMARY,
@@ -602,7 +602,7 @@ describe("buildJsonReport", () => {
         mkPair("c", "b2", 0.6, { intersections: semanticIntersections }),
       ];
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "y" },
+        pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
         pairs,
         config: defaultConfig,
         summary: STUB_PR_SUMMARY,
@@ -625,7 +625,7 @@ describe("buildJsonReport", () => {
       mkPair("c3", "b1", 0.5, { intersections }),
     ];
     const input: ReportInput = {
-      pr: { baseSha: "a", headSha: "b" },
+      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,

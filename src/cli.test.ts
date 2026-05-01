@@ -41,11 +41,13 @@ const COMPLEXITY_PREFIX = [...ARGV_PREFIX, "complexity"];
 interface ParsedFunctionReport {
   tool: { name: string; version: string };
   project: {
-    tsconfigPath: string;
     sourceFileCount: number;
-    functionCount: number;
+    /** `--verbose` only. */
+    tsconfigPath?: string;
+    /** `--verbose` only. */
+    functionCount?: number;
   };
-  functionHotspotCandidates: HotspotCandidate[];
+  hotspots: HotspotCandidate[];
   functionRankings?: Partial<Record<FunctionAxisId, RankedFunctionEntry[]>>;
   functionAxisMeta?: Record<FunctionAxisId, AxisMeta>;
   functionCoOccurrence?: FunctionCoOccurrenceEntry[];
@@ -71,19 +73,22 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     expect(report.tool.name).toBe("ts-hotspots");
-    expect(report.project.tsconfigPath).toBe(FIXTURE_TSCONFIG);
     expect(report.project.sourceFileCount).toBeGreaterThan(0);
-    expect(report.project.functionCount).toBeGreaterThan(0);
+    // Slim default trims `tsconfigPath` and `functionCount` from the
+    // envelope — they remain on the stderr stats line and surface only
+    // under `--verbose`.
+    expect(report.project.tsconfigPath).toBeUndefined();
+    expect(report.project.functionCount).toBeUndefined();
 
     // Slim default: only hotspot candidates remain as the primary signal.
-    expect(Array.isArray(report.functionHotspotCandidates)).toBe(true);
+    expect(Array.isArray(report.hotspots)).toBe(true);
     expect(report.functionRankings).toBeUndefined();
     expect(report.functionAxisMeta).toBeUndefined();
     expect(report.functions).toBeUndefined();
     expect(report.functionCoOccurrence).toBeUndefined();
   });
 
-  test("--limit caps functionHotspotCandidates only, not the per-axis rankings", async () => {
+  test("--limit caps hotspots only, not the per-axis rankings", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
@@ -92,7 +97,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
         FIXTURE_TSCONFIG,
         "--limit",
         "1",
-        "--full",
+        "--verbose",
         "--format",
         "json",
       ],
@@ -101,7 +106,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     );
     expect(code).toBe(0);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
-    expect(report.functionHotspotCandidates.length).toBeLessThanOrEqual(1);
+    expect(report.hotspots.length).toBeLessThanOrEqual(1);
     // --limit must NOT shrink per-axis rankings: the discriminative axes in
     // the fixture should still emit more than one ranked entry.
     const sloc = report.functionRankings?.sloc ?? [];
@@ -126,7 +131,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(code).toBe(0);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     // Sanity: a non-zero number of candidates exist so 'all' is observable.
-    expect(report.functionHotspotCandidates.length).toBeGreaterThan(0);
+    expect(report.hotspots.length).toBeGreaterThan(0);
   });
 
   test("--limit is ignored in --file mode and warns on stderr", async () => {
@@ -174,11 +179,11 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(stderr.text).toContain("unknown option");
   });
 
-  test("--metrics filters axes under --full; unspecified axes are empty", async () => {
+  test("--metrics filters axes under --verbose; unspecified axes are empty", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "-m", "sloc", "--full", "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "-m", "sloc", "--verbose", "--format", "json"],
       stdout,
       stderr,
     );
@@ -189,7 +194,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(report.functionRankings?.cognitiveComplexity).toEqual([]);
   });
 
-  test("--metrics accepts new v0.3.0 axes without errors (under --full)", async () => {
+  test("--metrics accepts new v0.3.0 axes without errors (under --verbose)", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
@@ -198,7 +203,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
         FIXTURE_TSCONFIG,
         "-m",
         "callerCount,mutationSiteCount,tryCatchCount,awaitCount,calleeCount",
-        "--full",
+        "--verbose",
         "--format", "json",
       ],
       stdout,
@@ -207,13 +212,13 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(code).toBe(0);
     expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
-    // Meta is emitted for every axis under --full.
+    // Meta is emitted for every axis under --verbose.
     expect(report.functionAxisMeta?.callerCount).toBeDefined();
     expect(report.functionAxisMeta?.calleeCount).toBeDefined();
     expect(report.functionAxisMeta?.tryCatchCount).toBeDefined();
     expect(report.functionAxisMeta?.awaitCount).toBeDefined();
     expect(report.functionAxisMeta?.mutationSiteCount).toBeDefined();
-    // Unrequested axes yield empty rankings under --full.
+    // Unrequested axes yield empty rankings under --verbose.
     expect(report.functionRankings?.cognitiveComplexity).toEqual([]);
   });
 
@@ -254,8 +259,10 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
   test("positional directory resolves to <dir>/tsconfig.json", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
+    // `--verbose` is required to surface `project.tsconfigPath` (the slim
+    // default omits it).
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--verbose", "--format", "json"],
       stdout,
       stderr,
     );
@@ -282,20 +289,20 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--full", "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--verbose", "--format", "json"],
       stdout,
       stderr,
     );
     expect(code).toBe(0);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     const locations = [
-      ...report.functionHotspotCandidates.map((c) => c.ref.location),
+      ...report.hotspots.map((c) => c.ref.location),
       ...Object.values(report.functionRankings ?? {}).flatMap((list) =>
         list.map((e) => e.ref.location),
       ),
     ];
     const names = [
-      ...report.functionHotspotCandidates.map((c) => c.ref.name),
+      ...report.hotspots.map((c) => c.ref.name),
       ...Object.values(report.functionRankings ?? {}).flatMap((list) =>
         list.map((e) => e.ref.name),
       ),
@@ -339,7 +346,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
         FIXTURE_TSCONFIG,
         "--exclude",
         "**/a.ts",
-        "--full",
+        "--verbose",
         "--format",
         "json",
       ],
@@ -384,7 +391,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(report.functionCoOccurrence).toBeUndefined();
     // Candidates must stay confined to the requested axes.
     const allowed = new Set(["cognitiveComplexity", "sloc"]);
-    for (const c of report.functionHotspotCandidates) {
+    for (const c of report.hotspots) {
       for (const key of Object.keys(c.metrics)) {
         expect(allowed.has(key)).toBe(true);
       }
@@ -404,11 +411,11 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(report.functionCoOccurrence).toBeUndefined();
   });
 
-  test("functionAxisMeta under --full is present for every function axis", async () => {
+  test("functionAxisMeta under --verbose is present for every function axis", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--full", "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--verbose", "--format", "json"],
       stdout,
       stderr,
     );
@@ -427,11 +434,11 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     }
   });
 
-  test("--full restores rankings, axisMeta, coOccurrence, and functions[]", async () => {
+  test("--verbose restores rankings, axisMeta, coOccurrence, and functions[]", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--full", "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--verbose", "--format", "json"],
       stdout,
       stderr,
     );
@@ -452,15 +459,15 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(axes).toContain("tryCatchCount");
     expect(rankings.tryCatchCount).toEqual([]);
 
-    expect(Array.isArray(report.functionHotspotCandidates)).toBe(true);
+    expect(Array.isArray(report.hotspots)).toBe(true);
     expect(report.functionAxisMeta?.cognitiveComplexity).toBeDefined();
   });
 
-  test("--full and slim default agree on functionHotspotCandidates", async () => {
+  test("--verbose and slim default agree on hotspots", async () => {
     const fullStdout = new StringSink();
     const fullStderr = new StringSink();
     const fullCode = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--full", "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--verbose", "--format", "json"],
       fullStdout,
       fullStderr,
     );
@@ -477,8 +484,8 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
 
     const fullReport = JSON.parse(fullStdout.text) as ParsedFunctionReport;
     const slimReport = JSON.parse(slimStdout.text) as ParsedFunctionReport;
-    expect(slimReport.functionHotspotCandidates).toEqual(
-      fullReport.functionHotspotCandidates,
+    expect(slimReport.hotspots).toEqual(
+      fullReport.hotspots,
     );
   });
 
@@ -527,7 +534,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const body = match?.[1] ?? "";
     const parsed = JSON.parse(body) as ParsedFunctionReport;
     expect(parsed.tool.name).toBe("ts-hotspots");
-    expect(Array.isArray(parsed.functionHotspotCandidates)).toBe(true);
+    expect(Array.isArray(parsed.hotspots)).toBe(true);
   });
 
   test("--json default invocation emits pure JSON (no Markdown header)", async () => {
@@ -584,7 +591,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--no-churn", "--full", "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--no-churn", "--verbose", "--format", "json"],
       stdout,
       stderr,
     );
@@ -707,8 +714,8 @@ describe("dismissal registry subcommands", () => {
 
   test("every candidate carries a comp:<hex> dismissalId", async () => {
     const report = await analyze();
-    expect(report.functionHotspotCandidates.length).toBeGreaterThan(0);
-    for (const c of report.functionHotspotCandidates) {
+    expect(report.hotspots.length).toBeGreaterThan(0);
+    for (const c of report.hotspots) {
       expect(c.dismissalId.startsWith("comp:")).toBe(true);
     }
   });
@@ -720,7 +727,7 @@ describe("dismissal registry subcommands", () => {
 
   test("dismiss writes registry, next run filters candidate and reports summary", async () => {
     const first = await analyze();
-    const target = first.functionHotspotCandidates[0];
+    const target = first.hotspots[0];
     if (target === undefined) throw new Error("fixture has no candidates");
 
     const dismissOut = new StringSink();
@@ -755,7 +762,7 @@ describe("dismissal registry subcommands", () => {
 
     const second = await analyze();
     expect(
-      second.functionHotspotCandidates.find(
+      second.hotspots.find(
         (c) => c.dismissalId === target.dismissalId,
       ),
     ).toBeUndefined();
@@ -816,7 +823,7 @@ describe("dismissal registry subcommands", () => {
 
   test("dismiss is idempotent for an already-dismissed id", async () => {
     const first = await analyze();
-    const target = first.functionHotspotCandidates[0];
+    const target = first.hotspots[0];
     if (target === undefined) throw new Error("fixture has no candidates");
 
     for (let i = 0; i < 2; i += 1) {
@@ -847,7 +854,7 @@ describe("dismissal registry subcommands", () => {
 
   test("list-dismissed --json prints the registry", async () => {
     const first = await analyze();
-    const target = first.functionHotspotCandidates[0];
+    const target = first.hotspots[0];
     if (target === undefined) throw new Error("fixture has no candidates");
 
     await run(
@@ -880,7 +887,7 @@ describe("dismissal registry subcommands", () => {
 
   test("undismiss removes an entry and errors when id absent", async () => {
     const first = await analyze();
-    const target = first.functionHotspotCandidates[0];
+    const target = first.hotspots[0];
     if (target === undefined) throw new Error("fixture has no candidates");
 
     await run(
@@ -992,6 +999,6 @@ describe("complexity subcommand routing", () => {
     expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     expect(report.tool.name).toBe("ts-hotspots");
-    expect(report.project.tsconfigPath).toBe(FIXTURE_TSCONFIG);
+    expect(report.project.sourceFileCount).toBeGreaterThan(0);
   });
 });

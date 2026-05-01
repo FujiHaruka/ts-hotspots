@@ -20,7 +20,7 @@ describe("parseCliArgs", () => {
       excludeGlobs: [],
       phaseTimings: undefined,
       limit: 20,
-      includeCode: true,
+      verbose: false,
     });
   });
 
@@ -138,7 +138,7 @@ describe("parseCliArgs", () => {
       excludeGlobs: [],
       phaseTimings: undefined,
       limit: 20,
-      includeCode: true,
+      verbose: false,
     });
   });
 
@@ -264,31 +264,31 @@ describe("parseCliArgs", () => {
     expect(r.limit).toBe(200);
   });
 
-  it("defaults includeCode to true", () => {
+  it("defaults verbose to false", () => {
     const pr = parseCliArgs(["main..feature"]);
     if (pr.kind !== "run" || pr.mode !== "pr") {
       throw new Error("expected pr mode");
     }
-    expect(pr.includeCode).toBe(true);
+    expect(pr.verbose).toBe(false);
 
     const wr = parseCliArgs(["--whole-repo"]);
     if (wr.kind !== "run" || wr.mode !== "whole-repo") {
       throw new Error("expected whole-repo mode");
     }
-    expect(wr.includeCode).toBe(true);
+    expect(wr.verbose).toBe(false);
   });
 
-  it("sets includeCode to false when --no-code is passed", () => {
-    const pr = parseCliArgs(["main..feature", "--no-code"]);
+  it("sets verbose to true when --verbose is passed", () => {
+    const pr = parseCliArgs(["main..feature", "--verbose"]);
     if (pr.kind !== "run" || pr.mode !== "pr") {
       throw new Error("expected pr mode");
     }
-    expect(pr.includeCode).toBe(false);
+    expect(pr.verbose).toBe(true);
 
-    const wr = parseCliArgs(["--whole-repo", "--no-code"]);
+    const wr = parseCliArgs(["--whole-repo", "--verbose"]);
     if (wr.kind !== "run" || wr.mode !== "whole-repo") {
       throw new Error("expected whole-repo mode");
     }
-    expect(wr.includeCode).toBe(false);
+    expect(wr.verbose).toBe(true);
   });
 });

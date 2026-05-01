@@ -72,13 +72,27 @@ export interface DismissedSummary {
   prunedThisRun: number;
 }
 
+/**
+ * PR-mode metadata. Mirrors `comp`'s `PrInfo` so consumers can read the
+ * scope of a diff identically across subcommands.
+ *
+ * In whole-repo mode `pr` still exists internally (`baseSha === headSha`,
+ * `threeDot: false`, `changedFiles: 0`) for type stability, but
+ * `serializeReport` strips it from the output envelope.
+ */
+export interface DuplicationPrInfo {
+  baseSha: string;
+  headSha: string;
+  /** `true` for `A...B` (merge-base semantics). `false` for `A..B`. */
+  threeDot: boolean;
+  /** Count of `.ts`/`.tsx` files changed between `baseSha` and `headSha`. */
+  changedFiles: number;
+}
+
 export interface CloneCandidateReport {
   status: "ok";
   tool: ReportTool;
-  pr: {
-    baseSha: string;
-    headSha: string;
-  };
+  pr: DuplicationPrInfo;
   summary: AnalysisSummary;
   groups: CloneGroup[];
   dismissed?: DismissedSummary;

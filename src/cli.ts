@@ -87,7 +87,7 @@ interface FunctionCliOptions extends ChurnCliOptions {
   limit?: number;
   metrics?: string[];
   file?: string;
-  full?: boolean;
+  verbose?: boolean;
   format?: ReportFormat;
   pr?: RevRange;
 }
@@ -200,7 +200,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     )
     .option(
       "--limit <N|all>",
-      "max entries in functionHotspotCandidates[] (default: 20). Pass 'all' to keep every candidate.",
+      "max entries in hotspots[] (default: 20). Pass 'all' to keep every candidate.",
       parseLimit,
     )
     .option(
@@ -210,8 +210,8 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     )
     .option("--file <path>", "drill down into a single file (raw metrics only)")
     .option(
-      "--full",
-      "emit the full report (all axes, coOccurrence, functions[])",
+      "--verbose",
+      "emit the rich report (all axes, coOccurrence, functions[])",
     )
     .option(
       "--churn-window <N>",
@@ -423,6 +423,16 @@ function prepare(
   return { tsconfigPath, rootDir, projectInfo, functions };
 }
 
+/**
+ * Strip `--verbose`-only fields from `projectInfo` so the slim default
+ * envelope only carries the one project signal an agent needs to size up
+ * the run (`sourceFileCount`). `tsconfigPath` and `functionCount` stay
+ * available to `--verbose` callers and to the stderr stats line.
+ */
+function slimProject(projectInfo: ReportProject): ReportProject {
+  return { sourceFileCount: projectInfo.sourceFileCount };
+}
+
 interface DismissalApplyResult {
   candidates: HotspotCandidate[];
   summary?: DismissedSummary;
@@ -484,7 +494,7 @@ function errorCode(err: unknown, fallback: string): string {
 
 function writeOk(
   stdout: WritableLike,
-  report: FunctionReport & { status: "ok" },
+  report: FunctionReport,
   streaming: boolean,
 ): void {
   stdout.write(streaming ? renderMarkdownBody(report) : renderJson(report));
@@ -492,8 +502,9 @@ function writeOk(
 
 function writeStatsLine(
   stderr: WritableLike,
-  report: FunctionReport & { status: "ok" },
+  report: FunctionReport,
   fileMode: { file: string } | undefined,
+  functionCount: number,
 ): void {
   const { project } = report;
   let payload: string;
@@ -503,8 +514,8 @@ function writeStatsLine(
   } else {
     payload =
       `files=${String(project.sourceFileCount)}, ` +
-      `functions=${String(project.functionCount)}, ` +
-      `candidates=${String(report.functionHotspotCandidates.length)}`;
+      `functions=${String(functionCount)}, ` +
+      `candidates=${String(report.hotspots.length)}`;
   }
   if (report.pr !== undefined) {
     payload += `, pr=${String(report.pr.changedFiles)} changed files`;
@@ -678,14 +689,13 @@ async function runFunctions(
         f.location.startsWith(prefix),
       );
       const report: FunctionReport = {
-        status: "ok",
         tool: { name: "ts-hotspots", version: pkg.version },
         project: projectInfo,
-        functionHotspotCandidates: [],
+        hotspots: [],
         functions: targetFunctions,
       };
       writeOk(stdout, report, streaming);
-      writeStatsLine(stderr, report, { file: rel });
+      writeStatsLine(stderr, report, { file: rel }, functions.length);
       return 0;
     }
 
@@ -739,7 +749,7 @@ async function runFunctions(
       prScope === undefined
         ? filteredCandidates
         : filterCandidatesByScope(filteredCandidates, prScope.isInScope);
-    const functionHotspotCandidates = Number.isFinite(limit)
+    const hotspots = Number.isFinite(limit)
       ? scopedCandidates.slice(0, limit)
       : scopedCandidates;
 
@@ -756,15 +766,14 @@ async function runFunctions(
           }
         : undefined;
 
-    if (options.full === true) {
+    if (options.verbose === true) {
       const usedFunctionKeys = collectFunctionRefKeys(displayedRankings);
       const report: FunctionReport = {
-        status: "ok",
         tool: { name: "ts-hotspots", version: pkg.version },
         project: projectInfo,
         functionRankings: displayedRankings,
         functionAxisMeta,
-        functionHotspotCandidates,
+        hotspots,
         functionCoOccurrence: displayedCoOccurrence,
         functions: functions.filter((f) =>
           usedFunctionKeys.has(
@@ -780,21 +789,20 @@ async function runFunctions(
       if (prScope !== undefined) report.pr = prScope.info;
       if (prNotice !== undefined) report.notice = prNotice;
       writeOk(stdout, report, streaming);
-      writeStatsLine(stderr, report, undefined);
+      writeStatsLine(stderr, report, undefined, functions.length);
       return 0;
     }
 
     const report: FunctionReport = {
-      status: "ok",
       tool: { name: "ts-hotspots", version: pkg.version },
-      project: projectInfo,
-      functionHotspotCandidates,
+      project: slimProject(projectInfo),
+      hotspots,
     };
     if (dismissed !== undefined) report.dismissed = dismissed;
     if (prScope !== undefined) report.pr = prScope.info;
     if (prNotice !== undefined) report.notice = prNotice;
     writeOk(stdout, report, streaming);
-    writeStatsLine(stderr, report, undefined);
+    writeStatsLine(stderr, report, undefined, functions.length);
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

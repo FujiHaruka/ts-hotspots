@@ -137,7 +137,7 @@ ts-hotspots complexity [path]    # function-axis report (FunctionReport); `comp`
 | `--exclude <glob...>` | Exclude target files | `**/*.{test,spec}.{ts,tsx,mts,cts}` |
 | `--metrics <list>` | Restrict output to these axis IDs (comma-separated) | unset = all axes |
 | `--file <path>` | Single-file drill-down mode: return every function in that file across all metrics. Ranking and candidate computation are skipped. | — |
-| `--full` | On top of the default slim output, restore `functionRankings` / `functionAxisMeta` / `functionCoOccurrence` / `functions[]` | off |
+| `--verbose` | On top of the default slim output, restore `functionRankings` / `functionAxisMeta` / `functionCoOccurrence` / `functions[]` | off |
 | `--churn-window <N>` | How many recent commits git churn walks | 200 |
 | `--churn-ref <ref>` | Starting ref for churn measurement | `HEAD` |
 | `--no-churn` | Disable git churn collection entirely | — |
@@ -149,12 +149,15 @@ A config file (`ts-hotspots.config.*`) is not shipped in v1. Candidate gates and
 
 ### 8.1 `FunctionReport` (default)
 
-- `functionHotspotCandidates`: the only primary signal. The candidate set produced in §6. Each candidate carries a `ref` (`location`, `name`, `kind`) and a `metrics` map containing **only the raw metrics corresponding to hit axes**.
-- Additional fields are returned only with `--full`:
+- Envelope: `tool`, `project`, `hotspots[]`, plus optional `dismissed`, `pr`, `notice`. The shape is parallel to `dup`'s output (same keys) so an agent can consume both subcommands identically. Success reports omit `status`; only the error envelope sets `status: "error"`, so a top-level `status` field doubles as the failure discriminator.
+- `project` carries only `sourceFileCount` in slim mode. `tsconfigPath` and `functionCount` move to `--verbose`; the stderr stats line repeats them in human form.
+- `hotspots`: the primary signal. The candidate set produced in §6. Each candidate carries `kind: "complexity"` (discriminator parallel to `dup`'s `kind: "duplication"`), a `ref` (`location`, `name`, `kind`), a `score` (`{ axis, value }` — the metric where this candidate ranked highest), a `metrics` map containing **only the raw metrics corresponding to hit axes**, and a `dismissalId`.
+- Additional fields are returned only with `--verbose`:
   - `functionRankings`: top-N across every axis
-  - `functionAxisMeta`: per-axis `nonZeroCount` / `maxTieLength` / `topNSpread` / `uniqueTopNValues` (always computed internally for candidate selection, but loaded into the schema only under `--full`)
+  - `functionAxisMeta`: per-axis `nonZeroCount` / `maxTieLength` / `topNSpread` / `uniqueTopNValues` (always computed internally for candidate selection, but loaded into the schema only under `--verbose`)
   - `functionCoOccurrence`: enumeration of functions that appear in the top-N of multiple axes
   - `functions[]`: raw metrics for every function that shows up in any ranking
+  - `project.tsconfigPath` / `project.functionCount` (omitted from the slim envelope)
 
 - Under `--file <path>`, ranking and candidate computation are both skipped; every function in the specified file is returned via `functions[]`.
 
@@ -269,21 +272,32 @@ Each candidate pair is then re-scored on:
 
 A weighted combined score is produced. Final reporting is gated by an **OR** condition: a pair clears if the combined score crosses its threshold *or* any single axis crosses its axis-specific threshold. This keeps the false-negative rate low.
 
-## B.6 Output: Clone Groups
+## B.6 Output: Hotspots
 
-The reporting unit is a **clone group**, not a pair. When the same pattern appears in N places, the report contains one group with N members, not `N(N−1)/2` pairs.
+The reporting unit is a **hotspot**, one per clone group. When the same pattern appears in N places, the report contains one entry with N coordinates, not `N(N−1)/2` pairs.
 
-A group carries:
+The envelope mirrors `comp`'s: `tool`, `project` (`sourceFileCount`; `--verbose` adds `fragmentCount`), `hotspots[]`, plus optional `pr`, `dismissed`. PR mode keeps the `pr` block (`baseSha` / `headSha` / `threeDot` / `changedFiles`, identical to `comp`'s); whole-repo mode omits it. The pipeline / scope counters live on the stderr stats line, not in the JSON. Success reports omit `status`; only the error envelope keeps it (`status: "error"`).
 
-- `pr.baseSha` / `pr.headSha` — same sha twice in whole-repo mode; the schema stays uniform across modes.
-- `summary` — mode (`pr` / `whole-repo`), per-side scope stats (files / fragments / lines / `fragmentsByKind` / `excludedFiles`), and pipeline counters (`candidatePairs` / `reportedPairs`).
-- `anchor` — the changed-side fragment in PR mode; `undefined` in whole-repo mode where no side is privileged.
-- `members[]` — each entry has the existing-side fragment view, per-pair scores, and per-pair evidence (which calls / properties / statement kinds / token n-grams matched).
-- `aggregateScores` — group-level `min` / `median` / `max` over members, per axis.
-- `sharedEvidence` — keys present in *every* pair of the group.
+Each `hotspots[]` entry carries:
+
+- `kind: "duplication"` — discriminator for agents that consume both `comp` and `dup`.
+- `size` — total fragments in the group: `(anchor ? 1 : 0) + members.length`.
+- `score` — `{ axis: "combined", value }` — single representative similarity (median `combined` across pairs, in 0..1). Same shape as `comp`'s `score`.
+- `anchor?` — the changed-side fragment in PR mode; absent in whole-repo mode where no side is privileged. Shape: `{ ref: { location, kind } }`.
+- `members[]` — every other fragment in the group, ordered by descending pair score. Shape: `{ ref: { location, kind } }`.
+- `evidence` — `calls[]` and `properties[]` shared by every member, prefix-stripped (`new X` / `await X` keep the constructor / await distinction visible without leaking internal `CALL:` / `NEW:` / `AWAIT_CALL:` / `PROP:` markers).
+- `dismissalId` — `dup:<hex>`; auto-expires when the group's membership changes.
+
+`--verbose` re-attaches the diagnostic detail dropped by the slim default:
+
+- `summary` — mode, per-side scope stats (files / fragments / lines / `fragmentsByKind` / `excludedFiles`), and pipeline counters (`candidatePairs` / `reportedPairs`).
+- `members[].scores` — per-pair `combined` plus the five sub-axes.
+- `members[].code` — fragment source (omitted from the slim default to keep the report under an LLM's attention budget).
+- `aggregateScores` — group-level `min` / `median` / `max` per axis.
+- `evidenceFull` — `statementKinds` and `tokenNgramsSample` (the slim `evidence` block already covers `calls` / `properties`).
 - `recommendationHint` — `extract-function` / `parameterize` / `manual-review`, plus a confidence level computed from the weakest pair.
 
-The exit code is `0` even when zero groups are found — detection is the tool's responsibility, decision-making is downstream. Default output is Markdown (`--format markdown`); `--format json` emits the same data as JSON.
+The exit code is `0` even when zero hotspots are found — detection is the tool's responsibility, decision-making is downstream. Default output is Markdown (`--format markdown`); `--format json` emits the same data as JSON.
 
 ## B.7 Non-functional
 
