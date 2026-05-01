@@ -160,7 +160,10 @@ async function tryResolveDisplay(
     }
     const declarations = enumerateDeclarations(project, rootDir, { files });
     for (const d of declarations) {
-      if (bodyHashToCompDismissalId(computeBodyHash(d.node)) === id) {
+      if (
+        bodyHashToCompDismissalId(computeBodyHash(d.tsNode, d.tsSourceFile)) ===
+        id
+      ) {
         return {
           file: d.file,
           name: d.name,

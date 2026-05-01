@@ -9,7 +9,7 @@
 - [x] **M1** — Bridge: `Declaration` に `tsNode` / `tsSourceFile` を追加 (`.compilerNode` 経由) し、ts-only の walk / parse ヘルパを新設。production 挙動は不変。
 - [x] **M2-1** — complexity collectors (cognitive / sloc / parameter-count / max-nesting-depth) を ts-only に書き換え。
 - [x] **M2-2** — effects + call-graph collectors (await-count / mutation-count / try-catch-count / callee-count) を ts-only に書き換え。
-- [ ] **M2-3** — dismissal/hash と aggregator のテスト fixture を ts-only に書き換え。
+- [x] **M2-3** — dismissal/hash を ts-only に書き換え + hash.test.ts を `parseFirstFunctionLike` に移行。aggregate.test.ts は `enumerateDeclarations` 経由のため M3 まで Project ベース据置。
 - [ ] **M3** — ts-morph 撤去: `Declaration.node` 削除 / `loadProject` を `ts.createSourceFile` 直接に書き換え / `enumerate-source-files.ts` を縮小 / `package.json` から `ts-morph` を削除 / dogfooding で性能・出力差確認。
 
 ## 1. 経緯
@@ -275,3 +275,15 @@ src/dismissal/hash.test.ts
 実装メモ:
 
 - `getBody` ヘルパが今や 6 collector (cognitive, max-nesting-depth, await-count, mutation-count, try-catch-count, callee-count) で重複。M3 で `Declaration` から ts-morph `node` を消す段階で `decl.tsBody` を生やすか、`internal/getBody.ts` を切り出す判断に持ち越し。本 M2-2 では機械的置換に集中し、共通化は後回し。
+
+### M2-3 (2026-05-01)
+
+- `computeBodyHash(node: ts.Node, sourceFile: ts.SourceFile)` にシグネチャ変更し、`node.getText()` → `node.getText(sourceFile)`。collector / aggregator 経路では sourceFile が常に取れるので runtime には影響しない。
+- 呼び出し側 2 箇所を更新: `src/aggregator/aggregate.ts` (`d.tsNode, d.tsSourceFile` 渡し)、`src/cli/dismiss.ts` (同上)。
+- `hash.test.ts` を `parseFirstFunctionLike` ベースに置換。`Project + getFirstDescendantByKindOrThrow(FunctionDeclaration)` パターンを `parseFirstFunctionLike` の 1 行に集約 (テスト 6 件)。
+- `aggregate.test.ts` は **意図的に Project ベースのまま据置**。`enumerateDeclarations` が依然 ts-morph `Project` を要求するため、ここを書き換えるなら M3 で `enumerateDeclarations` ごと移行する必要がある。M2-3 のスコープ越え。
+- 出力 dogfood: pre/post の `comp` 出力を全 54 関数で diff。修正したファイル `src/cli/dismiss.ts` の 1 関数 (3 行追加) 以外は **bodyHash bit-identical**。`getText()` ↔ `getText(sourceFile)` の置換が無害であることを確認。
+
+実装メモ:
+
+- `computeBodyHash` の引数追加は API breaking だが、本 repo 内の caller (aggregate / dismiss CLI / テスト) のみで完結するので破壊範囲は閉じている。外部 SDK ではない。

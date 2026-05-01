@@ -1,8 +1,11 @@
 import { createHash } from "node:crypto";
-import type { Node } from "ts-morph";
+import type ts from "typescript";
 
-export function computeBodyHash(node: Node): string {
-  return hashText(node.getText());
+export function computeBodyHash(
+  node: ts.Node,
+  sourceFile: ts.SourceFile,
+): string {
+  return hashText(node.getText(sourceFile));
 }
 
 export function hashText(raw: string): string {
