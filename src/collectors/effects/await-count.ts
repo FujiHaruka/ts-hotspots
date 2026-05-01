@@ -1,58 +1,25 @@
 import ts from "typescript";
-import type {
-  Collector,
-  CollectorContext,
-  DeclarationId,
-  FunctionLikeNode,
-} from "../types.ts";
-import { walkBodyExcludingNestedFunctions } from "../walk.ts";
+import { makeCountingCollector, countMatches } from "../countingCollector.ts";
+import type { FunctionLikeNode } from "../types.ts";
 
 export interface AwaitCountResult {
   awaitCount: number;
 }
 
-export function computeAwaitCount(node: FunctionLikeNode): number {
-  const body = getBody(node);
-  if (!body) return 0;
-
-  let count = 0;
-  walkBodyExcludingNestedFunctions(body, (n) => {
-    if (n.kind === ts.SyntaxKind.AwaitExpression) {
-      count += 1;
-      return;
-    }
-    if (n.kind === ts.SyntaxKind.ForOfStatement) {
-      const forOf = n as ts.ForOfStatement;
-      if (forOf.awaitModifier !== undefined) {
-        count += 1;
-      }
-    }
-  });
-  return count;
-}
-
-function getBody(node: FunctionLikeNode): ts.Node | undefined {
-  if (node.kind === ts.SyntaxKind.ArrowFunction) {
-    return (node as ts.ArrowFunction).body;
+function matches(n: ts.Node): boolean {
+  if (n.kind === ts.SyntaxKind.AwaitExpression) return true;
+  if (n.kind === ts.SyntaxKind.ForOfStatement) {
+    return (n as ts.ForOfStatement).awaitModifier !== undefined;
   }
-  return (node as Exclude<FunctionLikeNode, ts.ArrowFunction>).body;
+  return false;
 }
 
-export const awaitCountCollector: Collector<AwaitCountResult> = {
+export function computeAwaitCount(node: FunctionLikeNode): number {
+  return countMatches(node, matches);
+}
+
+export const awaitCountCollector = makeCountingCollector({
   name: "awaitCount",
-  collect(ctx: CollectorContext): Map<DeclarationId, AwaitCountResult> {
-    const result = new Map<DeclarationId, AwaitCountResult>();
-    for (const decl of ctx.declarations) {
-      try {
-        result.set(decl.id, { awaitCount: computeAwaitCount(decl.node) });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(
-          `awaitCountCollector failed at ${decl.file}:${String(decl.line)} (${decl.id}): ${msg}`,
-          { cause: err },
-        );
-      }
-    }
-    return result;
-  },
-};
+  resultKey: "awaitCount",
+  matches,
+});
