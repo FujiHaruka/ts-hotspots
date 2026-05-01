@@ -1,13 +1,7 @@
 import { readFileSync } from "node:fs";
 import { parseSource } from "../parser/parseSource.ts";
+import type { RepoSource } from "./listRepoSources.ts";
 import type { SourceFileInfo } from "./types.ts";
-
-export interface LoadProjectSource {
-  /** Absolute path on disk (used to read the file). */
-  absolute: string;
-  /** Project-relative path, POSIX-normalized (carried into `SourceFileInfo.path`). */
-  relative: string;
-}
 
 export interface LoadProjectOptions {
   /**
@@ -15,7 +9,7 @@ export interface LoadProjectOptions {
    * decides which files count — `loadProject` does not consult any tsconfig
    * and does not type-check.
    */
-  sources: readonly LoadProjectSource[];
+  sources: readonly RepoSource[];
 }
 
 export interface LoadedProject {
