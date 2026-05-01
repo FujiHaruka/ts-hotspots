@@ -100,6 +100,14 @@ describe("serializeReport — slim", () => {
     expect(h?.kind).toBe("architecture");
     expect(h?.score).toEqual({ axis: "composite", value: 0.92 });
     expect(h?.smells).toEqual(["architectural_hub", "high_fanout_component"]);
+    expect(h?.metrics).toEqual([
+      {
+        axis: "fan_in_pct",
+        value: 10,
+        percentile: 1.0,
+        zScore: 2.1,
+      },
+    ]);
     expect(h?.dismissalId.startsWith("arch:")).toBe(true);
   });
 
