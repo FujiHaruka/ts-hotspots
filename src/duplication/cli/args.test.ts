@@ -132,6 +132,21 @@ describe("parseCliArgs", () => {
     expect(r.excludeGlobs).toEqual(["src/legacy/**", "**/*.gen.ts"]);
   });
 
+  it("accepts -e as a short alias for --exclude", () => {
+    const r = parseCliArgs([
+      "--diff",
+      "main..feature",
+      "-e",
+      "src/legacy/**",
+      "-e",
+      "**/*.gen.ts",
+    ]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
+    }
+    expect(r.excludeGlobs).toEqual(["src/legacy/**", "**/*.gen.ts"]);
+  });
+
   it("returns an empty excludeGlobs when --exclude is not passed", () => {
     const r = parseCliArgs([]);
     if (r.kind !== "run" || r.mode !== "whole-repo") {

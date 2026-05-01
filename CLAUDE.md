@@ -19,6 +19,10 @@ See `docs/requirements.md` for the full spec (Part A = complexity, Part B = dupl
 - **`perfLog` must stay zero-cost when disabled.** The pipeline only allocates timing events / hot-path measurements when `--phase-timings` is set; do not add unconditional `performance.now()` calls.
 - **Recall over precision.** Search is a union over feature kinds; final reporting is OR-gated. When in doubt about a tradeoff, bias toward false positives — the downstream agent decides.
 
+## CLI flag conventions
+
+- **Keep `comp` and `dup` flag surfaces in sync.** When adding, removing, or renaming a flag on either subcommand, look at the other and decide explicitly: mirror it, document a justified asymmetry, or align the spelling. The two parsers are independent (`commander` for `comp` in `src/cli.ts`, `node:util` `parseArgs` for `dup` in `src/duplication/cli/args.ts`), so drift is silent — the discipline lives in review, not in types. Justified structural asymmetries today: `--diff` semantics (display filter vs. base/head sides), `--ref` (dup-only — comp reads working tree), `--metrics` / `--file` (comp-only — single-file drill-down doesn't map to a pairwise metric), `--phase-timings` (dup-only pipeline diagnostic). Anything else should match.
+
 ## Development workflow
 
 - **Commits and pushes are autonomous.** Decide when to commit and push on each turn without waiting for the user to ask. The user will not give commit instructions. Commit autonomously even for changes that did not originate in the current session (e.g. uncommitted edits already on disk).

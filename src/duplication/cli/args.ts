@@ -108,7 +108,12 @@ discovered by walking up from [path] until a .git entry is found
 
 Options:
   --diff <revrange>        Scope to a git revision range. Mutually exclusive
-                           with --ref. <revrange> forms:
+                           with --ref. Defines the comparison's base/head
+                           sides (changed fragments on the head side are
+                           compared against the rest of the codebase on the
+                           base side). Note: 'comp --diff' instead acts as
+                           a display filter on top of full-repo ranking.
+                           <revrange> forms:
                              A...B   diff from merge-base(A, B) to B
                                      (PR semantics; recommended)
                              A..B    diff base against head directly
@@ -117,7 +122,7 @@ Options:
   --ref <ref>              Commit/branch/tag to scan in whole-repo mode
                            (default: HEAD). Mutually exclusive with --diff.
   --format markdown|json   Report format (default: markdown)
-  --exclude <glob>         Extra path glob to exclude (repeatable). Added on
+  -e, --exclude <glob>     Extra path glob to exclude (repeatable). Added on
                            top of the built-in defaults (node_modules,
                            dist, generated files, test files, ...).
   --phase-timings[=LEVEL]  Emit a JSON Lines perf-debug log to stderr.
@@ -366,7 +371,7 @@ function parseExcludeGlobs(values: string[] | undefined): string[] {
 
 const OPTIONS = {
   format: { type: "string" },
-  exclude: { type: "string", multiple: true },
+  exclude: { type: "string", short: "e", multiple: true },
   diff: { type: "string" },
   ref: { type: "string" },
   "phase-timings": { type: "string" },
