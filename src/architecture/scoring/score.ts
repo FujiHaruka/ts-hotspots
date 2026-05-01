@@ -69,6 +69,13 @@ export interface ScoreOptions {
   readonly smallNCutoff?: number;
   readonly suppressFlag?: ReadonlyMap<string, boolean>;
   readonly weights?: Partial<WeightsTable>;
+  /**
+   * Node ids to drop from the ranked output. Excluded nodes still
+   * contribute their raw values to the per-axis percentile distribution
+   * — only the candidate emission is suppressed — so excluding a
+   * high-value node does not inflate the percentiles of the survivors.
+   */
+  readonly excludedNodeIds?: ReadonlySet<string>;
 }
 
 const DEFAULT_PERCENTILE_THRESHOLD = 0.85;
@@ -121,6 +128,7 @@ export function score(
   const smallNCutoff = options.smallNCutoff ?? DEFAULT_SMALL_N_CUTOFF;
   const weights = mergeWeights(options.weights);
   const suppressFlag = options.suppressFlag ?? new Map<string, boolean>();
+  const excludedNodeIds = options.excludedNodeIds;
 
   const nodeIds = [...metrics.keys()];
   const n = nodeIds.length;
@@ -138,6 +146,7 @@ export function score(
   const candidates: ArchCandidate[] = [];
 
   for (const id of nodeIds) {
+    if (excludedNodeIds?.has(id) === true) continue;
     const node = metrics.get(id);
     if (node === undefined) continue;
     const hits: SmellHit[] = [];

@@ -149,6 +149,48 @@ describe("score — secondary smells", () => {
   });
 });
 
+describe("score — excludedNodeIds", () => {
+  it("drops excluded ids from the output without shifting survivors' percentiles", () => {
+    // Two nodes both top out fan-out; without exclusion both qualify
+    // (composite=1.0, lex-sorted output). Excluding A must drop A from
+    // the result while leaving B's contributing percentile at 1.0 — i.e.
+    // A still participates in the percentile distribution.
+    const m = metrics([
+      ["src/a.ts::A::function", { fanOutWeighted: 100 }],
+      ["src/b.ts::B::function", { fanOutWeighted: 100 }],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+      ["src/f.ts::F::function", {}],
+      ["src/g.ts::G::function", {}],
+      ["src/h.ts::H::function", {}],
+      ["src/i.ts::I::function", {}],
+      ["src/j.ts::J::function", {}],
+    ]);
+
+    const baseline = score(m);
+    const baselineB = baseline.find(
+      (c) => c.nodeId === "src/b.ts::B::function",
+    );
+    expect(baselineB).toBeDefined();
+
+    const filtered = score(m, {
+      excludedNodeIds: new Set(["src/a.ts::A::function"]),
+    });
+    expect(filtered.map((c) => c.nodeId)).toEqual(["src/b.ts::B::function"]);
+
+    const filteredB = filtered[0];
+    const baselineFanOut = baselineB?.primary.contributing.find(
+      (mm) => mm.axis === "fan_out_pct",
+    );
+    const filteredFanOut = filteredB?.primary.contributing.find(
+      (mm) => mm.axis === "fan_out_pct",
+    );
+    expect(filteredFanOut?.percentile).toBe(baselineFanOut?.percentile);
+    expect(filteredB?.primary.composite).toBe(baselineB?.primary.composite);
+  });
+});
+
 describe("score — determinism", () => {
   it("ties sorted by node id (lex)", () => {
     // 10 nodes; 2 outliers at 100, 8 at 0. zScore for outliers ≈ 2.0
