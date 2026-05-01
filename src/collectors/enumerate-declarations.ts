@@ -4,7 +4,11 @@ import {
   enumerateSourceFiles,
   type SourceFileInfo,
 } from "./enumerate-source-files.ts";
-import type { Declaration, FunctionLikeNode } from "./types.ts";
+import type {
+  Declaration,
+  FunctionLikeNode,
+  FunctionLikeTsNode,
+} from "./types.ts";
 
 const FUNCTION_KINDS: Partial<Record<SyntaxKind, FunctionKind>> = {
   [SyntaxKind.FunctionDeclaration]: "function",
@@ -32,6 +36,7 @@ export function enumerateDeclarations(
     enumerateSourceFiles(project, rootDir, { exclude: options.exclude });
 
   for (const { path: relPosix, sourceFile } of files) {
+    const tsSourceFile = sourceFile.compilerNode;
     sourceFile.forEachDescendant((node) => {
       const kind = FUNCTION_KINDS[node.getKind()];
       if (!kind) return;
@@ -40,6 +45,8 @@ export function enumerateDeclarations(
       declarations.push({
         id: `${relPosix}:${String(fn.getStart())}`,
         node: fn,
+        tsNode: fn.compilerNode as FunctionLikeTsNode,
+        tsSourceFile,
         kind,
         name: getDeclarationName(fn),
         file: relPosix,
