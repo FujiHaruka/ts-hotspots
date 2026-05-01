@@ -41,6 +41,12 @@ export interface ArchParsedArgs {
 }
 
 export const DEFAULT_LIMIT = 20;
+export const DEFAULT_FORMAT: ReportFormat = "markdown";
+export const PHASE_TIMINGS_LEVELS: readonly PhaseTimingsLevel[] = [
+  "summary",
+  "verbose",
+];
+export const PHASE_TIMINGS_DEFAULT: PhaseTimingsLevel = "summary";
 
 export class ArgParseError extends Error {
   override readonly name = "ArgParseError";

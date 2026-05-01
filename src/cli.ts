@@ -304,7 +304,7 @@ Pick a subcommand by the question you have:
                over-shared — from fan-in / fan-out / reverse closure /
                PageRank / betweenness / instability.
 
-All three write a markdown report to stdout by default; pass --format json
+All three write a ${DEFAULT_FORMAT} report to stdout by default; pass --format json
 for machine-readable output. Each candidate carries a 'dismissalId' you
 can hand to 'ts-hotspots dismiss' to filter known false positives from
 future runs (auto-expires when the underlying code changes).
@@ -402,7 +402,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     )
     .option(
       "--limit <N|all>",
-      "max entries in hotspots[] (default: 20). Pass 'all' to keep every candidate.",
+      `max entries in hotspots[] (default: ${String(DEFAULT_LIMIT)}). Pass 'all' to keep every candidate.`,
       parseLimit,
     )
     .option(
@@ -429,7 +429,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     .option("--no-churn", "disable git churn collection")
     .option(
       "--format <markdown|json>",
-      "report format (default: markdown)",
+      `report format (default: ${DEFAULT_FORMAT})`,
       parseFormat,
     )
     .option(
