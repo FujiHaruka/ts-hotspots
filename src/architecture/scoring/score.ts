@@ -170,6 +170,24 @@ export function score(
     const hits: SmellHit[] = [];
 
     for (const smell of SMELL_TYPES) {
+      // Structural gate: a single-caller node cannot be an architectural
+      // bridge or load-bearing fan-out target. fanIn=0 means nothing
+      // depends on the node (top-level entry / dead export); fanIn=1
+      // means a single upstream pipeline owns it. In neither case does
+      // restructuring the node relieve cross-cutting pressure — the
+      // smell would be a false positive on CLI orchestrators and
+      // single-caller pipeline entry points. unstable_dependency_candidate
+      // is intentionally exempt: a node with no callers can still depend
+      // on more-unstable downstream code, and that is the SDP violation
+      // the smell tracks.
+      if (
+        (smell === "bridge_component" ||
+          smell === "high_fanout_component") &&
+        node.fanInUnweighted <= 1
+      ) {
+        continue;
+      }
+
       const smellWeights = weights[smell];
       let composite = 0;
       const contributing: ContributingMetric[] = [];
