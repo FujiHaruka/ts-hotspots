@@ -1,6 +1,6 @@
 ## ts-morph 依存撤廃 計画
 
-> Status: Drafted (2026-05-01)
+> Status: Completed (2026-05-01)
 > Goal: `comp` の collector / loader / dismissal が依存している `ts-morph` を取り除き、`typescript` 直接利用 (`ts.createSourceFile` + `ts.forEachChild`) に統一する。`dup` 側の indexer (`src/duplication/indexer/parseSource.ts`) と入力モデルを揃える。
 > 非 Goal: `comp` と `dup` の loader / parser モジュールを物理的に **1 本に統合** すること (本計画では parser を共有可能な形に lift するに留め、indexer / collector の合流は別計画)。`comp` の挙動・出力スキーマ・ranking ロジックの変更。`bench` の追加最適化。
 
