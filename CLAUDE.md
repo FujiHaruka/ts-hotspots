@@ -7,7 +7,7 @@ ts-hotspots is a CLI that statically analyzes a TypeScript project and hands cod
 It exposes two parallel features as subcommands of one binary. Both parse sources via `ts.createSourceFile` directly (no `ts.Program`, no TypeChecker); the shared parser lives at `src/parser/parseSource.ts`.
 
 - **Complexity** (`ts-hotspots complexity`, alias `comp`): per-function metrics ranked into refactor-candidate coordinates. The primary ranking unit is the function (including methods, arrow functions, and TSX components); file-level rankings are returned alongside.
-- **Duplication** (`ts-hotspots duplication`, alias `dup`): Type-3 duplication candidates in PR mode (`<revrange>`) or whole-repo mode (`--whole-repo`). Shells out to git for diff/source listing. Source lives under `src/duplication/`.
+- **Duplication** (`ts-hotspots duplication`, alias `dup`): Type-3 duplication candidates. Defaults to whole-repo scan at HEAD; pass `--diff <revrange>` to compare changed fragments on the head side against the rest of the codebase on the base side. Shells out to git for diff/source listing. Source lives under `src/duplication/`.
 
 See `docs/requirements.md` for the full spec (Part A = complexity, Part B = duplication). Duplication algorithm internals live under `docs/dedup/algorithms/` and mirror the pipeline stages in `src/duplication/`.
 
