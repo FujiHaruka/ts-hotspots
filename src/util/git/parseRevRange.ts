@@ -18,7 +18,7 @@ const DEFAULT_HEAD = "HEAD";
  *   - `A..`  / `A...`  → head side defaults to `HEAD`
  *   - `..B`  / `...B`  → base side defaults to `HEAD`
  *
- * A bare ref without `..` / `...` is rejected; ts-dedup always needs both
+ * A bare ref without `..` / `...` is rejected; ts-hotspots always needs both
  * endpoints so a single ref would be ambiguous.
  */
 export function parseRevRange(input: string): RevRange {
