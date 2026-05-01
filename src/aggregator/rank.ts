@@ -1,3 +1,4 @@
+import { bodyHashToCompDismissalId } from "../dismissal/hash.ts";
 import type {
   AxisMeta,
   FunctionAxisId,
@@ -257,7 +258,12 @@ function rankCandidates(
     }
     const qualityHits = orderedAxes.filter(isQualityAxis).length;
     intermediate.push({
-      candidate: { ref, metrics, dismissalId: entry?.bodyHash ?? "" },
+      candidate: {
+        ref,
+        metrics,
+        dismissalId:
+          entry !== undefined ? bodyHashToCompDismissalId(entry.bodyHash) : "",
+      },
       totalHits: orderedAxes.length,
       qualityHits,
     });

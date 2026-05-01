@@ -8,6 +8,7 @@ import type {
   GroupMember,
   RecommendationHint,
 } from "../domain/index.ts";
+import { buildLocation } from "../util/location.ts";
 import { nonNull } from "../util/nonNull.ts";
 import { buildEvidence } from "./evidence.ts";
 import { intersectIntersections } from "./internal/intersectIntersections.ts";
@@ -204,9 +205,7 @@ function compareDecorated(
 
 function fragmentView(f: Fragment, includeCode: boolean): FragmentView {
   const view: FragmentView = {
-    filePath: f.filePath,
-    startLine: f.startLine,
-    endLine: f.endLine,
+    location: buildLocation(f.filePath, f.startLine, f.endLine),
     kind: f.kind,
   };
   if (includeCode) {

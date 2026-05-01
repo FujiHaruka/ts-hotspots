@@ -4,6 +4,7 @@ import {
   type TempRepo,
 } from "../../../test/dedup/e2e/helpers/tempRepo.ts";
 import { defaultConfig } from "../config/index.ts";
+import { parseLocation } from "../util/location.ts";
 import { nonNull } from "../util/nonNull.ts";
 import { PhaseTimingsCollector, RecordingPerfLogger } from "./perfLog.ts";
 import { runWholeRepoDetector } from "./runWholeRepoDetector.ts";
@@ -61,7 +62,9 @@ describe("runWholeRepoDetector", () => {
     // Whole-repo clusters have no anchor; both files should appear as
     // members of the same group.
     const matched = result.groups.some((g) => {
-      const paths = new Set(g.members.map((m) => m.fragment.filePath).sort());
+      const paths = new Set(
+        g.members.map((m) => parseLocation(m.fragment.location).filePath).sort(),
+      );
       return paths.has("src/math.ts") && paths.has("src/util.ts");
     });
     expect(matched).toBe(true);
@@ -101,9 +104,10 @@ describe("runWholeRepoDetector", () => {
     // (a,b)/(b,a) duplication that would manifest as the same fragment
     // showing up twice in the same group.
     for (const g of result.groups) {
-      const memberKeys = g.members.map(
-        (m) => `${m.fragment.filePath}:${String(m.fragment.startLine)}`,
-      );
+      const memberKeys = g.members.map((m) => {
+        const { filePath, startLine } = parseLocation(m.fragment.location);
+        return `${filePath}:${String(startLine)}`;
+      });
       expect(new Set(memberKeys).size).toBe(memberKeys.length);
     }
   });
@@ -367,9 +371,10 @@ describe("runWholeRepoDetector", () => {
     // Cluster members appear once per group (no axis-double scoring would
     // surface as the same member listed twice).
     for (const g of result.groups) {
-      const memberKeys = g.members.map(
-        (m) => `${m.fragment.filePath}:${String(m.fragment.startLine)}`,
-      );
+      const memberKeys = g.members.map((m) => {
+        const { filePath, startLine } = parseLocation(m.fragment.location);
+        return `${filePath}:${String(startLine)}`;
+      });
       expect(new Set(memberKeys).size).toBe(memberKeys.length);
     }
 
@@ -409,8 +414,8 @@ describe("runWholeRepoDetector", () => {
     for (const g of result.groups) {
       for (let i = 0; i < g.members.length; i++) {
         for (let j = i + 1; j < g.members.length; j++) {
-          const a = nonNull(g.members[i]).fragment;
-          const b = nonNull(g.members[j]).fragment;
+          const a = parseLocation(nonNull(g.members[i]).fragment.location);
+          const b = parseLocation(nonNull(g.members[j]).fragment.location);
           if (a.filePath !== b.filePath) continue;
           const overlap = a.endLine >= b.startLine && b.endLine >= a.startLine;
           expect(overlap).toBe(false);

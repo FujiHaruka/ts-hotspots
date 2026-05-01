@@ -79,8 +79,10 @@ describe("runDetector", () => {
     expect(result.pr.headSha).toBe(head);
     const hasPair = result.groups.some(
       (g) =>
-        g.anchor?.filePath === "src/util.ts" &&
-        g.members.some((m) => m.fragment.filePath === "src/math.ts"),
+        g.anchor?.location.startsWith("src/util.ts:") === true &&
+        g.members.some((m) =>
+          m.fragment.location.startsWith("src/math.ts:"),
+        ),
     );
     expect(hasPair).toBe(true);
   });
@@ -136,8 +138,10 @@ describe("runDetector", () => {
         });
         const hasPair = result.groups.some(
           (g) =>
-            g.anchor?.filePath === "src/util.ts" &&
-            g.members.some((m) => m.fragment.filePath === "src/math.ts"),
+            g.anchor?.location.startsWith("src/util.ts:") === true &&
+            g.members.some((m) =>
+              m.fragment.location.startsWith("src/math.ts:"),
+            ),
         );
         expect(hasPair).toBe(true);
       });

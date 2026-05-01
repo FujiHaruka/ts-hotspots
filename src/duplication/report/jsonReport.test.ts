@@ -141,14 +141,14 @@ describe("buildJsonReport", () => {
     if (group === undefined) throw new Error("expected group");
     expect(group.size).toBe(4);
     expect(group.members).toHaveLength(3);
-    expect(group.members.map((m) => m.fragment.filePath)).toEqual([
-      "b1.ts",
-      "b3.ts",
-      "b2.ts",
+    expect(group.members.map((m) => m.fragment.location)).toEqual([
+      "b1.ts:5-20",
+      "b3.ts:5-20",
+      "b2.ts:5-20",
     ]);
   });
 
-  it("populates anchor / member views with filePath / startLine / endLine / kind / code", () => {
+  it("populates anchor / member views with location string + kind + code", () => {
     const changedText = "function foo() { return 1; }";
     const baseText = "function bar() { return 2; }";
     const pair: ScoredPair = {
@@ -183,16 +183,12 @@ describe("buildJsonReport", () => {
     expect(g).toBeDefined();
     if (!g) return;
     expect(g.anchor).toEqual({
-      filePath: "src/changed.ts",
-      startLine: 12,
-      endLine: 34,
+      location: "src/changed.ts:12-34",
       kind: "function",
       code: changedText,
     });
     expect(g.members[0]?.fragment).toEqual({
-      filePath: "src/existing.ts",
-      startLine: 5,
-      endLine: 30,
+      location: "src/existing.ts:5-30",
       kind: "block",
       code: baseText,
     });
@@ -352,8 +348,8 @@ describe("buildJsonReport", () => {
     if (g === undefined) throw new Error("expected one group");
     expect(g.anchor?.code).toBeUndefined();
     expect(g.members[0]?.fragment.code).toBeUndefined();
-    expect(g.anchor?.filePath).toBe("c1.ts");
-    expect(g.members[0]?.fragment.filePath).toBe("b1.ts");
+    expect(g.anchor?.location).toBe("c1.ts:1-10");
+    expect(g.members[0]?.fragment.location).toBe("b1.ts:5-20");
   });
 
   it("does not serialise the code key when includeCode is false", () => {
@@ -565,10 +561,10 @@ describe("buildJsonReport", () => {
       const g = nonNull(report.groups[0]);
       expect(g.anchor).toBeUndefined();
       expect(g.size).toBe(3);
-      expect(g.members.map((m) => m.fragment.filePath).sort()).toEqual([
-        "a.ts",
-        "b.ts",
-        "c.ts",
+      expect(g.members.map((m) => m.fragment.location).sort()).toEqual([
+        "a.ts:1-10",
+        "b.ts:5-20",
+        "c.ts:5-20",
       ]);
     });
 
@@ -612,7 +608,7 @@ describe("buildJsonReport", () => {
         summary: STUB_PR_SUMMARY,
       });
       expect(report.groups).toHaveLength(1);
-      expect(report.groups[0]?.anchor?.filePath).toBe("c.ts");
+      expect(report.groups[0]?.anchor?.location).toBe("c.ts:1-10");
       expect(report.groups[0]?.size).toBe(3);
     });
   });

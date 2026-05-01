@@ -5,6 +5,7 @@ import { resolveSha } from "../diff/gitRunner.ts";
 import type {
   CloneCandidateReport,
   Fragment,
+  ReportTool,
   ScopeStats,
 } from "../domain/index.ts";
 import { buildFileFeatureContext, extractFeatures } from "../features/index.ts";
@@ -63,6 +64,8 @@ export interface WholeRepoOptions {
    * from the report. Defaults to `true`.
    */
   includeCode?: boolean;
+  /** Stamped onto the report's `tool` envelope. */
+  tool?: ReportTool;
 }
 
 /**
@@ -89,7 +92,7 @@ export interface WholeRepoOptions {
 export async function runWholeRepoDetector(
   opts: WholeRepoOptions,
 ): Promise<CloneCandidateReport> {
-  const { repoPath, ref, config, perfLog, includeCode } = opts;
+  const { repoPath, ref, config, perfLog, includeCode, tool } = opts;
   const now: () => number =
     perfLog !== undefined ? () => performance.now() : () => 0;
 
@@ -334,6 +337,7 @@ export async function runWholeRepoDetector(
   emitPhaseStart(perfLog, "report");
   const report: CloneCandidateReport = buildJsonReport(
     {
+      tool,
       pr: { baseSha: sha, headSha: sha },
       pairs: scoredPairs,
       config,

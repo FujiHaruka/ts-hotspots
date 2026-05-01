@@ -45,6 +45,7 @@ afterEach(() => {
 function makeEntry(id: string): DismissalEntry {
   return {
     id,
+    feature: "comp",
     reason: "test",
     dismissedAt: "2026-04-20T00:00:00Z",
   };
@@ -71,18 +72,45 @@ describe("loadRegistry", () => {
 
   test("load/save round-trip", () => {
     const reg = emptyRegistry();
-    const added = addEntry(reg, makeEntry("sha256:abc")).registry;
+    const added = addEntry(reg, makeEntry("comp:abc")).registry;
     saveRegistry(tmpRoot, added);
     const reloaded = loadRegistry(tmpRoot);
-    expect(reloaded.entries.map((e) => e.id)).toEqual(["sha256:abc"]);
+    expect(reloaded.entries.map((e) => e.id)).toEqual(["comp:abc"]);
   });
 
   test("projectPath round-trips through save + load", () => {
     const reg = withProjectPath(emptyRegistry(), tmpRoot);
-    const added = addEntry(reg, makeEntry("sha256:abc")).registry;
+    const added = addEntry(reg, makeEntry("comp:abc")).registry;
     saveRegistry(tmpRoot, added);
     const reloaded = loadRegistry(tmpRoot);
     expect(reloaded.projectPath).toBe(tmpRoot);
+  });
+
+  test("migrates pre-M2 sha256:<hex> entries to comp:<hex> on load", () => {
+    // A pre-M2 registry that lacks the `<feature>:` prefix should load as
+    // `comp:<hex>` — that is the whole point of the M2 migration. We
+    // bypass the public API and write a legacy file directly so the
+    // assertion exercises the load path, not the save path.
+    const path = registryPath(tmpRoot);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: DISMISSAL_REGISTRY_VERSION,
+        entries: [
+          {
+            id: "sha256:legacyhex",
+            reason: "old",
+            dismissedAt: "2026-04-20T00:00:00Z",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const reloaded = loadRegistry(tmpRoot);
+    expect(reloaded.entries).toHaveLength(1);
+    expect(reloaded.entries[0]?.id).toBe("comp:legacyhex");
+    expect(reloaded.entries[0]?.feature).toBe("comp");
   });
 
   test("registryPath is isolated per project root under XDG_CONFIG_HOME", () => {
@@ -103,15 +131,15 @@ describe("addEntry", () => {
   test("appends new entry", () => {
     const { registry, added } = addEntry(
       emptyRegistry(),
-      makeEntry("sha256:a"),
+      makeEntry("comp:a"),
     );
     expect(added).toBe(true);
     expect(registry.entries).toHaveLength(1);
   });
 
   test("no-op when id already present", () => {
-    const start = addEntry(emptyRegistry(), makeEntry("sha256:a")).registry;
-    const { registry, added } = addEntry(start, makeEntry("sha256:a"));
+    const start = addEntry(emptyRegistry(), makeEntry("comp:a")).registry;
+    const { registry, added } = addEntry(start, makeEntry("comp:a"));
     expect(added).toBe(false);
     expect(registry).toBe(start);
   });
@@ -119,14 +147,14 @@ describe("addEntry", () => {
 
 describe("removeEntry", () => {
   test("removes existing id", () => {
-    const start = addEntry(emptyRegistry(), makeEntry("sha256:a")).registry;
-    const { registry, removed } = removeEntry(start, "sha256:a");
+    const start = addEntry(emptyRegistry(), makeEntry("comp:a")).registry;
+    const { registry, removed } = removeEntry(start, "comp:a");
     expect(removed).toBe(true);
     expect(registry.entries).toEqual([]);
   });
 
   test("returns removed=false when id absent", () => {
-    const { removed } = removeEntry(emptyRegistry(), "sha256:nope");
+    const { removed } = removeEntry(emptyRegistry(), "comp:nope");
     expect(removed).toBe(false);
   });
 });
@@ -134,26 +162,26 @@ describe("removeEntry", () => {
 describe("pruneRegistry", () => {
   test("drops entries whose id is not in current set", () => {
     const reg = emptyRegistry();
-    const withA = addEntry(reg, makeEntry("sha256:a")).registry;
-    const withAB = addEntry(withA, makeEntry("sha256:b")).registry;
+    const withA = addEntry(reg, makeEntry("comp:a")).registry;
+    const withAB = addEntry(withA, makeEntry("comp:b")).registry;
     const { registry, prunedCount } = pruneRegistry(
       withAB,
-      new Set(["sha256:a"]),
+      new Set(["comp:a"]),
     );
     expect(prunedCount).toBe(1);
-    expect(registry.entries.map((e) => e.id)).toEqual(["sha256:a"]);
+    expect(registry.entries.map((e) => e.id)).toEqual(["comp:a"]);
   });
 
   test("prunes nothing when all ids are present", () => {
-    const reg = addEntry(emptyRegistry(), makeEntry("sha256:a")).registry;
-    const { prunedCount } = pruneRegistry(reg, new Set(["sha256:a"]));
+    const reg = addEntry(emptyRegistry(), makeEntry("comp:a")).registry;
+    const { prunedCount } = pruneRegistry(reg, new Set(["comp:a"]));
     expect(prunedCount).toBe(0);
   });
 });
 
 describe("registryIdSet", () => {
   test("returns ids", () => {
-    const reg = addEntry(emptyRegistry(), makeEntry("sha256:a")).registry;
-    expect([...registryIdSet(reg)]).toEqual(["sha256:a"]);
+    const reg = addEntry(emptyRegistry(), makeEntry("comp:a")).registry;
+    expect([...registryIdSet(reg)]).toEqual(["comp:a"]);
   });
 });

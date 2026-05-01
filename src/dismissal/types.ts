@@ -11,8 +11,21 @@ export interface DismissalEntryDisplay {
   startLine?: number;
 }
 
+export type DismissalFeature = "comp" | "dup";
+
 export interface DismissalEntry {
+  /**
+   * `<feature>:<hex>` form (e.g. `comp:abc123...`). Encodes the source
+   * feature in the prefix so `dismiss` / `undismiss` can route on the
+   * id alone without a `--feature` flag. Pre-M2 entries (`sha256:<hex>`)
+   * are migrated to `comp:<hex>` on load.
+   */
   id: string;
+  /**
+   * Mirrors the `<feature>` prefix in `id`. Stored explicitly so the
+   * registry stays self-describing for tools that filter by feature.
+   */
+  feature: DismissalFeature;
   reason: string;
   dismissedAt: string;
   display?: DismissalEntryDisplay;

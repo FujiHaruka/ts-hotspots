@@ -1,9 +1,12 @@
 import type { Evidence, RecommendationHint } from "./report.ts";
 
 export interface FragmentView {
-  filePath: string;
-  startLine: number;
-  endLine: number;
+  /**
+   * `file:start-end` coordinate string (or `file:line` for single-line
+   * fragments). Matches `comp`'s `location` so both reports surface the
+   * same coordinate shape.
+   */
+  location: string;
   kind: string;
   /** Fragment source. Omitted when the report was built with includeCode=false. */
   code?: string;

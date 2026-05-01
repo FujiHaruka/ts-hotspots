@@ -672,11 +672,11 @@ describe("dismissal registry subcommands", () => {
     return JSON.parse(stdout.text) as ParsedFunctionReport;
   }
 
-  test("every candidate carries a sha256 dismissalId", async () => {
+  test("every candidate carries a comp:<hex> dismissalId", async () => {
     const report = await analyze();
     expect(report.functionHotspotCandidates.length).toBeGreaterThan(0);
     for (const c of report.functionHotspotCandidates) {
-      expect(c.dismissalId.startsWith("sha256:")).toBe(true);
+      expect(c.dismissalId.startsWith("comp:")).toBe(true);
     }
   });
 

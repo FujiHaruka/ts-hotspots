@@ -171,8 +171,10 @@ function normalizeRegistry(parsed: unknown): DismissalRegistry {
     const e = raw as Record<string, unknown>;
     if (typeof e.id !== "string" || typeof e.reason !== "string") continue;
     if (typeof e.dismissedAt !== "string") continue;
+    const feature = e.feature === "dup" ? "dup" : "comp";
     const entry: DismissalEntry = {
-      id: e.id,
+      id: migrateLegacyId(e.id, feature),
+      feature,
       reason: e.reason,
       dismissedAt: e.dismissedAt,
     };
@@ -189,4 +191,19 @@ function normalizeRegistry(parsed: unknown): DismissalRegistry {
     };
   }
   return { version: DISMISSAL_REGISTRY_VERSION, entries };
+}
+
+/**
+ * Translate a pre-M2 dismissal id into the `<feature>:<hex>` form used by
+ * post-M2 reports. Pre-M2 ids were the raw `sha256:<hex>` body hash;
+ * post-M2 they are `<feature>:<hex>`. Anything that already carries a
+ * feature prefix passes through untouched.
+ */
+function migrateLegacyId(rawId: string, feature: "comp" | "dup"): string {
+  if (rawId.startsWith("comp:") || rawId.startsWith("dup:")) return rawId;
+  const SHA256_PREFIX = "sha256:";
+  const hex = rawId.startsWith(SHA256_PREFIX)
+    ? rawId.slice(SHA256_PREFIX.length)
+    : rawId;
+  return `${feature}:${hex}`;
 }

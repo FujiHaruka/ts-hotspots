@@ -32,9 +32,7 @@ describe("renderJson", () => {
     const b = renderJson(report);
     expect(a).toBe(b);
     expect(a.endsWith("\n")).toBe(true);
-    const { status, ...rest } = report;
-    void status;
-    expect(JSON.parse(a)).toEqual(rest);
+    expect(JSON.parse(a)).toEqual(report);
   });
 
   test("renders slim FunctionReport by default with only hotspot candidates", () => {
@@ -69,11 +67,11 @@ describe("renderJson", () => {
     expect(JSON.parse(renderJson(err))).toEqual(err);
   });
 
-  test("omits status for ok Report but keeps it for ErrorReport", () => {
+  test("emits status for both ok and error reports (M2 envelope unification)", () => {
     const ok = JSON.parse(renderJson(makeFunctionReport())) as {
       status?: string;
     };
-    expect(ok.status).toBeUndefined();
+    expect(ok.status).toBe("ok");
     const err: ErrorReport = {
       status: "error",
       error: { code: "X", message: "y" },

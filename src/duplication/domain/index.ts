@@ -24,7 +24,9 @@ export type { InvertedIndex, Posting } from "./posting.ts";
 export type {
   AnalysisSummary,
   CloneCandidateReport,
+  DuplicationErrorReport,
   Evidence,
   RecommendationHint,
+  ReportTool,
   ScopeStats,
 } from "./report.ts";

@@ -1,5 +1,10 @@
 import type { CloneGroup } from "./cloneGroup.ts";
 
+export interface ReportTool {
+  name: "ts-hotspots";
+  version: string;
+}
+
 export interface Evidence {
   sharedCalls: string[];
   sharedProperties: string[];
@@ -52,10 +57,22 @@ export interface AnalysisSummary {
 }
 
 export interface CloneCandidateReport {
+  status: "ok";
+  tool: ReportTool;
   pr: {
     baseSha: string;
     headSha: string;
   };
   summary: AnalysisSummary;
   groups: CloneGroup[];
+}
+
+/**
+ * Failure-mode envelope. Mirrors `comp`'s `ErrorReport` shape so an agent
+ * branching on `status` can handle either subcommand identically.
+ */
+export interface DuplicationErrorReport {
+  status: "error";
+  tool: ReportTool;
+  error: { code: string; message: string };
 }

@@ -6,12 +6,13 @@ import type { Fragment } from "../domain/fragment.ts";
 import type {
   AnalysisSummary,
   CloneCandidateReport,
+  ReportTool,
 } from "../domain/report.ts";
 import { isThinWrapperFragment } from "../features/internal/isThinWrapper.ts";
 import { buildCloneGroups } from "./buildCloneGroups.ts";
 import { buildCloneGroupsFromClusters } from "./buildCloneGroupsFromClusters.ts";
 import { capPerFragmentPairs } from "./capPerFragmentPairs.ts";
-import { clusterPairs, type ClusterStats } from "./clusterPairs.ts";
+import { type ClusterStats, clusterPairs } from "./clusterPairs.ts";
 import { collapsePairs } from "./collapsePairs.ts";
 import { dropLowSemanticEvidence } from "./dropLowSemanticEvidence.ts";
 import { dropThinWrapperPairs } from "./dropThinWrapperPairs.ts";
@@ -26,6 +27,12 @@ export interface ScoredPair {
 }
 
 export interface ReportInput {
+  /**
+   * Stamped onto the report's `tool` field so consumers can branch on
+   * version. Defaults to a placeholder when omitted (suitable for tests
+   * that ignore the field).
+   */
+  tool?: ReportTool;
   pr: { baseSha: string; headSha: string };
   pairs: readonly ScoredPair[];
   config: Config;
@@ -129,6 +136,8 @@ export function buildJsonReport(
   }
 
   return {
+    status: "ok",
+    tool: input.tool ?? { name: "ts-hotspots", version: "0.0.0" },
     pr: {
       baseSha: input.pr.baseSha,
       headSha: input.pr.headSha,
