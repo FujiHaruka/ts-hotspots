@@ -5,7 +5,7 @@ import type { FragmentFeatures } from "../domain/feature.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import { extractFeatures } from "../features/extractFeatures.ts";
 import { extractFragments } from "../indexer/extractFragments.ts";
-import { parseSource } from "../indexer/parseSource.ts";
+import { parseSource } from "../../parser/parseSource.ts";
 import { buildFeatureSets } from "./featureSets.ts";
 import { scoreCandidateDetailedFromSets } from "./scoreCandidate.ts";
 

@@ -1,6 +1,5 @@
 import { resolve } from "node:path";
 import { enumerateDeclarations } from "../collectors/enumerate-declarations.ts";
-import type { SourceFileInfo } from "../collectors/enumerate-source-files.ts";
 import {
   bodyHashToCompDismissalId,
   computeBodyHash,
@@ -149,20 +148,11 @@ async function tryResolveDisplay(
 ): Promise<DismissalEntry["display"] | undefined> {
   try {
     const sources = await listRepoSources(rootDir);
-    const { project } = loadProject({
-      sourcePaths: sources.map((s) => s.absolute),
-    });
-    const files: SourceFileInfo[] = [];
-    for (const s of sources) {
-      const sourceFile = project.getSourceFile(s.absolute);
-      if (sourceFile === undefined) continue;
-      files.push({ path: s.relative, sourceFile });
-    }
-    const declarations = enumerateDeclarations(project, rootDir, { files });
+    const { files } = loadProject({ sources });
+    const declarations = enumerateDeclarations(files);
     for (const d of declarations) {
       if (
-        bodyHashToCompDismissalId(computeBodyHash(d.tsNode, d.tsSourceFile)) ===
-        id
+        bodyHashToCompDismissalId(computeBodyHash(d.node, d.sourceFile)) === id
       ) {
         return {
           file: d.file,

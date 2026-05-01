@@ -3,7 +3,7 @@ import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeTsNode,
+  FunctionLikeNode,
 } from "../types.ts";
 
 export interface SlocResult {
@@ -11,7 +11,7 @@ export interface SlocResult {
 }
 
 export function computeSloc(
-  node: FunctionLikeTsNode,
+  node: FunctionLikeNode,
   sourceFile: ts.SourceFile,
 ): number {
   const fullText = sourceFile.text;
@@ -55,7 +55,7 @@ export const slocCollector: Collector<SlocResult> = {
     for (const decl of ctx.declarations) {
       try {
         result.set(decl.id, {
-          sloc: computeSloc(decl.tsNode, decl.tsSourceFile),
+          sloc: computeSloc(decl.node, decl.sourceFile),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

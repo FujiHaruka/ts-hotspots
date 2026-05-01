@@ -1,7 +1,7 @@
-import { Project } from "ts-morph";
 import ts from "typescript";
 import { describe, expect, test } from "vitest";
 import { enumerateDeclarations } from "../enumerate-declarations.ts";
+import { mkSourceFiles } from "../internal/mkSourceFiles.test-helper.ts";
 import {
   parseAllFunctionLikes,
   parseFirstFunctionLike,
@@ -141,17 +141,14 @@ describe("computeMutationCount", () => {
 
 describe("mutationCountCollector", () => {
   test("returns a map keyed by declaration id", () => {
-    const project = new Project({ useInMemoryFileSystem: true });
-    project.createSourceFile(
-      "/proj/src/a.ts",
-      [
+    const files = mkSourceFiles({
+      "src/a.ts": [
         "export function pure(x: number){ return x + 1; }",
         "export function impure(){ let x = 0; x = 1; x++; return x; }",
       ].join("\n"),
-    );
-    const declarations = enumerateDeclarations(project, "/proj");
+    });
+    const declarations = enumerateDeclarations(files);
     const result = mutationCountCollector.collect({
-      project,
       rootDir: "/proj",
       declarations,
     });

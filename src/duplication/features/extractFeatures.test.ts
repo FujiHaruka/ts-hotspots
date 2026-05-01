@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultConfig } from "../config/index.ts";
 import { extractFragments } from "../indexer/extractFragments.ts";
-import { parseSource } from "../indexer/parseSource.ts";
+import { parseSource } from "../../parser/parseSource.ts";
 import { extractFeatures } from "./extractFeatures.ts";
 
 describe("extractFeatures", () => {

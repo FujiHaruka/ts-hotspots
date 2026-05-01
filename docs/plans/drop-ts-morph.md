@@ -10,7 +10,7 @@
 - [x] **M2-1** — complexity collectors (cognitive / sloc / parameter-count / max-nesting-depth) を ts-only に書き換え。
 - [x] **M2-2** — effects + call-graph collectors (await-count / mutation-count / try-catch-count / callee-count) を ts-only に書き換え。
 - [x] **M2-3** — dismissal/hash を ts-only に書き換え + hash.test.ts を `parseFirstFunctionLike` に移行。aggregate.test.ts は `enumerateDeclarations` 経由のため M3 まで Project ベース据置。
-- [ ] **M3** — ts-morph 撤去: `Declaration.node` 削除 / `loadProject` を `ts.createSourceFile` 直接に書き換え / `enumerate-source-files.ts` を縮小 / `package.json` から `ts-morph` を削除 / dogfooding で性能・出力差確認。
+- [x] **M3** — ts-morph 撤去: `Declaration.node` 削除 / `loadProject` を `ts.createSourceFile` 直接に書き換え / `enumerate-source-files.ts` を削除 / `package.json` から `ts-morph` を削除 / dogfooding で出力差確認 (untouched file の metrics + bodyHash は bit-identical)。
 
 ## 1. 経緯
 
@@ -264,6 +264,26 @@ src/dismissal/hash.test.ts
 - `BinaryExpression` の `getChildren()` ループは `ts.forEachChild` に置換。tokens (`operatorToken`) は構造的子ではないため `forEachChild` でスキップされるが、collector はトークンをカウントしないので score に影響なし (cognitive.test.ts 全 22 ケース pass で確認)。
 - 出力 dogfood: `node src/index.ts comp --format json --limit all --verbose` を pre/post で取得。`src/collectors/complexity/` 配下を除く 54 関数中 50 関数 (jq で除外) の metrics は **bit-identical**。complexity 配下の 4 ファイルは自身を書き換えたので metrics と bodyHash が変わる (期待動作)。
 - 副次効果: 書き直した cognitive.ts の `visit` arrow が `cognitiveComplexity 44 → 26`, `calleeCount 54 → 16` に低下 (ts-morph の chained method calls が直接 field access に置き換わったため)。挙動変化ではなく実装の slimming。
+
+### M3 (2026-05-01)
+
+- **D1 後半**: `Declaration.node` (ts-morph) を削除し、`tsNode` → `node`、`tsSourceFile` → `sourceFile` にリネーム。`FunctionLikeTsNode` も `FunctionLikeNode` にリネームして旧 ts-morph 名と入れ替え。
+- **D5 (b)**: `Declaration.node` の最終型は `ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration | ts.ConstructorDeclaration` の union (M2-1 で導入した specificity を維持)。
+- **D7**: `CollectorContext.project` を完全削除。`AggregateContext` から `project` を渡す呼び出し側 (cli.ts の `prepare()`、aggregate.test.ts の fixture) も同期して削除。
+- **D8**: `enumerate-source-files.ts` 物理削除 + `cli.ts` の `prepare()` が `loadProject` の戻り値 (`SourceFileInfo[]`) を直接 `enumerateDeclarations` / `aggregate` に渡す形へ。`SourceFileInfo` 型は `src/loader/types.ts` (新設) に再定義し、collector / aggregator / churn / dismiss CLI の import 経路を新パスに付け替え。
+- **`enumerateDeclarations` のシグネチャ簡素化**: `(project, rootDir, options)` から `(files, options?)` に縮約。`rootDir` は実装内で使われなくなったので落とした (filter は `info.path` の文字列照合のみ)。
+- **`loadProject`**: `Project` インスタンスを返す形から、`{ files: SourceFileInfo[] }` を返す形に変更。`sources` (absolute / relative ペア) を受け取り、`fs.readFileSync` + `parseSource` で各ファイルを 1 回ずつ parse する。読み込み失敗 (削除済み等) は silently skip。
+- **walk.ts 物理統合**: 旧 `walk.ts` (ts-morph) を `git rm`、`walk-ts.ts` を `git mv walk.ts` にリネーム。すべての collector の import を `../walk-ts.ts` → `../walk.ts` に戻した。`walk-ts.test.ts` も `walk.test.ts` にリネーム。
+- **dup 側 parseSource 統合**: `src/duplication/indexer/parseSource.ts` (re-export shim) を物理削除し、dup 内の 11 ファイルの import 経路を `../../parser/parseSource.ts` (もしくは相対深度合わせ) に直接付け替え。`src/duplication/indexer/index.ts` の re-export 行も同じ src を指すよう更新。
+- **package.json**: `dependencies.ts-morph` 行削除 → `pnpm install` で lockfile から `ts-morph` および推移依存 (`@ts-morph/common`, `code-block-writer`, `mitt`) が消えることを確認。
+
+### M3 (2026-05-01) - 実装メモ
+
+- **テスト fixture ヘルパ追加**: `src/collectors/internal/mkSourceFiles.test-helper.ts` を新設。`mkSourceFiles({ "src/a.ts": "...", ... })` で `SourceFileInfo[]` を返す。`Project + createSourceFile` パターンが残っていた 8 collectors の "...Collector" describe ブロックすべてをこれに付け替え。aggregate.test.ts も同じヘルパに統一。
+- **enumerate-declarations.test.ts のリファクタ**: 旧テストは `/proj/src/a.ts` のような absolute-style key に rootDir filtering を期待していたが、新 API では `info.path` ベースのフィルタリングなので `src/a.ts` 形式のキーに置き換え。"skips files outside rootDir" ケースは新 API のスコープ外 (caller 責務) になったので削除。`node_modules` ケースは `node_modules/lib/index.ts` 形式で再構成。
+- **dogfood 結果**: pre/post の `comp` 出力を比較し、**29 個ある analyze 対象ファイルすべて** で `metrics` + `bodyHash` + 出力順序が **bit-identical**。`sourceFileCount` 130 → 127 と `functionCount` 615 → 612 の差は、本 commit が削除した 3 ファイル (`enumerate-source-files.ts`、旧 `walk.ts`、dup `parseSource.ts` shim) と、まだ untracked のため `git ls-files` に拾われていない 2 ファイル (`loader/types.ts`、`mkSourceFiles.test-helper.ts`) の足し引き。挙動変化ではなく、リポジトリの構造変化。
+- **strip-only**: `pnpm check:strip-only` green。新規ファイル (`loader/types.ts`、`mkSourceFiles.test-helper.ts`) は `enum` / `namespace` / parameter properties を踏まず。
+- **bench (D10)**: 本コミットでは未計測。Project 構築コストが消えた分だけ軽くなっているはずだが、CHANGELOG 値がほしくなった時点で `pnpm bench` を回す方針に倒した (本計画の bottleneck ではない)。
 
 ### M2-2 (2026-05-01)
 
