@@ -95,28 +95,149 @@ describe("score — composite", () => {
   });
 });
 
-describe("score — flag axes", () => {
-  it("unstable_edge_flag contributes raw 0/1 rather than percentile", () => {
-    // unstable_dependency_candidate: unstable_edge_flag (0.6) +
-    // instability_delta_pct (0.4). With unstableEdgeCount > 0 and
-    // instabilityDelta=0.5 at top percentile, composite = 0.6*1 + 0.4*1 = 1.0.
+describe("score — unstable_edge_ratio_pct axis", () => {
+  it("ranks unstable_dependency_candidate by ratio percentile, not by presence", () => {
+    // unstable_dependency_candidate weights:
+    //   unstable_edge_ratio_pct  0.6
+    //   instability_delta_pct    0.4
+    // A: ratio 1.0 (3/3) and instabilityDelta 0.5 — top of both populations.
+    //    composite = 0.6 * 1 + 0.4 * 1 = 1.0  → fires.
+    // B: ratio 0.1 (1/10), no delta — ratio percentile is below threshold once
+    //    A pegs the top, and delta contributes 0. Below the 0.85 gate.
     const m = metrics([
       [
         "src/a.ts::A::function",
-        { unstableEdgeCount: 3, instabilityDelta: 0.5 },
+        {
+          unstableEdgeCount: 3,
+          unstableEdgeRatio: 1,
+          fanOutUnweighted: 3,
+          instabilityDelta: 0.5,
+        },
       ],
-      ["src/b.ts::B::function", {}],
+      [
+        "src/b.ts::B::function",
+        {
+          unstableEdgeCount: 1,
+          unstableEdgeRatio: 0.1,
+          fanOutUnweighted: 10,
+        },
+      ],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],
       ["src/e.ts::E::function", {}],
     ]);
     const candidates = score(m);
     const a = candidates.find((c) => c.nodeId === "src/a.ts::A::function");
-    expect(a).toBeDefined();
-    const hit = a?.primary;
-    expect(hit?.smellType === "unstable_dependency_candidate").toBe(true);
+    expect(a?.primary.smellType).toBe("unstable_dependency_candidate");
+    const ratioContribution = a?.primary.contributing.find(
+      (mm) => mm.axis === "unstable_edge_ratio_pct",
+    );
+    expect(ratioContribution?.value).toBeCloseTo(1, 6);
+    expect(ratioContribution?.percentile).toBeCloseTo(1, 6);
+
+    expect(
+      candidates.find((c) => c.nodeId === "src/b.ts::B::function"),
+    ).toBeUndefined();
   });
 
+  it("does not fire when one unstable edge sits in a population of zero ratios", () => {
+    // The previous binary flag would have pegged A at 0.6 just for having
+    // any unstable edge. With the percentile-ranked ratio, A's ratio (0.05)
+    // is the population top so its percentile is 1.0 — the prior false
+    // positive shape — but there is no `instability_delta_pct` signal, so
+    // composite is 0.6 * 1.0 + 0.4 * 0 = 0.6, well under the 0.85 gate.
+    const m = metrics([
+      [
+        "src/a.ts::A::function",
+        {
+          unstableEdgeCount: 1,
+          unstableEdgeRatio: 0.05,
+          fanOutUnweighted: 20,
+        },
+      ],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ]);
+    expect(
+      score(m).find(
+        (c) => c.primary.smellType === "unstable_dependency_candidate",
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe("score — zero-guard on percentile axes", () => {
+  it("a node whose every percentile-axis raw value is 0 cannot fire any smell", () => {
+    // 10 nodes; one has all signals positive, the other nine are all
+    // zeros. Without the zero-guard, the percentile lookup's
+    // last-occurrence-rank convention assigns a 0 raw value the
+    // percentile of the tied-zero block's top — close to 1.0 — and a
+    // node with no signal at all would clear the threshold by inheriting
+    // the inflated percentile through `0.6 * pct + 0.4 * pct`.
+    const entries: ReadonlyArray<[string, Partial<NodeMetrics>]> = [
+      [
+        "src/a.ts::A::function",
+        {
+          fanInWeighted: 10,
+          fanOutWeighted: 10,
+          reverseClosure: 10,
+          pageRank: 1,
+          betweenness: 1,
+          unstableEdgeRatio: 1,
+          instabilityDelta: 0.5,
+        },
+      ],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+      ["src/f.ts::F::function", {}],
+      ["src/g.ts::G::function", {}],
+      ["src/h.ts::H::function", {}],
+      ["src/i.ts::I::function", {}],
+      ["src/j.ts::J::function", {}],
+    ];
+    const lineCounts = new Map(
+      entries.map(([id]) => [id, id.startsWith("src/a") ? 100 : 0]),
+    );
+    const result = score(metrics(entries), { lineCounts });
+    expect(result.map((c) => c.nodeId)).toEqual(["src/a.ts::A::function"]);
+  });
+
+  it("a 0 raw value is reported with percentile 0 in the contributing breakdown", () => {
+    const entries: ReadonlyArray<[string, Partial<NodeMetrics>]> = [
+      ["src/a.ts::A::function", { fanOutWeighted: 100 }],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ];
+    const lineCounts = new Map([
+      ["src/a.ts::A::function", 100],
+      ["src/b.ts::B::function", 1],
+      ["src/c.ts::C::function", 1],
+      ["src/d.ts::D::function", 1],
+      ["src/e.ts::E::function", 1],
+    ]);
+    const result = score(metrics(entries), { lineCounts });
+    const a = result.find((c) => c.nodeId === "src/a.ts::A::function");
+    // high_fanout_component is the primary hit; high_impact_component
+    // would be a secondary hit if A had non-zero fan_in / reverse closure
+    // — A has 0 on those, so they should not contribute.
+    const impactHit = a?.secondary.find(
+      (s) => s.smellType === "high_impact_component",
+    );
+    if (impactHit !== undefined) {
+      const fanIn = impactHit.contributing.find((m) => m.axis === "fan_in_pct");
+      expect(fanIn?.value).toBe(0);
+      expect(fanIn?.percentile).toBe(0);
+    }
+  });
+});
+
+describe("score — flag axes", () => {
   it("suppress_flag uses the option lookup, defaults to 0", () => {
     const m = metrics([
       [

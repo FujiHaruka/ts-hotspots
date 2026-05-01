@@ -2,7 +2,7 @@
  * Shared adjacency precomputation. Every metric in
  * `src/architecture/metrics/` consumes one of:
  *
- * - per-node out-edges (PageRank, instability, unstable-edge flag)
+ * - per-node out-edges (PageRank, instability, unstable-edge ratio)
  * - per-node in-edges (fan-in, reverse closure, betweenness)
  *
  * Building both indices once lets every metric read O(deg(v)) rather

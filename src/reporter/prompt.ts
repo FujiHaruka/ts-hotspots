@@ -50,7 +50,7 @@ export const DUPLICATION_ERROR_PROMPT = `# ts-hotspots duplication error
 
 export const ARCHITECTURE_REPORT_PROMPT = `# ts-hotspots architecture report
 
-This is the output of \`ts-hotspots architecture\`, a static analyzer that surfaces structurally load-bearing exported components in a TypeScript codebase. Each candidate is an exported declaration (named export, default export, function, class, const, type, interface, enum) ranked by a percentile-weighted composite of structural metrics (fan-in, fan-out, reverse closure size, PageRank, betweenness, instability, unstable-edge flag).
+This is the output of \`ts-hotspots architecture\`, a static analyzer that surfaces structurally load-bearing exported components in a TypeScript codebase. Each candidate is an exported declaration (named export, default export, function, class, const, type, interface, enum) ranked by a percentile-weighted composite of structural metrics (fan-in, fan-out, reverse closure size, PageRank, betweenness, instability, unstable-edge ratio).
 
 ## Your task
 

@@ -113,8 +113,8 @@ function readAxisValue(node: NodeMetrics, axis: AxisId): number {
       return node.betweenness;
     case "instability_delta_pct":
       return node.instabilityDelta;
-    case "unstable_edge_flag":
-      return node.unstableEdgeCount > 0 ? 1 : 0;
+    case "unstable_edge_ratio_pct":
+      return node.unstableEdgeRatio;
     case "size_pct":
     case "suppress_flag":
       return 0;
@@ -128,6 +128,7 @@ const PERCENTILE_AXES: readonly AxisId[] = [
   "pagerank_pct",
   "betweenness_pct",
   "instability_delta_pct",
+  "unstable_edge_ratio_pct",
   "size_pct",
 ];
 
@@ -203,6 +204,24 @@ export function score(
         if (lookup === undefined) continue;
         const raw =
           axis === "size_pct" ? sizeOf(id) : readAxisValue(node, axis);
+        // A raw 0 means "no signal on this axis" — a node with no
+        // outgoing edges has no fan-out, no unstable edges, etc. Without
+        // this guard, the percentile lookup's last-occurrence-rank
+        // convention would assign 0 the percentile of the tied-zero
+        // block's top, which in sparse populations (most nodes at 0) is
+        // close to 1.0 and trivially clears thresholds.
+        if (raw === 0) {
+          contributing.push({
+            axis,
+            weight,
+            value: 0,
+            percentile: 0,
+            rank: 0,
+            thresholdDelta: -threshold,
+            zScore: 0,
+          });
+          continue;
+        }
         const entry = lookup(raw);
         composite += weight * entry.percentile;
         contributing.push({

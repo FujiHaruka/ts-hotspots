@@ -35,7 +35,7 @@ export const DEFAULT_WEIGHTS: WeightsTable = {
     betweenness_pct: 1.0,
   },
   unstable_dependency_candidate: {
-    unstable_edge_flag: 0.6,
+    unstable_edge_ratio_pct: 0.6,
     instability_delta_pct: 0.4,
   },
   over_shared_component: {

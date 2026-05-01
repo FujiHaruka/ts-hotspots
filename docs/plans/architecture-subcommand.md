@@ -179,7 +179,7 @@ After dropping classification-dependent axes, six candidate types survive:
 | `high_fanout_component`          | fan-out                                         |
 | `high_impact_component`          | fan-in, reverse closure size                    |
 | `bridge_component`               | betweenness centrality                          |
-| `unstable_dependency_candidate`  | instability, unstable-edge flag                 |
+| `unstable_dependency_candidate`  | instability, unstable-edge ratio                |
 | `over_shared_component`          | fan-in, fan-out, suppress-flag presence         |
 
 Removed from the draft: `feature_tight_coupling`, `layer_boundary_blur`.
@@ -210,8 +210,8 @@ bridge_component:
   betweenness_pct      1.00
 
 unstable_dependency_candidate:
-  unstable_edge_flag    0.60
-  instability_delta_pct 0.40
+  unstable_edge_ratio_pct 0.60
+  instability_delta_pct   0.40
 
 over_shared_component:
   fan_in_pct           0.40
@@ -295,7 +295,7 @@ src/architecture/
   resolve/    — module/path resolution; reads tsconfig paths; pure
   graph/      — build component dependency graph from resolved imports
   metrics/    — fan-in/out, reverse closure, betweenness, PageRank,
-                instability, unstable-edge flag
+                instability, unstable-edge ratio
   ranking/    — percentile + z-score + small-N fallback
   scoring/    — composite per smell type; smell aggregation rule
   report/     — Markdown + JSON renderers
