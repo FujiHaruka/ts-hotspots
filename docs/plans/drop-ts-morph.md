@@ -6,7 +6,7 @@
 
 ## 0. Progress
 
-- [ ] **M1** — Bridge: `Declaration` に `tsNode` / `tsSourceFile` を追加 (`.compilerNode` 経由) し、ts-only の walk / parse ヘルパを新設。production 挙動は不変。
+- [x] **M1** — Bridge: `Declaration` に `tsNode` / `tsSourceFile` を追加 (`.compilerNode` 経由) し、ts-only の walk / parse ヘルパを新設。production 挙動は不変。
 - [ ] **M2-1** — complexity collectors (cognitive / sloc / parameter-count / max-nesting-depth) を ts-only に書き換え。
 - [ ] **M2-2** — effects + call-graph collectors (await-count / mutation-count / try-catch-count / callee-count) を ts-only に書き換え。
 - [ ] **M2-3** — dismissal/hash と aggregator のテスト fixture を ts-only に書き換え。
@@ -240,4 +240,15 @@ src/dismissal/hash.test.ts
 
 ## 7. 決定済み事項
 
-(M1 着手時に D1-D10 を確定する。それまで本セクションは空。)
+### M1 (2026-05-01)
+
+- **D1**: Bridge は `Declaration` に `tsNode` / `tsSourceFile` を **追加** する形 (案 a)。`node` (ts-morph) は M3 まで残置。
+- **D2**: `parseSource` は `src/parser/parseSource.ts` に新設し、dup 側は re-export に縮小 (案 a)。
+- **D3**: ts-only walk ヘルパは新ファイル `src/collectors/walk-ts.ts` で提供 (案 a)。M3 で旧 `walk.ts` を削除し `walk-ts.ts` を `walk.ts` にリネーム予定。
+- **D6**: `setParentNodes: true` のまま (案 a) — dup 側と一致、cognitive collector の parent 参照に必要。
+
+実装メモ:
+
+- `src/collectors/internal/declarationHelpers.ts` は M1 では作らず、具体の consumer が出る M2-1 で導入する (YAGNI)。
+- `parseSource.test.ts` は dup 側に既存テストが無かったので新規作成。`scriptKind` / `parseDiagnostics` は public API ではなかったため、AST 構造 (`JsxSelfClosingElement` の有無) で TSX/TS の振る舞いを assert している。
+- `walk-ts` の挙動: nested function declaration に到達した時点で **その関数自身を visit せず** に return する (旧 `walk.ts` と同一)。テストもこの挙動を assert。
