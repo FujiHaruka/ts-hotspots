@@ -14,7 +14,6 @@ export {
   type ReportInput,
   type ScoredPair,
 } from "./jsonReport.ts";
-export { buildMarkdownReport } from "./markdownReport.ts";
 export { type RankablePair, sortCandidates } from "./ranking.ts";
 export {
   type DeriveHintArgs,

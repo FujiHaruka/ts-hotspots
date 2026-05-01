@@ -68,7 +68,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     expect(report.tool.name).toBe("ts-hotspots");
     expect(report.project.tsconfigPath).toBe(FIXTURE_TSCONFIG);
@@ -205,7 +205,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     // Meta is emitted for every axis under --full.
     expect(report.functionAxisMeta?.callerCount).toBeDefined();
@@ -436,7 +436,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
 
     expect(Array.isArray(report.functionCoOccurrence)).toBe(true);
@@ -482,12 +482,45 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     );
   });
 
+  test("emits a `ts-hotspots complexity:` stats line on stderr after a successful run", async () => {
+    const stdout = new StringSink();
+    const stderr = new StringSink();
+    const code = await run(
+      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--format", "json"],
+      stdout,
+      stderr,
+    );
+    expect(code).toBe(0);
+    expect(stderr.text).toMatch(
+      /^ts-hotspots complexity: files=\d+, functions=\d+, candidates=\d+\n$/,
+    );
+  });
+
+  test("--file mode stats line names the inspected file", async () => {
+    const stdout = new StringSink();
+    const stderr = new StringSink();
+    const code = await run(
+      [
+        ...COMPLEXITY_PREFIX,
+        FIXTURE_TSCONFIG,
+        "--file",
+        "src/a.ts",
+        "--format",
+        "json",
+      ],
+      stdout,
+      stderr,
+    );
+    expect(code).toBe(0);
+    expect(stderr.text).toMatch(/ts-hotspots complexity: file=src\/a\.ts, functions=\d+/);
+  });
+
   test("default invocation emits Markdown with the Claude prompt and fenced JSON", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run([...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG], stdout, stderr);
     expect(code).toBe(0);
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     expect(stdout.text.startsWith("# ts-hotspots report")).toBe(true);
     const match = /```json\n([\s\S]*?)\n```/.exec(stdout.text);
     expect(match).not.toBeNull();
@@ -556,7 +589,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     for (const f of report.functions ?? []) {
       expect(f.metrics.commitCount).toBeUndefined();
@@ -945,7 +978,7 @@ describe("complexity subcommand routing", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toBe("");
+    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     expect(report.tool.name).toBe("ts-hotspots");
     expect(report.project.tsconfigPath).toBe(FIXTURE_TSCONFIG);

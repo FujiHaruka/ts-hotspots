@@ -30,10 +30,11 @@ import { main as runDuplicationMain } from "./duplication/cli/main.ts";
 import { loadProject, TsconfigNotFoundError } from "./loader/load-project.ts";
 import {
   renderJson,
-  renderMarkdown,
   renderMarkdownBody,
   renderMarkdownErrorBody,
   renderMarkdownHead,
+  renderMarkdownPreError,
+  renderStatsLine,
 } from "./reporter/render.ts";
 import type {
   DismissedSummary,
@@ -298,7 +299,11 @@ function writeError(
     status: "error",
     error: { code, message },
   };
-  stdout.write(asJson ? renderJson(errorReport) : renderMarkdown(errorReport));
+  stdout.write(
+    asJson
+      ? renderJson(errorReport)
+      : renderMarkdownPreError("complexity", message),
+  );
   const humanMessage =
     err instanceof Error ? (err.stack ?? err.message) : String(err);
   stderr.write(`${humanMessage}\n`);
@@ -446,6 +451,28 @@ function writeOk(
   stdout.write(streaming ? renderMarkdownBody(report) : renderJson(report));
 }
 
+function writeStatsLine(
+  stderr: WritableLike,
+  report: FunctionReport & { status: "ok" },
+  fileMode: { file: string } | undefined,
+): void {
+  const { project } = report;
+  let payload: string;
+  if (fileMode !== undefined) {
+    const fnCount = report.functions?.length ?? 0;
+    payload = `file=${fileMode.file}, functions=${String(fnCount)}`;
+  } else {
+    payload =
+      `files=${String(project.sourceFileCount)}, ` +
+      `functions=${String(project.functionCount)}, ` +
+      `candidates=${String(report.functionHotspotCandidates.length)}`;
+  }
+  if (report.dismissed !== undefined && report.dismissed.active > 0) {
+    payload += `, dismissed=${String(report.dismissed.active)}`;
+  }
+  stderr.write(renderStatsLine("complexity", payload));
+}
+
 function runFunctions(
   positional: string | undefined,
   options: FunctionCliOptions,
@@ -489,7 +516,7 @@ function runFunctions(
     return 1;
   }
 
-  if (streaming) stdout.write(renderMarkdownHead());
+  if (streaming) stdout.write(renderMarkdownHead("complexity"));
 
   try {
     const { rootDir, projectInfo, functions } = prepare(
@@ -513,6 +540,7 @@ function runFunctions(
         functions: targetFunctions,
       };
       writeOk(stdout, report, streaming);
+      writeStatsLine(stderr, report, { file: rel });
       return 0;
     }
 
@@ -572,6 +600,7 @@ function runFunctions(
       };
       if (dismissed !== undefined) report.dismissed = dismissed;
       writeOk(stdout, report, streaming);
+      writeStatsLine(stderr, report, undefined);
       return 0;
     }
 
@@ -583,6 +612,7 @@ function runFunctions(
     };
     if (dismissed !== undefined) report.dismissed = dismissed;
     writeOk(stdout, report, streaming);
+    writeStatsLine(stderr, report, undefined);
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

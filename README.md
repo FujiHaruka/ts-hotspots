@@ -96,7 +96,7 @@ ts-hotspots duplication --whole-repo --format json > report.json
 ts-hotspots duplication --whole-repo --exclude 'src/legacy/**'
 ```
 
-Output is a clone-group report. Each group bundles a set of fragments that look like the same code, with per-pair scores (token overlap, statement-kind similarity, call/property overlap, size compatibility), shared evidence (which calls / properties / statement kinds / token n-grams the members agree on), and a recommendation hint (`extract-function`, `parameterize`, or `manual-review`). Markdown is the default; pass `--format json` for the machine-readable form.
+By default the tool emits a Markdown document containing a short instruction block followed by the report data inside a fenced JSON code block — pipeable straight into an agent in plan mode. Each group bundles a set of fragments that look like the same code, with per-pair scores (token overlap, statement-kind similarity, call/property overlap, size compatibility), shared evidence (which calls / properties / statement kinds / token n-grams the members agree on), and a recommendation hint (`extract-function`, `parameterize`, or `manual-review`). Pass `--format json` for the machine-readable form.
 
 Common options:
 

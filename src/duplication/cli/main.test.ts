@@ -85,7 +85,47 @@ describe("main", () => {
     expect(code).toBe(0);
     const out = cap.stdout();
     expect(out).toContain("# ts-hotspots duplication report");
-    expect(out).toContain("groups: 0");
+    const fenceMatch = /```json\n([\s\S]*?)\n```/.exec(out);
+    expect(fenceMatch).not.toBeNull();
+    const parsed = JSON.parse(fenceMatch?.[1] ?? "") as {
+      status: string;
+      groups: unknown[];
+    };
+    expect(parsed.status).toBe("ok");
+    expect(parsed.groups).toEqual([]);
+  });
+
+  it("streams the Markdown head before running the detector", async () => {
+    const r = newRepo();
+    r.write("src/a.ts", "export const x = 1;\n");
+    const sha = r.commit("only");
+
+    const stdoutChunks: string[] = [];
+    const stderrChunks: string[] = [];
+    const io: MainIO = {
+      stdout: {
+        write: (chunk: string): boolean => {
+          stdoutChunks.push(chunk);
+          return true;
+        },
+      } as NodeJS.WritableStream,
+      stderr: {
+        write: (chunk: string): boolean => {
+          stderrChunks.push(chunk);
+          return true;
+        },
+      } as NodeJS.WritableStream,
+      cwd: () => process.cwd(),
+    };
+    const code = await main([`${sha}..${sha}`, r.path], io);
+    expect(code).toBe(0);
+    expect(stdoutChunks.length).toBeGreaterThanOrEqual(2);
+    const head = stdoutChunks[0] ?? "";
+    expect(head.startsWith("# ts-hotspots duplication report")).toBe(true);
+    expect(head.endsWith("```json\n")).toBe(true);
+    expect(head).not.toContain('"status"');
+    const full = stdoutChunks.join("");
+    expect(full.endsWith("```\n")).toBe(true);
   });
 
   it("writes JSON to stdout when --format json is passed", async () => {
