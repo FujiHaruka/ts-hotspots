@@ -28,7 +28,7 @@ You are working inside the ts-hotspots repo. ts-hotspots is a CLI that staticall
 2. **Validate `hotspots` against real code.** Read the candidates top-down and open each coordinate. Judge whether each candidate's `axes[]` and `metrics` (raw values on hit axes) line up with an actual code smell. Classify into at least:
 
    - **True signal**: the coordinate is a legitimate refactor starting point.
-   - **Structural false positive**: saturation from many identical values, interface-implementation boilerplate, etc. — structural facts, not code problems.
+   - **Structural false positive**: saturation from many identical values, interface-implementation boilerplate, accumulator-loop saturation (`let out = ""; while (...) { out += ... }` patterns inflate `mutationSiteCount` without indicating mutable state spread), etc. — structural facts, not code problems.
    - **Idiomatic false positive**: an axis saturated by a library-specific idiom in this project (e.g. `asKindOrThrow`, ORM query builders, certain React hooks).
    - **Boundary false positive**: external I/O, JSON parsing, CLI argument handling, and other boundaries where `any` / assertions are unavoidable.
    - **Barrel / shared-types high fan-in**: used as intended, not a problem.

@@ -91,6 +91,14 @@ function buildFixtureRepo(repoRoot: string): void {
   );
   touch(repoRoot, "src/a.ts", complexFn("processA"));
   touch(repoRoot, "src/b.ts", complexFn("processB"));
+  // Third file with a simpler function so per-axis top-N has non-zero spread
+  // and unique value count > 1. Without this, processA / processB tie on every
+  // metric and every axis is degenerate under the candidate gate.
+  touch(
+    repoRoot,
+    "src/c.ts",
+    "export function tieBreaker(x: number): number { if (x > 0) return x + 1; return 0; }\n",
+  );
   git(repoRoot, ["init", "--initial-branch=main"]);
   git(repoRoot, ["add", "."]);
   git(repoRoot, ["commit", "-m", "c1"]);

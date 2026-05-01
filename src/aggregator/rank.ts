@@ -165,6 +165,7 @@ const functionAxisMetricKeys: Record<
 
 const HOTSPOT_CO_OCCURRENCE_MIN_AXES = 3;
 const HOTSPOT_DISCRIMINATIVE_TOP_N = 3;
+const HOTSPOT_RESCUE_MIN_NON_ZERO_RATIO = 0.05;
 
 const FUNCTION_AXIS_CATEGORY: Record<FunctionAxisId, "quality" | "leverage"> = {
   cognitiveComplexity: "quality",
@@ -180,6 +181,9 @@ const FUNCTION_AXIS_CATEGORY: Record<FunctionAxisId, "quality" | "leverage"> = {
 
 const isQualityAxis = (axis: FunctionAxisId): boolean =>
   FUNCTION_AXIS_CATEGORY[axis] === "quality";
+
+const isDegenerateAxis = (meta: AxisMeta): boolean =>
+  meta.topNSpread <= 0 || meta.uniqueTopNValues <= 1;
 
 interface AxisHits {
   ref: FunctionRef;
@@ -203,6 +207,7 @@ function accumulateHits(
   rankings: Record<FunctionAxisId, RankedFunctionEntry[]>,
   axisMeta: Record<FunctionAxisId, AxisMeta>,
   coOccurrence: readonly FunctionCoOccurrenceEntry[],
+  totalFunctions: number,
 ): Map<string, AxisHits> {
   const acc = new Map<string, AxisHits>();
   const addHit = (ref: FunctionRef, axis: FunctionAxisId): void => {
@@ -216,15 +221,23 @@ function accumulateHits(
   };
 
   for (const entry of coOccurrence) {
-    if (entry.axisHitCount < HOTSPOT_CO_OCCURRENCE_MIN_AXES) continue;
-    if (!entry.axes.some(isQualityAxis)) continue;
-    for (const axis of entry.axes) addHit(entry.ref, axis);
+    const liveAxes = entry.axes.filter(
+      (a) => !isDegenerateAxis(axisMeta[a]),
+    );
+    if (liveAxes.length < HOTSPOT_CO_OCCURRENCE_MIN_AXES) continue;
+    if (!liveAxes.some(isQualityAxis)) continue;
+    for (const axis of liveAxes) addHit(entry.ref, axis);
   }
 
   for (const axis of FUNCTION_AXIS_IDS) {
     if (!isQualityAxis(axis)) continue;
     const meta = axisMeta[axis];
-    if (meta.topNSpread <= 0 || meta.uniqueTopNValues <= 1) continue;
+    if (isDegenerateAxis(meta)) continue;
+    if (
+      totalFunctions > 0 &&
+      meta.nonZeroCount / totalFunctions < HOTSPOT_RESCUE_MIN_NON_ZERO_RATIO
+    )
+      continue;
     const top = rankings[axis].slice(0, HOTSPOT_DISCRIMINATIVE_TOP_N);
     for (const rankedEntry of top) addHit(rankedEntry.ref, axis);
   }
@@ -236,6 +249,7 @@ function rankCandidates(
   acc: ReadonlyMap<string, AxisHits>,
   entryByKey: ReadonlyMap<string, FunctionEntry>,
   rankings: Record<FunctionAxisId, RankedFunctionEntry[]>,
+  axisMeta: Record<FunctionAxisId, AxisMeta>,
 ): HotspotCandidate[] {
   const intermediate: {
     candidate: HotspotCandidate;
@@ -248,6 +262,7 @@ function rankCandidates(
     const metrics: Partial<FunctionMetrics> = {};
     if (entry !== undefined) {
       for (const axis of orderedAxes) {
+        if (isDegenerateAxis(axisMeta[axis])) continue;
         for (const key of functionAxisMetricKeys[axis]) {
           const val = entry.metrics[key];
           if (val !== undefined) metrics[key] = val;
@@ -288,8 +303,8 @@ export function computeFunctionHotspotCandidates(
   coOccurrence: readonly FunctionCoOccurrenceEntry[],
 ): HotspotCandidate[] {
   const entryByKey = buildEntryIndex(entries);
-  const acc = accumulateHits(rankings, axisMeta, coOccurrence);
-  return rankCandidates(acc, entryByKey, rankings);
+  const acc = accumulateHits(rankings, axisMeta, coOccurrence, entries.length);
+  return rankCandidates(acc, entryByKey, rankings, axisMeta);
 }
 
 /**

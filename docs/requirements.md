@@ -101,8 +101,10 @@ The default output for function axes is a **slim structure containing only hotsp
 
 Function F becomes a candidate if (OR):
 
-- **Co-occurrence gate**: the set of axes F hit has size ≥ 3 **and** contains ≥ 1 quality axis.
-- **Quality-only discriminative rescue**: F is in the top-3 of some **quality axis**, and that axis is not degenerate (`topNSpread > 0` **and** `uniqueTopNValues > 1`).
+- **Co-occurrence gate**: the set of **non-degenerate** axes F hit has size ≥ 3 **and** contains ≥ 1 quality axis. An axis is degenerate when `topNSpread = 0 ∨ uniqueTopNValues = 1`. The same predicate gates rescue.
+- **Quality-only discriminative rescue**: F is in the top-3 of some **quality axis**, the axis is not degenerate, and the axis is not too sparse — its `nonZeroCount` covers at least 5% of measured functions. The threshold is fixed (no flag in v1).
+
+The displayed `metrics` block also drops degenerate axes: a function gated in by co-occurrence has its degenerate hit axes filtered out before raw values are copied, so an agent reading `metrics` never sees a tie value masquerading as evidence.
 
 Leverage axes alone do not produce candidates. They do not participate in the co-occurrence count unless at least one quality axis is also present. Rescue applies to quality axes only. This prevents load-bearing functions that merely have "many callers" or "high churn" from bubbling up.
 
