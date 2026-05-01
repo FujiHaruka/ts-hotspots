@@ -5,6 +5,7 @@ import { collectChangedFragments } from "../diff/pipeline.ts";
 import type {
   CloneCandidateReport,
   Fragment,
+  ReportTool,
   ScopeStats,
 } from "../domain/index.ts";
 import { buildFileFeatureContext, extractFeatures } from "../features/index.ts";
@@ -19,7 +20,7 @@ import {
   scoreCandidateFromSets,
   shouldReport,
 } from "../scoring/index.ts";
-import { searchCandidates, type SearchStats } from "../search/index.ts";
+import { type SearchStats, searchCandidates } from "../search/index.ts";
 import { countLines, listBaseSources } from "./listBaseSources.ts";
 import type { PerfLogger } from "./perfLog.ts";
 import {
@@ -52,6 +53,8 @@ export interface RunOptions {
    * from the report. Defaults to `true`.
    */
   includeCode?: boolean;
+  /** Stamped onto the report's `tool` envelope. */
+  tool?: ReportTool;
 }
 
 /**
@@ -68,8 +71,16 @@ export interface RunOptions {
 export async function runDetector(
   opts: RunOptions,
 ): Promise<CloneCandidateReport> {
-  const { repoPath, baseRef, headRef, threeDot, config, perfLog, includeCode } =
-    opts;
+  const {
+    repoPath,
+    baseRef,
+    headRef,
+    threeDot,
+    config,
+    perfLog,
+    includeCode,
+    tool,
+  } = opts;
   const now: () => number =
     perfLog !== undefined ? () => performance.now() : () => 0;
 
@@ -296,6 +307,7 @@ export async function runDetector(
   emitPhaseStart(perfLog, "report");
   const report = buildJsonReport(
     {
+      tool,
       pr: { baseSha: diff.baseSha, headSha: diff.headSha },
       pairs: scoredPairs,
       config,

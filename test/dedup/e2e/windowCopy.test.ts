@@ -71,10 +71,10 @@ describe("e2e: partial statement-window copy", () => {
     });
 
     const match = report.groups
-      .filter((g) => g.anchor?.filePath === "src/normalize.ts")
+      .filter((g) => g.anchor?.location.startsWith("src/normalize.ts:"))
       .flatMap((g) =>
         g.members
-          .filter((m) => m.fragment.filePath === "src/pipeline.ts")
+          .filter((m) => m.fragment.location.startsWith("src/pipeline.ts:"))
           .map((m) => ({ scores: m.scores })),
       )[0];
     expect(match).toBeDefined();

@@ -7,12 +7,28 @@ import type { CloneGroup, GroupMember } from "../domain/cloneGroup.ts";
 import type { CloneCandidateReport } from "../domain/report.ts";
 import { buildMarkdownReport } from "./markdownReport.ts";
 
+const STUB_TOOL: CloneCandidateReport["tool"] = {
+  name: "ts-hotspots",
+  version: "0.0.0-test",
+};
+
+function mkReport(
+  partial: Partial<Omit<CloneCandidateReport, "status" | "tool">>,
+): CloneCandidateReport {
+  return {
+    status: "ok",
+    tool: STUB_TOOL,
+    pr: { baseSha: "a", headSha: "b" },
+    summary: STUB_PR_SUMMARY,
+    groups: [],
+    ...partial,
+  };
+}
+
 function mkMember(partial: Partial<GroupMember> = {}): GroupMember {
   return {
     fragment: {
-      filePath: "src/existing.ts",
-      startLine: 5,
-      endLine: 30,
+      location: "src/existing.ts:5-30",
       kind: "function",
       code: "function bar() { return 2; }",
     },
@@ -38,9 +54,7 @@ function mkGroup(partial: Partial<CloneGroup> = {}): CloneGroup {
   const member = mkMember();
   return {
     anchor: {
-      filePath: "src/changed.ts",
-      startLine: 12,
-      endLine: 34,
+      location: "src/changed.ts:12-34",
       kind: "function",
       code: "function foo() { return 1; }",
     },
@@ -65,6 +79,8 @@ function mkGroup(partial: Partial<CloneGroup> = {}): CloneGroup {
 describe("buildMarkdownReport", () => {
   it("renders header and groups: 0 when empty", () => {
     const md = buildMarkdownReport({
+      status: "ok",
+      tool: STUB_TOOL,
       pr: { baseSha: "deadbeef", headSha: "cafef00d" },
       summary: STUB_PR_SUMMARY,
       groups: [],
@@ -78,6 +94,8 @@ describe("buildMarkdownReport", () => {
 
   it("renders aggregateScores, hint, sharedEvidence, anchor and member blocks for each group", () => {
     const md = buildMarkdownReport({
+      status: "ok",
+      tool: STUB_TOOL,
       pr: { baseSha: "a", headSha: "b" },
       summary: STUB_PR_SUMMARY,
       groups: [mkGroup()],
@@ -105,14 +123,14 @@ describe("buildMarkdownReport", () => {
 
   it("expands the fence when code contains a backtick run >= 3", () => {
     const md = buildMarkdownReport({
+      status: "ok",
+      tool: STUB_TOOL,
       pr: { baseSha: "a", headSha: "b" },
       summary: STUB_PR_SUMMARY,
       groups: [
         mkGroup({
           anchor: {
-            filePath: "a.ts",
-            startLine: 1,
-            endLine: 3,
+            location: "a.ts:1-3",
             kind: "function",
             code: "const md = `\\`\\`\\` block ```` end`;",
           },
@@ -126,43 +144,37 @@ describe("buildMarkdownReport", () => {
   });
 
   it("is deterministic: two runs produce the same string", () => {
-    const report: CloneCandidateReport = {
-      pr: { baseSha: "a", headSha: "b" },
-      summary: STUB_PR_SUMMARY,
+    const report = mkReport({
       groups: [
         mkGroup(),
         mkGroup({
           anchor: {
-            filePath: "x.ts",
-            startLine: 1,
-            endLine: 5,
+            location: "x.ts:1-5",
             kind: "block",
             code: "return x;",
           },
         }),
       ],
-    };
+    });
     expect(buildMarkdownReport(report)).toBe(buildMarkdownReport(report));
   });
 
   it("omits the changed:/existing: code blocks when code is undefined", () => {
     const member = mkMember({
       fragment: {
-        filePath: "src/existing.ts",
-        startLine: 5,
-        endLine: 30,
+        location: "src/existing.ts:5-30",
         kind: "function",
       },
     });
     const md = buildMarkdownReport({
+      status: "ok",
+      tool: STUB_TOOL,
       pr: { baseSha: "a", headSha: "b" },
       summary: STUB_PR_SUMMARY,
       groups: [
         mkGroup({
           anchor: {
-            filePath: "src/changed.ts",
-            startLine: 12,
-            endLine: 34,
+            location: "src/changed.ts:12-34",
             kind: "function",
           },
           members: [member],
@@ -179,6 +191,8 @@ describe("buildMarkdownReport", () => {
   it("renders 'Cluster #N' heading for anchor-less whole-repo groups", () => {
     const member = mkMember();
     const md = buildMarkdownReport({
+      status: "ok",
+      tool: STUB_TOOL,
       pr: { baseSha: "deadbeef", headSha: "deadbeef" },
       summary: STUB_WHOLE_REPO_SUMMARY,
       groups: [
@@ -195,6 +209,8 @@ describe("buildMarkdownReport", () => {
 
   it("uses neutral 'anchor:' / 'member:' labels in whole-repo mode", () => {
     const md = buildMarkdownReport({
+      status: "ok",
+      tool: STUB_TOOL,
       pr: { baseSha: "deadbeef", headSha: "deadbeef" },
       summary: STUB_WHOLE_REPO_SUMMARY,
       groups: [mkGroup()],
@@ -215,6 +231,8 @@ describe("buildMarkdownReport", () => {
       },
     });
     const md = buildMarkdownReport({
+      status: "ok",
+      tool: STUB_TOOL,
       pr: { baseSha: "a", headSha: "b" },
       summary: STUB_PR_SUMMARY,
       groups: [

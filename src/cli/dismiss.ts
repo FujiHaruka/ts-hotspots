@@ -1,7 +1,11 @@
 import { dirname, resolve } from "node:path";
 import { enumerateDeclarations } from "../collectors/enumerate-declarations.ts";
 import { enumerateSourceFiles } from "../collectors/enumerate-source-files.ts";
-import { computeBodyHash } from "../dismissal/hash.ts";
+import {
+  bodyHashToCompDismissalId,
+  computeBodyHash,
+  normalizeDismissalId,
+} from "../dismissal/hash.ts";
 import {
   addEntry,
   findEntry,
@@ -29,28 +33,28 @@ export function runDismiss(
   stdout: WritableLike,
   stderr: WritableLike,
 ): number {
+  const id = normalizeDismissalId(options.id);
   const rootDir = resolve(dirname(options.tsconfigPath));
   const registry = loadRegistry(rootDir, {
     onWarning: (msg) => {
       stderr.write(`${msg}\n`);
     },
   });
-  if (findEntry(registry, options.id) !== undefined) {
-    stdout.write(`ts-hotspots: ${options.id} is already dismissed\n`);
+  if (findEntry(registry, id) !== undefined) {
+    stdout.write(`ts-hotspots: ${id} is already dismissed\n`);
     return 0;
   }
   const entry: DismissalEntry = {
-    id: options.id,
+    id,
+    feature: "comp",
     reason: options.reason,
     dismissedAt: new Date().toISOString(),
   };
-  const display = tryResolveDisplay(options.tsconfigPath, options.id, stderr);
+  const display = tryResolveDisplay(options.tsconfigPath, id, stderr);
   if (display !== undefined) entry.display = display;
   const { registry: next } = addEntry(registry, entry);
   saveRegistry(rootDir, withProjectPath(next, rootDir));
-  stdout.write(
-    `ts-hotspots: dismissed ${options.id} (${registryPath(rootDir)})\n`,
-  );
+  stdout.write(`ts-hotspots: dismissed ${id} (${registryPath(rootDir)})\n`);
   return 0;
 }
 
@@ -98,19 +102,20 @@ export function runUndismiss(
   stdout: WritableLike,
   stderr: WritableLike,
 ): number {
+  const id = normalizeDismissalId(options.id);
   const rootDir = resolve(dirname(options.tsconfigPath));
   const registry = loadRegistry(rootDir, {
     onWarning: (msg) => {
       stderr.write(`${msg}\n`);
     },
   });
-  const { registry: next, removed } = removeEntry(registry, options.id);
+  const { registry: next, removed } = removeEntry(registry, id);
   if (!removed) {
-    stderr.write(`ts-hotspots: ${options.id} not found in registry\n`);
+    stderr.write(`ts-hotspots: ${id} not found in registry\n`);
     return 1;
   }
   saveRegistry(rootDir, withProjectPath(next, rootDir));
-  stdout.write(`ts-hotspots: removed ${options.id}\n`);
+  stdout.write(`ts-hotspots: removed ${id}\n`);
   return 0;
 }
 
@@ -129,7 +134,7 @@ function tryResolveDisplay(
     const files = enumerateSourceFiles(project, rootDir);
     const declarations = enumerateDeclarations(project, rootDir, { files });
     for (const d of declarations) {
-      if (computeBodyHash(d.node) === id) {
+      if (bodyHashToCompDismissalId(computeBodyHash(d.node)) === id) {
         return {
           file: d.file,
           name: d.name,

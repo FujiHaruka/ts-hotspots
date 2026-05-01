@@ -86,7 +86,7 @@ describe("buildCloneGroups", () => {
     if (group === undefined) throw new Error("expected group");
     expect(group.size).toBe(4);
     expect(group.members).toHaveLength(3);
-    expect(group.anchor?.filePath).toBe("c.ts");
+    expect(group.anchor?.location).toBe("c.ts:1-10");
   });
 
   it("orders members by combined desc then base id asc", () => {
@@ -96,8 +96,8 @@ describe("buildCloneGroups", () => {
       true,
       noThin,
     );
-    const memberPaths = groups[0]?.members.map((m) => m.fragment.filePath);
-    expect(memberPaths).toEqual(["b2.ts", "b1.ts", "b3.ts"]);
+    const memberPaths = groups[0]?.members.map((m) => m.fragment.location);
+    expect(memberPaths).toEqual(["b2.ts:1-10", "b1.ts:1-10", "b3.ts:1-10"]);
   });
 
   it("aggregates min/median/max across the group's pairs", () => {
@@ -205,8 +205,8 @@ describe("buildCloneGroups", () => {
       mkPair("c3", "b3", 0.6),
     ];
     const groups = buildCloneGroups(pairs, defaultConfig, true, noThin);
-    const anchors = groups.map((g) => g.anchor?.filePath);
-    expect(anchors).toEqual(["c1.ts", "c3.ts", "c2.ts"]);
+    const anchors = groups.map((g) => g.anchor?.location);
+    expect(anchors).toEqual(["c1.ts:1-10", "c3.ts:1-10", "c2.ts:1-10"]);
   });
 
   it("anchor and members carry code when includeCode=true", () => {

@@ -58,9 +58,9 @@ describe("e2e: whole-function copy", () => {
     });
 
     const matches = report.groups.flatMap((g) =>
-      g.anchor?.filePath === "src/util.ts"
+      g.anchor?.location.startsWith("src/util.ts:")
         ? g.members
-            .filter((m) => m.fragment.filePath === "src/math.ts")
+            .filter((m) => m.fragment.location.startsWith("src/math.ts:"))
             .map((m) => ({
               left: nonNull(g.anchor),
               right: m.fragment,

@@ -1,12 +1,106 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import pkg from "../../../package.json" with { type: "json" };
 import { defaultConfig } from "../config/index.ts";
-import type { CloneCandidateReport } from "../domain/index.ts";
+import type {
+  CloneCandidateReport,
+  DuplicationErrorReport,
+  ReportTool,
+} from "../domain/index.ts";
 import { buildMarkdownReport } from "../report/index.ts";
 import { ArgParseError, parseCliArgs, USAGE } from "./args.ts";
 import { JsonlPerfLogger, type PerfLogger } from "./perfLog.ts";
 import { runDetector } from "./runDetector.ts";
 import { runWholeRepoDetector } from "./runWholeRepoDetector.ts";
+
+const TOOL: ReportTool = { name: "ts-hotspots", version: pkg.version };
+
+/**
+ * Build the error JSON envelope. Mirrors `comp`'s shape so an agent
+ * branching on `status` handles both subcommands the same way.
+ */
+function buildErrorReport(
+  code: string,
+  message: string,
+): DuplicationErrorReport {
+  return {
+    status: "error",
+    tool: TOOL,
+    error: { code, message },
+  };
+}
+
+/**
+ * Render the error envelope for `--format markdown`. Until M3 introduces
+ * the agent-first prelude, this is a minimal heading + fenced JSON body
+ * so the body shape stays in lockstep with `comp`'s error markdown.
+ */
+function renderMarkdownError(report: DuplicationErrorReport): string {
+  return `# ts-hotspots duplication error
+
+\`\`\`json
+${JSON.stringify(report, null, 2)}
+\`\`\`
+`;
+}
+
+/**
+ * Write a fatal-error envelope to stdout in the requested format and the
+ * raw human-readable message to stderr. `code` is one of the strings in
+ * the dup error vocabulary (see comments below); `message` is what the
+ * agent / human sees as the explanation.
+ */
+function writeFatalError(
+  io: MainIO,
+  format: "markdown" | "json",
+  code: string,
+  message: string,
+  humanDetail: string,
+): void {
+  const report = buildErrorReport(code, message);
+  io.stdout.write(
+    format === "json"
+      ? `${JSON.stringify(report, null, 2)}\n`
+      : renderMarkdownError(report),
+  );
+  io.stderr.write(`ts-hotspots duplication: ${humanDetail}\n`);
+}
+
+/**
+ * Best-effort `--format` extraction for the case where `parseCliArgs`
+ * throws before we have a `ParsedArgs`. We still want a `--format json`
+ * caller to receive a JSON envelope on its arg-parse failure.
+ */
+function sniffFormat(argv: readonly string[]): "markdown" | "json" {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--format=json") return "json";
+    if (a === "--format=markdown") return "markdown";
+    if (a === "--format") {
+      const next = argv[i + 1];
+      if (next === "json") return "json";
+      if (next === "markdown") return "markdown";
+    }
+  }
+  return "markdown";
+}
+
+function classifyError(err: unknown): { code: string; message: string } {
+  if (err instanceof ArgParseError) {
+    return { code: "INVALID_ARGS", message: err.message };
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  // Heuristic mapping: detector failures bubble up `git`-flavoured
+  // messages most of the time. A more exhaustive vocabulary lands when
+  // M5 introduces dismissal-side error codes.
+  if (/^not in a git repository/.test(message)) {
+    return { code: "NOT_A_GIT_REPO", message };
+  }
+  if (/git/i.test(message) || /spawn/i.test(message)) {
+    return { code: "GIT_FAILED", message };
+  }
+  return { code: "UNKNOWN_ERROR", message };
+}
 
 /**
  * Walk up from `start` until a `.git` entry is found, returning that
@@ -66,7 +160,18 @@ export async function main(
     args = parseCliArgs(argv);
   } catch (err) {
     if (err instanceof ArgParseError) {
-      io.stderr.write(`ts-hotspots duplication: ${err.message}\n\n${USAGE}`);
+      // `parseCliArgs` failed before yielding a `ParsedArgs`, so we don't
+      // have `args.format` to consult. Sniff `--format` directly from
+      // argv to honour the common `--format json` case; everything else
+      // defaults to markdown (the dup default).
+      const { code, message } = classifyError(err);
+      writeFatalError(
+        io,
+        sniffFormat(argv),
+        code,
+        message,
+        `${err.message}\n\n${USAGE}`,
+      );
       return 1;
     }
     throw err;
@@ -81,8 +186,8 @@ export async function main(
   try {
     repoPath = findGitRoot(args.path ?? io.cwd());
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    io.stderr.write(`ts-hotspots duplication: ${msg}\n`);
+    const { code, message } = classifyError(err);
+    writeFatalError(io, args.format, code, message, message);
     return 1;
   }
 
@@ -112,6 +217,7 @@ export async function main(
             config,
             perfLog,
             includeCode: args.includeCode,
+            tool: TOOL,
           })
         : await runWholeRepoDetector({
             repoPath,
@@ -119,6 +225,7 @@ export async function main(
             config,
             perfLog,
             includeCode: args.includeCode,
+            tool: TOOL,
           });
 
     // Cap the group list at `--limit` (default 50). The runner produces
@@ -156,8 +263,10 @@ export async function main(
     );
     return 0;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    io.stderr.write(`ts-hotspots duplication: ${msg}\n`);
+    const { code, message } = classifyError(err);
+    const humanDetail =
+      err instanceof Error ? (err.stack ?? err.message) : String(err);
+    writeFatalError(io, args.format, code, message, humanDetail);
     return 1;
   }
 }

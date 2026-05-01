@@ -338,8 +338,8 @@ describe("main", () => {
 
     const parsed = JSON.parse(cap.stdout()) as {
       groups: {
-        anchor?: { filePath: string };
-        members: { fragment: { filePath: string } }[];
+        anchor?: { location: string };
+        members: { fragment: { location: string } }[];
       }[];
     };
     expect(parsed.groups.length).toBeGreaterThan(0);

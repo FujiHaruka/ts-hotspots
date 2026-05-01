@@ -15,10 +15,10 @@ import {
 } from "./aggregator/rank.ts";
 import { runDismiss, runListDismissed, runUndismiss } from "./cli/dismiss.ts";
 import { collectChurn } from "./collectors/churn/commit-count.ts";
-import { main as runDuplicationMain } from "./duplication/cli/main.ts";
 import { enumerateDeclarations } from "./collectors/enumerate-declarations.ts";
 import { enumerateSourceFiles } from "./collectors/enumerate-source-files.ts";
 import { DEFAULT_EXCLUDE_GLOBS } from "./defaults.ts";
+import { bodyHashToCompDismissalId } from "./dismissal/hash.ts";
 import {
   loadRegistry,
   pruneRegistry,
@@ -26,6 +26,7 @@ import {
   saveRegistry,
   withProjectPath,
 } from "./dismissal/store.ts";
+import { main as runDuplicationMain } from "./duplication/cli/main.ts";
 import { loadProject, TsconfigNotFoundError } from "./loader/load-project.ts";
 import {
   renderJson,
@@ -100,11 +101,7 @@ function parseLimit(value: string): number {
   const trimmed = value.trim();
   if (trimmed.toLowerCase() === "all") return Number.POSITIVE_INFINITY;
   const n = Number.parseInt(trimmed, 10);
-  if (
-    !Number.isFinite(n) ||
-    n <= 0 ||
-    !/^\d+$/.test(trimmed)
-  ) {
+  if (!Number.isFinite(n) || n <= 0 || !/^\d+$/.test(trimmed)) {
     throw new InvalidArgumentError(
       "--limit must be a positive integer or 'all'",
     );
@@ -114,9 +111,7 @@ function parseLimit(value: string): number {
 
 function parseFormat(value: string): ReportFormat {
   if (value === "markdown" || value === "json") return value;
-  throw new InvalidArgumentError(
-    "--format must be 'markdown' or 'json'",
-  );
+  throw new InvalidArgumentError("--format must be 'markdown' or 'json'");
 }
 
 function parseChurnWindow(value: string): number {
@@ -399,7 +394,7 @@ interface DismissalApplyResult {
 function applyDismissalRegistry(
   rootDir: string,
   candidates: HotspotCandidate[],
-  bodyHashes: ReadonlySet<string>,
+  activeDismissalIds: ReadonlySet<string>,
   stderr: WritableLike,
 ): DismissalApplyResult {
   const original = loadRegistry(rootDir, {
@@ -410,7 +405,10 @@ function applyDismissalRegistry(
   if (original.entries.length === 0) {
     return { candidates };
   }
-  const { registry: pruned, prunedCount } = pruneRegistry(original, bodyHashes);
+  const { registry: pruned, prunedCount } = pruneRegistry(
+    original,
+    activeDismissalIds,
+  );
   if (prunedCount > 0) {
     saveRegistry(rootDir, withProjectPath(pruned, rootDir));
   }
@@ -464,9 +462,7 @@ function runFunctions(
   // Warn (not fail) when --limit is supplied alongside a mode that ignores
   // it, so users do not silently assume their cap was honoured.
   if (options.file !== undefined && userLimit !== undefined) {
-    stderr.write(
-      "ts-hotspots complexity: --limit is ignored in --file mode\n",
-    );
+    stderr.write("ts-hotspots complexity: --limit is ignored in --file mode\n");
   }
 
   // Pre-stream validation: fast checks that can fail with a clear error before
@@ -540,9 +536,16 @@ function runFunctions(
       functionCoOccurrence,
     );
 
-    const bodyHashes = new Set(functions.map((f) => f.bodyHash));
+    const activeDismissalIds = new Set(
+      functions.map((f) => bodyHashToCompDismissalId(f.bodyHash)),
+    );
     const { candidates: filteredCandidates, summary: dismissed } =
-      applyDismissalRegistry(rootDir, rawCandidates, bodyHashes, stderr);
+      applyDismissalRegistry(
+        rootDir,
+        rawCandidates,
+        activeDismissalIds,
+        stderr,
+      );
     const functionHotspotCandidates = Number.isFinite(limit)
       ? filteredCandidates.slice(0, limit)
       : filteredCandidates;

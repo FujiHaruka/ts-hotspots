@@ -29,6 +29,7 @@ export function buildMarkdownReport(report: CloneCandidateReport): string {
   const lines: string[] = [];
   lines.push("# ts-hotspots duplication report");
   lines.push("");
+  lines.push(`tool: ${report.tool.name} v${report.tool.version}`);
   lines.push(`mode: ${report.summary.mode}`);
   if (report.summary.mode === "pr") {
     lines.push(`base: ${report.pr.baseSha}`);
@@ -163,7 +164,7 @@ function renderEvidence(lines: string[], e: Evidence): void {
 }
 
 function formatRange(view: FragmentView): string {
-  return `${view.filePath}:${String(view.startLine)}-${String(view.endLine)} (${view.kind})`;
+  return `${view.location} (${view.kind})`;
 }
 
 function pushFencedCode(lines: string[], code: string): void {

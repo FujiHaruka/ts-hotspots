@@ -76,10 +76,10 @@ describe("buildCloneGroupsFromClusters", () => {
     expect(groups).toHaveLength(1);
     const g = nonNull(groups[0]);
     expect(g.anchor).toBeUndefined();
-    expect(g.members.map((m) => m.fragment.filePath)).toEqual([
-      "a.ts",
-      "b.ts",
-      "c.ts",
+    expect(g.members.map((m) => m.fragment.location)).toEqual([
+      "a.ts:1-10",
+      "b.ts:1-10",
+      "c.ts:1-10",
     ]);
     expect(g.size).toBe(3);
   });

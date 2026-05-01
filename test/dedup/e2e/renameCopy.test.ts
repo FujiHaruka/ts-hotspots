@@ -55,10 +55,10 @@ describe("e2e: identifier-renamed copy (Type-2 / Type-3)", () => {
     });
 
     const match = report.groups
-      .filter((g) => g.anchor?.filePath === "src/check.ts")
+      .filter((g) => g.anchor?.location.startsWith("src/check.ts:"))
       .flatMap((g) =>
         g.members
-          .filter((m) => m.fragment.filePath === "src/validate.ts")
+          .filter((m) => m.fragment.location.startsWith("src/validate.ts:"))
           .map((m) => ({ scores: m.scores })),
       )[0];
     expect(match).toBeDefined();
