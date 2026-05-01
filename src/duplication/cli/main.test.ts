@@ -548,12 +548,18 @@ describe("main", () => {
       );
       r.commit("mutate");
 
-      const second = await runDup(r.path);
+      const cap = captureIO();
+      const code = await main(["--whole-repo", r.path, "--format", "json"], cap.io);
+      expect(code).toBe(0);
+      const second = JSON.parse(cap.stdout()) as ParsedReport;
       expect(second.dismissed).toEqual({
         active: 0,
         filteredThisRun: 0,
         prunedThisRun: 1,
       });
+      expect(cap.stderr()).toContain(
+        "ts-hotspots duplication: pruned 1 expired dismissal (group composition changed since dismiss)",
+      );
       const regPath = registryPath(r.path);
       const after = JSON.parse(readFileSync(regPath, "utf-8")) as {
         entries: unknown[];

@@ -106,6 +106,7 @@ interface PrEnvelope {
   functionHotspotCandidates: { ref: { location: string } }[];
   functionRankings?: Record<string, { ref: { location: string } }[]>;
   functionCoOccurrence?: { ref: { location: string } }[];
+  notice?: { code: string; message: string };
 }
 
 describe("complexity --pr (PR scope filter)", () => {
@@ -160,6 +161,7 @@ describe("complexity --pr (PR scope filter)", () => {
     for (const c of report.functionHotspotCandidates) {
       expect(c.ref.location.startsWith("src/a.ts:")).toBe(true);
     }
+    expect(report.notice).toBeUndefined();
     expect(stderr.text).toMatch(/pr=1 changed files/);
   });
 
@@ -210,7 +212,33 @@ describe("complexity --pr (PR scope filter)", () => {
     const report = JSON.parse(stdout.text) as PrEnvelope;
     expect(report.pr?.changedFiles).toBe(0);
     expect(report.functionHotspotCandidates).toEqual([]);
+    expect(report.notice?.code).toBe("PR_SCOPE_EMPTY");
+    expect(report.notice?.message).toMatch(/no functions/i);
     expect(stderr.text).toMatch(/pr=0 changed files/);
+  });
+
+  test("PR_SCOPE_EMPTY notice also surfaces in --full mode", async () => {
+    buildFixtureRepo(tmp);
+
+    const stdout = new StringSink();
+    const stderr = new StringSink();
+    const code = await run(
+      [
+        ...ARGV_PREFIX,
+        tmp,
+        "--pr",
+        "HEAD..HEAD",
+        "--full",
+        "--format",
+        "json",
+      ],
+      stdout,
+      stderr,
+    );
+    expect(code).toBe(0);
+    const report = JSON.parse(stdout.text) as PrEnvelope;
+    expect(report.pr?.changedFiles).toBe(0);
+    expect(report.notice?.code).toBe("PR_SCOPE_EMPTY");
   });
 
   test("rejects --pr combined with --file", async () => {

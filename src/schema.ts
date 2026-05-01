@@ -126,6 +126,7 @@ export interface FunctionReport {
   functions?: FunctionEntry[];
   dismissed?: DismissedSummary;
   pr?: PrInfo;
+  notice?: { code: string; message: string };
 }
 
 export interface ErrorReport {

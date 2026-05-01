@@ -448,6 +448,13 @@ function applyDismissalRegistry(
   );
   if (prunedCount > 0) {
     saveRegistry(rootDir, withProjectPath(pruned, rootDir));
+    const noun = prunedCount === 1 ? "dismissal" : "dismissals";
+    stderr.write(
+      renderStatsLine(
+        "complexity",
+        `pruned ${String(prunedCount)} expired ${noun} (function changed since dismiss)`,
+      ),
+    );
   }
   const activeIds = registryIdSet(pruned);
   let filteredThisRun = 0;
@@ -736,6 +743,19 @@ async function runFunctions(
       ? scopedCandidates.slice(0, limit)
       : scopedCandidates;
 
+    // PR scope can be vacuous: a PR that only edits README, JSON configs,
+    // or types in another tsconfig leaves zero project functions to rank.
+    // Surface that explicitly so consumers don't read empty hotspots as a
+    // clean bill of health.
+    const prNotice: FunctionReport["notice"] =
+      prScope !== undefined && prScope.info.changedFiles === 0
+        ? {
+            code: "PR_SCOPE_EMPTY",
+            message:
+              "Changed files contain no functions tracked by this tsconfig — nothing to rank",
+          }
+        : undefined;
+
     if (options.full === true) {
       const usedFunctionKeys = collectFunctionRefKeys(displayedRankings);
       const report: FunctionReport = {
@@ -758,6 +778,7 @@ async function runFunctions(
       };
       if (dismissed !== undefined) report.dismissed = dismissed;
       if (prScope !== undefined) report.pr = prScope.info;
+      if (prNotice !== undefined) report.notice = prNotice;
       writeOk(stdout, report, streaming);
       writeStatsLine(stderr, report, undefined);
       return 0;
@@ -771,6 +792,7 @@ async function runFunctions(
     };
     if (dismissed !== undefined) report.dismissed = dismissed;
     if (prScope !== undefined) report.pr = prScope.info;
+    if (prNotice !== undefined) report.notice = prNotice;
     writeOk(stdout, report, streaming);
     writeStatsLine(stderr, report, undefined);
     return 0;

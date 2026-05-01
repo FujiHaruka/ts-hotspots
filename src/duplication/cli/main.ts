@@ -195,6 +195,13 @@ function applyDismissalRegistry(
   const { registry: pruned, prunedCount } = pruneRegistry(original, currentIds);
   if (prunedCount > 0) {
     saveRegistry(rootDir, withProjectPath(pruned, rootDir));
+    const noun = prunedCount === 1 ? "dismissal" : "dismissals";
+    stderr.write(
+      renderStatsLine(
+        "duplication",
+        `pruned ${String(prunedCount)} expired ${noun} (group composition changed since dismiss)`,
+      ),
+    );
   }
   const activeIds = registryIdSet(pruned);
   const kept: CloneCandidateReport["groups"] = [];
