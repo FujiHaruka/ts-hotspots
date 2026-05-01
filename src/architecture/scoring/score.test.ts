@@ -19,7 +19,10 @@ describe("score — small-N gate", () => {
     // `high_fanout_component` weights (0.8 fan-out + 0.2 size) clear the
     // 0.85 threshold.
     const m = metrics([
-      ["hub.ts::H::function", { fanOutWeighted: 10 }],
+      [
+        "hub.ts::H::function",
+        { fanOutWeighted: 10, fanInUnweighted: 2 },
+      ],
       ["a.ts::A::function", { fanOutWeighted: 0 }],
       ["b.ts::B::function", { fanOutWeighted: 0 }],
       ["c.ts::C::function", { fanOutWeighted: 0 }],
@@ -165,6 +168,101 @@ describe("score — unstable_edge_ratio_pct axis", () => {
         (c) => c.primary.smellType === "unstable_dependency_candidate",
       ),
     ).toBeUndefined();
+  });
+});
+
+describe("score — single-caller gate on bridge / fanout", () => {
+  it("fanIn <= 1 suppresses bridge_component even with high betweenness", () => {
+    // A would otherwise top the betweenness distribution (bridge weight
+    // 1.0 → composite 1.0). With fanInUnweighted=1 it is structurally
+    // a single-caller pipeline entry, not a bridge.
+    const m = metrics([
+      [
+        "src/a.ts::A::function",
+        { betweenness: 1, fanInUnweighted: 1 },
+      ],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ]);
+    const result = score(m);
+    const a = result.find((c) => c.nodeId === "src/a.ts::A::function");
+    expect(a?.primary.smellType).not.toBe("bridge_component");
+    expect(a?.secondary.find((s) => s.smellType === "bridge_component")).toBeUndefined();
+  });
+
+  it("fanIn <= 1 suppresses high_fanout_component even with high fanout", () => {
+    const m = metrics([
+      [
+        "src/a.ts::A::function",
+        { fanOutWeighted: 100, fanInUnweighted: 1 },
+      ],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ]);
+    const lineCounts = new Map([
+      ["src/a.ts::A::function", 100],
+      ["src/b.ts::B::function", 1],
+      ["src/c.ts::C::function", 1],
+      ["src/d.ts::D::function", 1],
+      ["src/e.ts::E::function", 1],
+    ]);
+    const result = score(m, { lineCounts });
+    const a = result.find((c) => c.nodeId === "src/a.ts::A::function");
+    expect(a?.primary.smellType).not.toBe("high_fanout_component");
+    expect(
+      a?.secondary.find((s) => s.smellType === "high_fanout_component"),
+    ).toBeUndefined();
+  });
+
+  it("fanIn = 2 still allows high_fanout_component to fire (boundary)", () => {
+    const m = metrics([
+      [
+        "src/a.ts::A::function",
+        { fanOutWeighted: 100, fanInUnweighted: 2 },
+      ],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ]);
+    const lineCounts = new Map([
+      ["src/a.ts::A::function", 100],
+      ["src/b.ts::B::function", 1],
+      ["src/c.ts::C::function", 1],
+      ["src/d.ts::D::function", 1],
+      ["src/e.ts::E::function", 1],
+    ]);
+    const result = score(m, { lineCounts });
+    const a = result.find((c) => c.nodeId === "src/a.ts::A::function");
+    expect(a?.primary.smellType).toBe("high_fanout_component");
+  });
+
+  it("fanIn = 0 does not suppress unstable_dependency_candidate", () => {
+    // A node with no callers (top-level entry / external API) can still
+    // depend on more-unstable downstream code. The unstable smell is
+    // intentionally exempt from the single-caller gate.
+    const m = metrics([
+      [
+        "src/a.ts::A::function",
+        {
+          unstableEdgeCount: 3,
+          unstableEdgeRatio: 1,
+          fanOutUnweighted: 3,
+          instabilityDelta: 0.5,
+          fanInUnweighted: 0,
+        },
+      ],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ]);
+    const a = score(m).find((c) => c.nodeId === "src/a.ts::A::function");
+    expect(a?.primary.smellType).toBe("unstable_dependency_candidate");
   });
 });
 
@@ -392,8 +490,14 @@ describe("score — excludedNodeIds", () => {
     // drop A from the result while leaving B's contributing percentile
     // at 1.0 — i.e. A still participates in the percentile distribution.
     const m = metrics([
-      ["src/a.ts::A::function", { fanOutWeighted: 100 }],
-      ["src/b.ts::B::function", { fanOutWeighted: 100 }],
+      [
+        "src/a.ts::A::function",
+        { fanOutWeighted: 100, fanInUnweighted: 2 },
+      ],
+      [
+        "src/b.ts::B::function",
+        { fanOutWeighted: 100, fanInUnweighted: 2 },
+      ],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],
       ["src/e.ts::E::function", {}],
@@ -447,8 +551,14 @@ describe("score — determinism", () => {
     // zeros ≈ -0.5 (below). Both outliers tie on composite = 1.0 →
     // must sort lex.
     const entries: ReadonlyArray<[string, Partial<NodeMetrics>]> = [
-      ["src/a.ts::A::function", { fanOutWeighted: 100 }],
-      ["src/b.ts::B::function", { fanOutWeighted: 100 }],
+      [
+        "src/a.ts::A::function",
+        { fanOutWeighted: 100, fanInUnweighted: 2 },
+      ],
+      [
+        "src/b.ts::B::function",
+        { fanOutWeighted: 100, fanInUnweighted: 2 },
+      ],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],
       ["src/e.ts::E::function", {}],
@@ -478,8 +588,14 @@ describe("score — size_pct axis", () => {
     // axes alone. Giving one a larger declaration span lifts its
     // size_pct contribution and orders it first.
     const entries: readonly [string, Partial<NodeMetrics>][] = [
-      ["src/big.ts::Big::function", { fanOutWeighted: 100 }],
-      ["src/small.ts::Small::function", { fanOutWeighted: 100 }],
+      [
+        "src/big.ts::Big::function",
+        { fanOutWeighted: 100, fanInUnweighted: 2 },
+      ],
+      [
+        "src/small.ts::Small::function",
+        { fanOutWeighted: 100, fanInUnweighted: 2 },
+      ],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],
       ["src/e.ts::E::function", {}],
