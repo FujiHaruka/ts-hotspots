@@ -42,6 +42,7 @@ import {
   renderStatsLine,
 } from "./reporter/render.ts";
 import type {
+  AxisMeta,
   DismissedSummary,
   ErrorReport,
   FunctionAxisId,
@@ -416,6 +417,87 @@ function slimProject(projectInfo: ReportProject): ReportProject {
   return { sourceFileCount: projectInfo.sourceFileCount };
 }
 
+function validateFunctionCliInputs(
+  positional: string | undefined,
+  options: FunctionCliOptions,
+): { rootDir: string; functionAxes: FunctionAxisId[] | undefined } {
+  const rootDir = resolveRootDir(positional);
+  if (!existsSync(rootDir)) {
+    throw new InvalidArgsError(`path does not exist: ${rootDir}`);
+  }
+  if (!statSync(rootDir).isDirectory()) {
+    throw new InvalidArgsError(`path is not a directory: ${rootDir}`);
+  }
+  const functionAxes =
+    options.metrics !== undefined ? parseFunctionAxes(options.metrics) : undefined;
+  if (options.pr !== undefined && options.file !== undefined) {
+    throw new InvalidArgsError("--pr and --file are mutually exclusive");
+  }
+  return { rootDir, functionAxes };
+}
+
+interface BuildFunctionReportInput {
+  projectInfo: ReportProject;
+  hotspots: HotspotCandidate[];
+  rankings: Record<FunctionAxisId, RankedFunctionEntry[]>;
+  axisMeta: Record<FunctionAxisId, AxisMeta>;
+  coOccurrence: FunctionCoOccurrenceEntry[];
+  functions: readonly FunctionEntry[];
+  verbose: boolean;
+}
+
+function buildFunctionReport(input: BuildFunctionReportInput): FunctionReport {
+  const {
+    projectInfo,
+    hotspots,
+    rankings,
+    axisMeta,
+    coOccurrence,
+    functions,
+    verbose,
+  } = input;
+  if (!verbose) {
+    return {
+      tool: { name: "ts-hotspots", version: pkg.version },
+      project: slimProject(projectInfo),
+      hotspots,
+    };
+  }
+  const usedFunctionKeys = collectFunctionRefKeys(rankings);
+  return {
+    tool: { name: "ts-hotspots", version: pkg.version },
+    project: projectInfo,
+    functionRankings: rankings,
+    functionAxisMeta: axisMeta,
+    hotspots,
+    functionCoOccurrence: coOccurrence,
+    functions: functions.filter((f) =>
+      usedFunctionKeys.has(
+        functionRefKey({
+          location: f.location,
+          name: f.name,
+          kind: f.kind,
+        }),
+      ),
+    ),
+  };
+}
+
+interface OptionalReportFields {
+  dismissed: DismissedSummary | undefined;
+  prScope: PrScope | undefined;
+  prNotice: FunctionReport["notice"];
+}
+
+function applyOptionalReportFields(
+  report: FunctionReport,
+  fields: OptionalReportFields,
+): void {
+  if (fields.dismissed !== undefined) report.dismissed = fields.dismissed;
+  if (fields.prScope !== undefined) report.pr = fields.prScope.info;
+  if (fields.prNotice !== undefined) report.notice = fields.prNotice;
+}
+
 interface DismissalApplyResult {
   candidates: HotspotCandidate[];
   summary?: DismissedSummary;
@@ -634,19 +716,7 @@ async function runFunctions(
   // longer switch to the old "# ts-hotspots error" preamble on failure.
   let functionAxes: FunctionAxisId[] | undefined;
   try {
-    const rootDir = resolveRootDir(positional);
-    if (!existsSync(rootDir)) {
-      throw new InvalidArgsError(`path does not exist: ${rootDir}`);
-    }
-    if (!statSync(rootDir).isDirectory()) {
-      throw new InvalidArgsError(`path is not a directory: ${rootDir}`);
-    }
-    if (options.metrics !== undefined) {
-      functionAxes = parseFunctionAxes(options.metrics);
-    }
-    if (options.pr !== undefined && options.file !== undefined) {
-      throw new InvalidArgsError("--pr and --file are mutually exclusive");
-    }
+    ({ functionAxes } = validateFunctionCliInputs(positional, options));
   } catch (err) {
     writeError(
       stdout,
@@ -752,41 +822,16 @@ async function runFunctions(
           }
         : undefined;
 
-    if (options.verbose === true) {
-      const usedFunctionKeys = collectFunctionRefKeys(displayedRankings);
-      const report: FunctionReport = {
-        tool: { name: "ts-hotspots", version: pkg.version },
-        project: projectInfo,
-        functionRankings: displayedRankings,
-        functionAxisMeta,
-        hotspots,
-        functionCoOccurrence: displayedCoOccurrence,
-        functions: functions.filter((f) =>
-          usedFunctionKeys.has(
-            functionRefKey({
-              location: f.location,
-              name: f.name,
-              kind: f.kind,
-            }),
-          ),
-        ),
-      };
-      if (dismissed !== undefined) report.dismissed = dismissed;
-      if (prScope !== undefined) report.pr = prScope.info;
-      if (prNotice !== undefined) report.notice = prNotice;
-      writeOk(stdout, report, streaming);
-      writeStatsLine(stderr, report, undefined, functions.length);
-      return 0;
-    }
-
-    const report: FunctionReport = {
-      tool: { name: "ts-hotspots", version: pkg.version },
-      project: slimProject(projectInfo),
+    const report = buildFunctionReport({
+      projectInfo,
       hotspots,
-    };
-    if (dismissed !== undefined) report.dismissed = dismissed;
-    if (prScope !== undefined) report.pr = prScope.info;
-    if (prNotice !== undefined) report.notice = prNotice;
+      rankings: displayedRankings,
+      axisMeta: functionAxisMeta,
+      coOccurrence: displayedCoOccurrence,
+      functions,
+      verbose: options.verbose === true,
+    });
+    applyOptionalReportFields(report, { dismissed, prScope, prNotice });
     writeOk(stdout, report, streaming);
     writeStatsLine(stderr, report, undefined, functions.length);
     return 0;
