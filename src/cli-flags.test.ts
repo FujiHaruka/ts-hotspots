@@ -76,7 +76,15 @@ describe("cross-CLI flag vocabulary", () => {
 
     const dupStderr = new StringSink();
     const dupCode = await run(
-      [...ARGV, "dup", "main..feature", "/nonexistent", "--limit", "all"],
+      [
+        ...ARGV,
+        "dup",
+        "--diff",
+        "main..feature",
+        "/nonexistent",
+        "--limit",
+        "all",
+      ],
       new StringSink(),
       dupStderr,
     );
@@ -96,7 +104,7 @@ describe("cross-CLI flag vocabulary", () => {
 
     const dupStderr = new StringSink();
     const dupCode = await run(
-      [...ARGV, "dup", "main..feature", "--repo", "/tmp"],
+      [...ARGV, "dup", "--diff", "main..feature", "--repo", "/tmp"],
       new StringSink(),
       dupStderr,
     );

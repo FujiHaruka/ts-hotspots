@@ -113,8 +113,8 @@ function buildFixtureRepo(repoRoot: string): void {
   git(repoRoot, ["commit", "-m", "c2"]);
 }
 
-interface PrEnvelope {
-  pr?: {
+interface DiffEnvelope {
+  diff?: {
     baseSha: string;
     headSha: string;
     threeDot: boolean;
@@ -126,11 +126,11 @@ interface PrEnvelope {
   notice?: { code: string; message: string };
 }
 
-describe("complexity --pr (PR scope filter)", () => {
+describe("complexity --diff (diff scope filter)", () => {
   let tmp: string;
 
   beforeEach(() => {
-    tmp = mkdtempSync(join(tmpdir(), "ts-hotspots-comp-pr-"));
+    tmp = mkdtempSync(join(tmpdir(), "ts-hotspots-comp-diff-"));
   });
 
   afterEach(() => {
@@ -140,7 +140,7 @@ describe("complexity --pr (PR scope filter)", () => {
   test("scopes hotspot candidates to functions in changed files", async () => {
     buildFixtureRepo(tmp);
 
-    // Sanity: without --pr both files contribute candidates.
+    // Sanity: without --diff both files contribute candidates.
     const baselineStdout = new StringSink();
     const baselineStderr = new StringSink();
     const baselineCode = await run(
@@ -149,35 +149,35 @@ describe("complexity --pr (PR scope filter)", () => {
       baselineStderr,
     );
     expect(baselineCode).toBe(0);
-    const baseline = JSON.parse(baselineStdout.text) as PrEnvelope;
-    expect(baseline.pr).toBeUndefined();
+    const baseline = JSON.parse(baselineStdout.text) as DiffEnvelope;
+    expect(baseline.diff).toBeUndefined();
     const baselineFiles = new Set(
       baseline.hotspots.map((c) => c.ref.location.split(":")[0]),
     );
     expect(baselineFiles.has("src/a.ts")).toBe(true);
     expect(baselineFiles.has("src/b.ts")).toBe(true);
 
-    // With --pr, only the changed file (src/a.ts) should appear.
+    // With --diff, only the changed file (src/a.ts) should appear.
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...ARGV_PREFIX, tmp, "--pr", "HEAD~1..HEAD", "--format", "json"],
+      [...ARGV_PREFIX, tmp, "--diff", "HEAD~1..HEAD", "--format", "json"],
       stdout,
       stderr,
     );
     expect(code).toBe(0);
-    const report = JSON.parse(stdout.text) as PrEnvelope;
-    expect(report.pr).toBeDefined();
-    expect(report.pr?.changedFiles).toBe(1);
-    expect(report.pr?.threeDot).toBe(false);
-    expect(report.pr?.baseSha).toMatch(/^[0-9a-f]{40}$/);
-    expect(report.pr?.headSha).toMatch(/^[0-9a-f]{40}$/);
+    const report = JSON.parse(stdout.text) as DiffEnvelope;
+    expect(report.diff).toBeDefined();
+    expect(report.diff?.changedFiles).toBe(1);
+    expect(report.diff?.threeDot).toBe(false);
+    expect(report.diff?.baseSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(report.diff?.headSha).toMatch(/^[0-9a-f]{40}$/);
     expect(report.hotspots.length).toBeGreaterThan(0);
     for (const c of report.hotspots) {
       expect(c.ref.location.startsWith("src/a.ts:")).toBe(true);
     }
     expect(report.notice).toBeUndefined();
-    expect(stderr.text).toMatch(/pr=1 changed files/);
+    expect(stderr.text).toMatch(/diff=1 changed files/);
   });
 
   test("--verbose filters rankings and co-occurrence to changed files", async () => {
@@ -189,7 +189,7 @@ describe("complexity --pr (PR scope filter)", () => {
       [
         ...ARGV_PREFIX,
         tmp,
-        "--pr",
+        "--diff",
         "HEAD~1..HEAD",
         "--verbose",
         "--format",
@@ -199,7 +199,7 @@ describe("complexity --pr (PR scope filter)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    const report = JSON.parse(stdout.text) as PrEnvelope;
+    const report = JSON.parse(stdout.text) as DiffEnvelope;
     expect(report.functionRankings).toBeDefined();
     for (const axis of Object.keys(report.functionRankings ?? {})) {
       const entries = report.functionRankings?.[axis] ?? [];
@@ -219,20 +219,20 @@ describe("complexity --pr (PR scope filter)", () => {
     const stderr = new StringSink();
     // HEAD..HEAD: no files changed.
     const code = await run(
-      [...ARGV_PREFIX, tmp, "--pr", "HEAD..HEAD", "--format", "json"],
+      [...ARGV_PREFIX, tmp, "--diff", "HEAD..HEAD", "--format", "json"],
       stdout,
       stderr,
     );
     expect(code).toBe(0);
-    const report = JSON.parse(stdout.text) as PrEnvelope;
-    expect(report.pr?.changedFiles).toBe(0);
+    const report = JSON.parse(stdout.text) as DiffEnvelope;
+    expect(report.diff?.changedFiles).toBe(0);
     expect(report.hotspots).toEqual([]);
-    expect(report.notice?.code).toBe("PR_SCOPE_EMPTY");
+    expect(report.notice?.code).toBe("DIFF_SCOPE_EMPTY");
     expect(report.notice?.message).toMatch(/no functions/i);
-    expect(stderr.text).toMatch(/pr=0 changed files/);
+    expect(stderr.text).toMatch(/diff=0 changed files/);
   });
 
-  test("PR_SCOPE_EMPTY notice also surfaces in --verbose mode", async () => {
+  test("DIFF_SCOPE_EMPTY notice also surfaces in --verbose mode", async () => {
     buildFixtureRepo(tmp);
 
     const stdout = new StringSink();
@@ -241,7 +241,7 @@ describe("complexity --pr (PR scope filter)", () => {
       [
         ...ARGV_PREFIX,
         tmp,
-        "--pr",
+        "--diff",
         "HEAD..HEAD",
         "--verbose",
         "--format",
@@ -251,12 +251,12 @@ describe("complexity --pr (PR scope filter)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    const report = JSON.parse(stdout.text) as PrEnvelope;
-    expect(report.pr?.changedFiles).toBe(0);
-    expect(report.notice?.code).toBe("PR_SCOPE_EMPTY");
+    const report = JSON.parse(stdout.text) as DiffEnvelope;
+    expect(report.diff?.changedFiles).toBe(0);
+    expect(report.notice?.code).toBe("DIFF_SCOPE_EMPTY");
   });
 
-  test("rejects --pr combined with --file", async () => {
+  test("rejects --diff combined with --file", async () => {
     buildFixtureRepo(tmp);
 
     const stdout = new StringSink();
@@ -265,7 +265,7 @@ describe("complexity --pr (PR scope filter)", () => {
       [
         ...ARGV_PREFIX,
         tmp,
-        "--pr",
+        "--diff",
         "HEAD~1..HEAD",
         "--file",
         "src/a.ts",
@@ -282,7 +282,7 @@ describe("complexity --pr (PR scope filter)", () => {
     };
     expect(errReport.status).toBe("error");
     expect(errReport.error.code).toBe("INVALID_ARGS");
-    expect(errReport.error.message).toMatch(/--pr.*--file/);
+    expect(errReport.error.message).toMatch(/--diff.*--file/);
   });
 
   test("invalid revrange surfaces commander's parse error", async () => {
@@ -291,7 +291,7 @@ describe("complexity --pr (PR scope filter)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...ARGV_PREFIX, tmp, "--pr", "not-a-range", "--format", "json"],
+      [...ARGV_PREFIX, tmp, "--diff", "not-a-range", "--format", "json"],
       stdout,
       stderr,
     );
@@ -319,7 +319,7 @@ describe("complexity --pr (PR scope filter)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...ARGV_PREFIX, tmp, "--pr", "HEAD~1..HEAD", "--format", "json"],
+      [...ARGV_PREFIX, tmp, "--diff", "HEAD~1..HEAD", "--format", "json"],
       stdout,
       stderr,
     );

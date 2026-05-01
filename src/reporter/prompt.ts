@@ -25,11 +25,11 @@ export const COMPLEXITY_ERROR_PROMPT = `# ts-hotspots error
 
 export const DUPLICATION_REPORT_PROMPT = `# ts-hotspots duplication report
 
-This is the output of \`ts-hotspots duplication\`, a static analyzer that surfaces likely Type-3 (modified-with-renames) duplication in a TypeScript codebase. PR mode (\`<revrange>\`) pivots on fragments changed between two refs; whole-repo mode (\`--whole-repo\`) clusters mutually similar fragments across an entire ref.
+This is the output of \`ts-hotspots duplication\`, a static analyzer that surfaces likely Type-3 (modified-with-renames) duplication in a TypeScript codebase. Diff mode (\`--diff <revrange>\`) pivots on fragments changed between two refs; the default whole-repo mode clusters mutually similar fragments across an entire ref.
 
 ## Your task
 
-You have been handed a list of clone-candidate hotspots below in \`hotspots[]\`. Each hotspot has \`kind: "duplication"\`, an optional \`anchor\` (PR mode pivots on the changed-side fragment; whole-repo mode has no anchor), a \`members[]\` array of fragments judged similar enough, a \`score\` (\`{ axis: "combined", value }\` — median \`combined\` similarity across pairs, in the 0..1 range), and \`evidence\` listing the top \`calls\` and \`properties\` every member has in common. Each fragment's \`ref.location\` is \`file:start-end\` (or \`file:line\` for single-line fragments) and \`ref.kind\` is \`function\` / \`block\` / \`window\`. Each hotspot also carries a \`dismissalId\` (\`dup:<hex>\`) — use it with the \`dismiss\` subcommand described below.
+You have been handed a list of clone-candidate hotspots below in \`hotspots[]\`. Each hotspot has \`kind: "duplication"\`, an optional \`anchor\` (diff mode pivots on the changed-side fragment; whole-repo mode has no anchor), a \`members[]\` array of fragments judged similar enough, a \`score\` (\`{ axis: "combined", value }\` — median \`combined\` similarity across pairs, in the 0..1 range), and \`evidence\` listing the top \`calls\` and \`properties\` every member has in common. Each fragment's \`ref.location\` is \`file:start-end\` (or \`file:line\` for single-line fragments) and \`ref.kind\` is \`function\` / \`block\` / \`window\`. Each hotspot also carries a \`dismissalId\` (\`dup:<hex>\`) — use it with the \`dismiss\` subcommand described below.
 
 Walk the hotspots **from the top of the list downward**, evaluating them one at a time, until you find one that genuinely warrants extracting a shared helper or otherwise unifying the duplication. For each hotspot:
 

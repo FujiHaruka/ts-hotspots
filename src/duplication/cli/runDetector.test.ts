@@ -35,8 +35,8 @@ describe("runDetector", () => {
       threeDot: false,
       config: defaultConfig,
     });
-    expect(result.pr.baseSha).toBe(sha);
-    expect(result.pr.headSha).toBe(sha);
+    expect(result.diff.baseSha).toBe(sha);
+    expect(result.diff.headSha).toBe(sha);
     expect(result.groups).toEqual([]);
     expect(result.summary.scope.changed?.files).toBe(0);
     expect(result.summary.pipeline.reportedPairs).toBe(0);
@@ -75,8 +75,8 @@ describe("runDetector", () => {
       threeDot: false,
       config: defaultConfig,
     });
-    expect(result.pr.baseSha).toBe(base);
-    expect(result.pr.headSha).toBe(head);
+    expect(result.diff.baseSha).toBe(base);
+    expect(result.diff.headSha).toBe(head);
     const hasPair = result.groups.some(
       (g) =>
         g.anchor?.location.startsWith("src/util.ts:") === true &&
@@ -231,7 +231,7 @@ describe("runDetector", () => {
       config: defaultConfig,
     });
     const summary = result.summary;
-    expect(summary.mode).toBe("pr");
+    expect(summary.mode).toBe("diff");
     expect(summary.scope.base.files).toBeGreaterThanOrEqual(1);
     expect(summary.scope.base.lines).toBeGreaterThanOrEqual(1);
     expect(summary.scope.base.fragments).toBeGreaterThanOrEqual(1);

@@ -55,8 +55,8 @@ describe("runWholeRepoDetector", () => {
       config: defaultConfig,
     });
 
-    expect(result.pr.baseSha).toBe(sha);
-    expect(result.pr.headSha).toBe(sha);
+    expect(result.diff.baseSha).toBe(sha);
+    expect(result.diff.headSha).toBe(sha);
     expect(result.groups.length).toBeGreaterThan(0);
 
     // Whole-repo clusters have no anchor; both files should appear as

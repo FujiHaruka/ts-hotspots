@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  STUB_PR_SUMMARY,
+  STUB_DIFF_SUMMARY,
   STUB_WHOLE_REPO_SUMMARY,
 } from "../../../test/dedup/helpers/stubSummary.ts";
 import { RecordingPerfLogger } from "../cli/perfLog.ts";
@@ -87,7 +87,7 @@ function mkPair(
 describe("buildJsonReport", () => {
   it("passes baseSha / headSha through verbatim", () => {
     const input: ReportInput = {
-      pr: {
+      diff: {
         baseSha: "deadbeef",
         headSha: "cafef00d",
         threeDot: true,
@@ -95,11 +95,11 @@ describe("buildJsonReport", () => {
       },
       pairs: [],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     };
     const report = buildJsonReport(input);
-    expect(report.pr.baseSha).toBe("deadbeef");
-    expect(report.pr.headSha).toBe("cafef00d");
+    expect(report.diff.baseSha).toBe("deadbeef");
+    expect(report.diff.headSha).toBe("cafef00d");
   });
 
   it("emits one group per unique changed anchor", () => {
@@ -116,10 +116,10 @@ describe("buildJsonReport", () => {
       mkPair("c3", "b3", 0.3, { intersections: semanticIntersections }),
     ];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     expect(report.groups).toHaveLength(3);
   });
@@ -136,10 +136,10 @@ describe("buildJsonReport", () => {
       mkPair("c", "b3", 0.6, { intersections: semanticIntersections }),
     ];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     expect(report.groups).toHaveLength(1);
     const group = report.groups[0];
@@ -179,10 +179,10 @@ describe("buildJsonReport", () => {
       intersections: { tokens: [], statements: [], calls: [] },
     };
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [pair],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const g = report.groups[0];
     expect(g).toBeDefined();
@@ -210,10 +210,10 @@ describe("buildJsonReport", () => {
       },
     });
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [pair],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const m = report.groups[0]?.members[0];
     expect(m).toBeDefined();
@@ -236,10 +236,10 @@ describe("buildJsonReport", () => {
     };
     const pair = mkPair("c", "b", 0.5, { intersections });
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [pair],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const m = report.groups[0]?.members[0];
     expect(m).toBeDefined();
@@ -263,10 +263,10 @@ describe("buildJsonReport", () => {
       },
     });
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [pair],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const g = report.groups[0];
     expect(g).toBeDefined();
@@ -285,10 +285,10 @@ describe("buildJsonReport", () => {
   it("deduplicates pairs with the same (changedId, baseId)", () => {
     const pair = mkPair("c", "b", 0.5);
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [pair, pair],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     expect(report.groups).toHaveLength(1);
     expect(report.groups[0]?.members).toHaveLength(1);
@@ -306,10 +306,10 @@ describe("buildJsonReport", () => {
       mkPair("c3", "b3", 0.6, { intersections: semanticIntersections }),
     ];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     expect(report.groups.map((g) => g.aggregateScores.combined.max)).toEqual([
       0.9, 0.6, 0.3,
@@ -324,10 +324,10 @@ describe("buildJsonReport", () => {
     };
     const pairs = [mkPair("c1", "b1", 0.6, { intersections })];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const g = report.groups[0];
     if (g === undefined) throw new Error("expected one group");
@@ -343,10 +343,10 @@ describe("buildJsonReport", () => {
     };
     const pairs = [mkPair("c1", "b1", 0.6, { intersections })];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
       includeCode: false,
     });
     const g = report.groups[0];
@@ -365,10 +365,10 @@ describe("buildJsonReport", () => {
     };
     const pairs = [mkPair("c1", "b1", 0.6, { intersections })];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
       includeCode: false,
     });
     const json = JSON.stringify(report);
@@ -446,10 +446,10 @@ describe("buildJsonReport", () => {
       const a = thinFragment("a", "a.tsx");
       const b = thinFragment("b", "b.tsx");
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
+        diff: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
         pairs: [makePair(a, b)],
         config: defaultConfig,
-        summary: STUB_PR_SUMMARY,
+        summary: STUB_DIFF_SUMMARY,
         getSourceFile: buildSourceFileLookup(a, b),
       });
       expect(report.groups).toHaveLength(0);
@@ -459,10 +459,10 @@ describe("buildJsonReport", () => {
       const a = thinFragment("a", "a.tsx");
       const b = thinFragment("b", "b.tsx");
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
+        diff: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
         pairs: [makePair(a, b)],
         config: defaultConfig,
-        summary: STUB_PR_SUMMARY,
+        summary: STUB_DIFF_SUMMARY,
       });
       expect(report.groups).toHaveLength(1);
     });
@@ -471,7 +471,7 @@ describe("buildJsonReport", () => {
       const a = thinFragment("a", "a.tsx");
       const b = thinFragment("b", "b.tsx");
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
+        diff: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
         pairs: [makePair(a, b)],
         config: {
           ...defaultConfig,
@@ -483,7 +483,7 @@ describe("buildJsonReport", () => {
             },
           },
         },
-        summary: STUB_PR_SUMMARY,
+        summary: STUB_DIFF_SUMMARY,
         getSourceFile: buildSourceFileLookup(a, b),
       });
       expect(report.groups).toHaveLength(1);
@@ -493,10 +493,10 @@ describe("buildJsonReport", () => {
       const a = thinFragment("a", "a.tsx");
       const b = realFragment("b", "b.tsx");
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
+        diff: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
         pairs: [makePair(a, b)],
         config: defaultConfig,
-        summary: STUB_PR_SUMMARY,
+        summary: STUB_DIFF_SUMMARY,
         getSourceFile: buildSourceFileLookup(a, b),
       });
       expect(report.groups).toHaveLength(1);
@@ -511,10 +511,10 @@ describe("buildJsonReport", () => {
       const perfLog = new RecordingPerfLogger();
       buildJsonReport(
         {
-          pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
+          diff: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
           pairs: [makePair(a, b)],
           config: defaultConfig,
-          summary: STUB_PR_SUMMARY,
+          summary: STUB_DIFF_SUMMARY,
           getSourceFile: buildSourceFileLookup(a, b),
         },
         perfLog,
@@ -530,10 +530,10 @@ describe("buildJsonReport", () => {
       const perfLog = new RecordingPerfLogger();
       buildJsonReport(
         {
-          pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
+          diff: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
           pairs: [makePair(a, b)],
           config: defaultConfig,
-          summary: STUB_PR_SUMMARY,
+          summary: STUB_DIFF_SUMMARY,
           getSourceFile: buildSourceFileLookup(a, b),
         },
         perfLog,
@@ -557,7 +557,7 @@ describe("buildJsonReport", () => {
         mkPair("b", "c", 0.75, { intersections: semanticIntersections }),
       ];
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "x", threeDot: false, changedFiles: 0 },
+        diff: { baseSha: "x", headSha: "x", threeDot: false, changedFiles: 0 },
         pairs,
         config: defaultConfig,
         summary: STUB_WHOLE_REPO_SUMMARY,
@@ -590,7 +590,7 @@ describe("buildJsonReport", () => {
         },
       };
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "x", threeDot: false, changedFiles: 0 },
+        diff: { baseSha: "x", headSha: "x", threeDot: false, changedFiles: 0 },
         pairs,
         config,
         summary: STUB_WHOLE_REPO_SUMMARY,
@@ -607,10 +607,10 @@ describe("buildJsonReport", () => {
         mkPair("c", "b2", 0.6, { intersections: semanticIntersections }),
       ];
       const report = buildJsonReport({
-        pr: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
+        diff: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
         pairs,
         config: defaultConfig,
-        summary: STUB_PR_SUMMARY,
+        summary: STUB_DIFF_SUMMARY,
       });
       expect(report.groups).toHaveLength(1);
       expect(report.groups[0]?.anchor?.location).toBe("c.ts:1-10");
@@ -630,10 +630,10 @@ describe("buildJsonReport", () => {
       mkPair("c3", "b1", 0.5, { intersections }),
     ];
     const input: ReportInput = {
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     };
     const a = JSON.stringify(buildJsonReport(input));
     const b = JSON.stringify(buildJsonReport(input));

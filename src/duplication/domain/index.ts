@@ -28,7 +28,7 @@ export type {
   CloneCandidateReport,
   DismissedSummary,
   DuplicationErrorReport,
-  DuplicationPrInfo,
+  DuplicationDiffInfo,
   Evidence,
   RecommendationHint,
   ReportTool,

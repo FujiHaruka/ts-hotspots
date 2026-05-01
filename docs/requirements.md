@@ -3,7 +3,7 @@
 ts-hotspots is a CLI with two complementary features:
 
 - **Complexity** (`ts-hotspots complexity [path]`, alias `comp`): per-function metrics ranked into a small set of refactor-candidate coordinates. Specified in Part A below.
-- **Duplication** (`ts-hotspots duplication`, alias `dup`): Type-3 duplication candidates, in PR mode (changed code vs. the rest of the tree) or whole-repo mode. Specified in Part B; the implementation-level algorithms live under `docs/dedup/`.
+- **Duplication** (`ts-hotspots duplication`, alias `dup`): Type-3 duplication candidates, in diff mode (changed code vs. the rest of the tree, opted into via `--diff <revrange>`) or the default whole-repo mode. Specified in Part B; the implementation-level algorithms live under `docs/dedup/`.
 
 Both features share a single guiding principle: **return coordinates and evidence, not verdicts.** The downstream coding agent or reviewer decides what to do.
 
@@ -214,12 +214,12 @@ A duplication-candidate detector tuned for **recall over precision**. Type-3 clo
 
 Two modes, sharing the same back-end pipeline:
 
-- **PR mode**: given a git revrange (`A...B` / `A..B`), surface duplications between the head-side changed code and the rest of the tree.
-- **Whole-repo mode**: at one ref, surface every cluster of fragments that look like the same code.
+- **Diff mode** (`--diff <revrange>`): given a git revrange (`A...B` / `A..B`), surface duplications between the head-side changed code and the rest of the tree.
+- **Whole-repo mode** (default): at one ref, surface every cluster of fragments that look like the same code.
 
 ## B.2 Pipeline
 
-A 7-stage pipeline. PR / whole-repo only differ in how the front-end builds the input set; everything from feature extraction onward is shared.
+A 7-stage pipeline. Diff / whole-repo only differ in how the front-end builds the input set; everything from feature extraction onward is shared.
 
 ```
 [1] Diff Collector / Source Lister
@@ -288,14 +288,14 @@ When churn collection is unavailable (non-git, shallow clone, missing git binary
 
 The reporting unit is a **hotspot**, one per clone group. When the same pattern appears in N places, the report contains one entry with N coordinates, not `N(N−1)/2` pairs.
 
-The envelope mirrors `comp`'s: `tool`, `project` (`sourceFileCount`; `--verbose` adds `fragmentCount`), `hotspots[]`, plus optional `pr`, `dismissed`. PR mode keeps the `pr` block (`baseSha` / `headSha` / `threeDot` / `changedFiles`, identical to `comp`'s); whole-repo mode omits it. The pipeline / scope counters live on the stderr stats line, not in the JSON. Success reports omit `status`; only the error envelope keeps it (`status: "error"`).
+The envelope mirrors `comp`'s: `tool`, `project` (`sourceFileCount`; `--verbose` adds `fragmentCount`), `hotspots[]`, plus optional `diff`, `dismissed`. Diff mode keeps the `diff` block (`baseSha` / `headSha` / `threeDot` / `changedFiles`, identical to `comp`'s); whole-repo mode omits it. The pipeline / scope counters live on the stderr stats line, not in the JSON. Success reports omit `status`; only the error envelope keeps it (`status: "error"`).
 
 Each `hotspots[]` entry carries:
 
 - `kind: "duplication"` — discriminator for agents that consume both `comp` and `dup`.
 - `size` — total fragments in the group: `(anchor ? 1 : 0) + members.length`.
 - `score` — `{ axis: "combined", value }` — single representative similarity (median `combined` across pairs, in 0..1). Same shape as `comp`'s `score`.
-- `anchor?` — the changed-side fragment in PR mode; absent in whole-repo mode where no side is privileged. Shape: `{ ref: { location, kind } }`.
+- `anchor?` — the changed-side fragment in diff mode; absent in whole-repo mode where no side is privileged. Shape: `{ ref: { location, kind } }`.
 - `members[]` — every other fragment in the group, ordered by descending pair score. Shape: `{ ref: { location, kind } }`.
 - `evidence` — `calls[]` and `properties[]` shared by every member, prefix-stripped (`new X` / `await X` keep the constructor / await distinction visible without leaking internal `CALL:` / `NEW:` / `AWAIT_CALL:` / `PROP:` markers).
 - `dismissalId` — `dup:<hex>`; auto-expires when the group's membership changes.

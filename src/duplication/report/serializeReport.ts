@@ -4,7 +4,7 @@ import type {
   CloneCandidateReport,
   CloneGroup,
   DismissedSummary,
-  DuplicationPrInfo,
+  DuplicationDiffInfo,
   Evidence,
   FragmentView,
   GroupMember,
@@ -26,8 +26,8 @@ import type {
  *     recommendation hint, and the analysis summary.
  *
  * Both profiles share the same envelope (`status`, `tool`, `project`,
- * `pr?`, `hotspots[]`, `dismissed?`) so consumers can branch only on the
- * extra detail keys, not on the top-level shape.
+ * `diff?`, `hotspots[]`, `dismissed?`) so consumers can branch only on
+ * the extra detail keys, not on the top-level shape.
  */
 
 /**
@@ -47,7 +47,7 @@ export interface SlimDupHotspot {
   size: number;
   /** Headline score — see `DupScore`. */
   score: DupScore;
-  /** PR mode anchor (the changed-side fragment). Absent in whole-repo. */
+  /** Diff mode anchor (the changed-side fragment). Absent in whole-repo. */
   anchor?: { ref: HotspotRef };
   /** Other fragments in the group, ordered by descending score. */
   members: { ref: HotspotRef }[];
@@ -94,8 +94,8 @@ export interface VerboseMember {
 export interface SerializedDupReport {
   tool: ReportTool;
   project: { sourceFileCount: number; fragmentCount?: number };
-  /** Only emitted in PR mode (omitted in whole-repo). */
-  pr?: DuplicationPrInfo;
+  /** Only emitted in diff mode (omitted in whole-repo). */
+  diff?: DuplicationDiffInfo;
   hotspots: SlimDupHotspot[];
   dismissed?: DismissedSummary;
   /** `--verbose` only: pipeline counts and scope sizes. */
@@ -136,7 +136,7 @@ export function serializeReport(
       : report.groups.map(toSlimHotspot),
   };
   if (!wholeRepo) {
-    base.pr = report.pr;
+    base.diff = report.diff;
   }
   if (report.dismissed !== undefined) {
     base.dismissed = report.dismissed;

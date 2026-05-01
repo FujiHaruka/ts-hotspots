@@ -36,16 +36,16 @@ export interface ScopeStats {
 }
 
 export interface AnalysisSummary {
-  /** `"pr"` for revrange runs, `"whole-repo"` for full-tree scans. */
-  mode: "pr" | "whole-repo";
+  /** `"diff"` for revrange runs, `"whole-repo"` for full-tree scans. */
+  mode: "diff" | "whole-repo";
   scope: {
     /**
-     * In PR mode this describes the base-side codebase. In whole-repo
+     * In diff mode this describes the base-side codebase. In whole-repo
      * mode it describes the entire scanned tree (the only set in play).
      * The `mode` field above disambiguates.
      */
     base: ScopeStats;
-    /** PR mode only: stats for the head-side changed fragments. */
+    /** Diff mode only: stats for the head-side changed fragments. */
     changed?: ScopeStats;
   };
   pipeline: {
@@ -73,14 +73,14 @@ export interface DismissedSummary {
 }
 
 /**
- * PR-mode metadata. Mirrors `comp`'s `PrInfo` so consumers can read the
- * scope of a diff identically across subcommands.
+ * Diff-mode metadata. Mirrors `comp`'s `DiffInfo` so consumers can read
+ * the scope of a diff identically across subcommands.
  *
- * In whole-repo mode `pr` still exists internally (`baseSha === headSha`,
+ * In whole-repo mode `diff` still exists internally (`baseSha === headSha`,
  * `threeDot: false`, `changedFiles: 0`) for type stability, but
  * `serializeReport` strips it from the output envelope.
  */
-export interface DuplicationPrInfo {
+export interface DuplicationDiffInfo {
   baseSha: string;
   headSha: string;
   /** `true` for `A...B` (merge-base semantics). `false` for `A..B`. */
@@ -92,7 +92,7 @@ export interface DuplicationPrInfo {
 export interface CloneCandidateReport {
   status: "ok";
   tool: ReportTool;
-  pr: DuplicationPrInfo;
+  diff: DuplicationDiffInfo;
   summary: AnalysisSummary;
   groups: CloneGroup[];
   dismissed?: DismissedSummary;

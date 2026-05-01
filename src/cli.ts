@@ -43,6 +43,7 @@ import {
 } from "./reporter/render.ts";
 import type {
   AxisMeta,
+  DiffInfo,
   DismissedSummary,
   ErrorReport,
   FunctionAxisId,
@@ -50,7 +51,6 @@ import type {
   FunctionEntry,
   FunctionReport,
   HotspotCandidate,
-  PrInfo,
   RankedFunctionEntry,
   ReportProject,
 } from "./schema.ts";
@@ -93,7 +93,7 @@ interface FunctionCliOptions extends ChurnCliOptions {
   file?: string;
   verbose?: boolean;
   format?: ReportFormat;
-  pr?: RevRange;
+  diff?: RevRange;
 }
 
 interface DismissCliOptions {
@@ -135,7 +135,7 @@ function parseFormat(value: string): ReportFormat {
   throw new InvalidArgumentError("--format must be 'markdown' or 'json'");
 }
 
-function parsePr(value: string): RevRange {
+function parseDiff(value: string): RevRange {
   try {
     return parseRevRange(value);
   } catch (err) {
@@ -235,9 +235,9 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
       parseFormat,
     )
     .option(
-      "--pr <revrange>",
+      "--diff <revrange>",
       "scope hotspot output to functions in files changed by <revrange> (e.g. origin/main...). Rankings are still computed against the full head ref so the distribution is intact.",
-      parsePr,
+      parseDiff,
     )
     .action((pathArg: string | undefined, opts: FunctionCliOptions) => {
       onInvoke({ kind: "complexity", positional: pathArg, options: opts });
@@ -430,8 +430,8 @@ function validateFunctionCliInputs(
   }
   const functionAxes =
     options.metrics !== undefined ? parseFunctionAxes(options.metrics) : undefined;
-  if (options.pr !== undefined && options.file !== undefined) {
-    throw new InvalidArgsError("--pr and --file are mutually exclusive");
+  if (options.diff !== undefined && options.file !== undefined) {
+    throw new InvalidArgsError("--diff and --file are mutually exclusive");
   }
   return { rootDir, functionAxes };
 }
@@ -485,8 +485,8 @@ function buildFunctionReport(input: BuildFunctionReportInput): FunctionReport {
 
 interface OptionalReportFields {
   dismissed: DismissedSummary | undefined;
-  prScope: PrScope | undefined;
-  prNotice: FunctionReport["notice"];
+  diffScope: DiffScope | undefined;
+  diffNotice: FunctionReport["notice"];
 }
 
 function applyOptionalReportFields(
@@ -494,8 +494,8 @@ function applyOptionalReportFields(
   fields: OptionalReportFields,
 ): void {
   if (fields.dismissed !== undefined) report.dismissed = fields.dismissed;
-  if (fields.prScope !== undefined) report.pr = fields.prScope.info;
-  if (fields.prNotice !== undefined) report.notice = fields.prNotice;
+  if (fields.diffScope !== undefined) report.diff = fields.diffScope.info;
+  if (fields.diffNotice !== undefined) report.notice = fields.diffNotice;
 }
 
 interface DismissalApplyResult {
@@ -582,8 +582,8 @@ function writeStatsLine(
       `functions=${String(functionCount)}, ` +
       `candidates=${String(report.hotspots.length)}`;
   }
-  if (report.pr !== undefined) {
-    payload += `, pr=${String(report.pr.changedFiles)} changed files`;
+  if (report.diff !== undefined) {
+    payload += `, diff=${String(report.diff.changedFiles)} changed files`;
   }
   if (report.dismissed !== undefined && report.dismissed.active > 0) {
     payload += `, dismissed=${String(report.dismissed.active)}`;
@@ -591,8 +591,8 @@ function writeStatsLine(
   stderr.write(renderStatsLine("complexity", payload));
 }
 
-interface PrScope {
-  info: PrInfo;
+interface DiffScope {
+  info: DiffInfo;
   isInScope: (location: string) => boolean;
 }
 
@@ -605,15 +605,15 @@ class GitFailedError extends Error {
 }
 
 /**
- * Resolve the PR scope: list of project-relative file paths whose
+ * Resolve the diff scope: list of project-relative file paths whose
  * head-side content differs between `rev.baseRef` and `rev.headRef`,
  * intersected with files that contain functions in this project.
  */
-async function resolvePrScope(
+async function resolveDiffScope(
   rev: RevRange,
   rootDir: string,
   functions: readonly FunctionEntry[],
-): Promise<PrScope> {
+): Promise<DiffScope> {
   let gitRoot: string;
   try {
     gitRoot = findGitRoot(rootDir);
@@ -786,37 +786,37 @@ async function runFunctions(
         stderr,
       );
 
-    // PR scope narrows the displayed surfaces (rankings, co-occurrence,
+    // Diff scope narrows the displayed surfaces (rankings, co-occurrence,
     // candidates) to functions in changed files. axisMeta keeps the full
     // distribution so spread / tie / non-zero stats stay representative.
-    const prScope =
-      options.pr !== undefined
-        ? await resolvePrScope(options.pr, rootDir, functions)
+    const diffScope =
+      options.diff !== undefined
+        ? await resolveDiffScope(options.diff, rootDir, functions)
         : undefined;
     const displayedRankings =
-      prScope === undefined
+      diffScope === undefined
         ? functionRankings
-        : filterRankingsByScope(functionRankings, prScope.isInScope);
+        : filterRankingsByScope(functionRankings, diffScope.isInScope);
     const displayedCoOccurrence =
-      prScope === undefined
+      diffScope === undefined
         ? functionCoOccurrence
-        : filterCoOccurrenceByScope(functionCoOccurrence, prScope.isInScope);
+        : filterCoOccurrenceByScope(functionCoOccurrence, diffScope.isInScope);
     const scopedCandidates =
-      prScope === undefined
+      diffScope === undefined
         ? filteredCandidates
-        : filterCandidatesByScope(filteredCandidates, prScope.isInScope);
+        : filterCandidatesByScope(filteredCandidates, diffScope.isInScope);
     const hotspots = Number.isFinite(limit)
       ? scopedCandidates.slice(0, limit)
       : scopedCandidates;
 
-    // PR scope can be vacuous: a PR that only edits README, JSON configs,
+    // Diff scope can be vacuous: a diff that only edits README, JSON configs,
     // or types in another tsconfig leaves zero project functions to rank.
     // Surface that explicitly so consumers don't read empty hotspots as a
     // clean bill of health.
-    const prNotice: FunctionReport["notice"] =
-      prScope !== undefined && prScope.info.changedFiles === 0
+    const diffNotice: FunctionReport["notice"] =
+      diffScope !== undefined && diffScope.info.changedFiles === 0
         ? {
-            code: "PR_SCOPE_EMPTY",
+            code: "DIFF_SCOPE_EMPTY",
             message:
               "Changed files contain no functions tracked by this tsconfig — nothing to rank",
           }
@@ -831,7 +831,7 @@ async function runFunctions(
       functions,
       verbose: options.verbose === true,
     });
-    applyOptionalReportFields(report, { dismissed, prScope, prNotice });
+    applyOptionalReportFields(report, { dismissed, diffScope, diffNotice });
     writeOk(stdout, report, streaming);
     writeStatsLine(stderr, report, undefined, functions.length);
     return 0;
