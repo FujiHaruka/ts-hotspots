@@ -64,6 +64,7 @@ import {
 import { serializeReport } from "../report/serializeReport.ts";
 import type { ArchHotspot, ArchReport, ArchTool } from "../report/types.ts";
 import { score } from "../scoring/score.ts";
+import { collectTypeOnlyNodeIds } from "../scoring/typeOnlyNodes.ts";
 import {
   type ArchParsedArgs,
   ArgParseError,
@@ -285,7 +286,9 @@ export async function runPipeline(
     });
     const metrics = withBetweenness(baseMetrics, adjacency);
 
-    const candidates = score(metrics);
+    const candidates = score(metrics, {
+      excludedNodeIds: collectTypeOnlyNodeIds(graph),
+    });
 
     const refLabel = args.ref ?? "working-tree";
     const fullReport = serializeReport(candidates, {

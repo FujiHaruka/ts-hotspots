@@ -5,4 +5,5 @@ export {
   type SmellHit,
   score,
 } from "./score.ts";
+export { collectTypeOnlyNodeIds } from "./typeOnlyNodes.ts";
 export { DEFAULT_WEIGHTS, type SmellWeights, type WeightsTable } from "./weights.ts";
