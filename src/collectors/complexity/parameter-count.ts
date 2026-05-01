@@ -2,15 +2,15 @@ import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeNode,
+  FunctionLikeTsNode,
 } from "../types.ts";
 
 export interface ParameterCountResult {
   parameterCount: number;
 }
 
-export function computeParameterCount(node: FunctionLikeNode): number {
-  return node.getParameters().length;
+export function computeParameterCount(node: FunctionLikeTsNode): number {
+  return node.parameters.length;
 }
 
 export const parameterCountCollector: Collector<ParameterCountResult> = {
@@ -20,7 +20,7 @@ export const parameterCountCollector: Collector<ParameterCountResult> = {
     for (const decl of ctx.declarations) {
       try {
         result.set(decl.id, {
-          parameterCount: computeParameterCount(decl.node),
+          parameterCount: computeParameterCount(decl.tsNode),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

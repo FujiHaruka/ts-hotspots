@@ -1,20 +1,26 @@
+import ts from "typescript";
 import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeNode,
+  FunctionLikeTsNode,
 } from "../types.ts";
 
 export interface SlocResult {
   sloc: number;
 }
 
-export function computeSloc(node: FunctionLikeNode): number {
-  const sourceFile = node.getSourceFile();
-  const fullText = sourceFile.getFullText();
+export function computeSloc(
+  node: FunctionLikeTsNode,
+  sourceFile: ts.SourceFile,
+): number {
+  const fullText = sourceFile.text;
   const lines = fullText.split("\n");
-  const startLine = node.getStartLineNumber();
-  const endLine = node.getEndLineNumber();
+  const startLine =
+    ts.getLineAndCharacterOfPosition(sourceFile, node.getStart(sourceFile))
+      .line + 1;
+  const endLine =
+    ts.getLineAndCharacterOfPosition(sourceFile, node.getEnd()).line + 1;
 
   // Extract the slice of lines covering the function span (1-indexed).
   const slice: string[] = [];
@@ -48,7 +54,9 @@ export const slocCollector: Collector<SlocResult> = {
     const result = new Map<DeclarationId, SlocResult>();
     for (const decl of ctx.declarations) {
       try {
-        result.set(decl.id, { sloc: computeSloc(decl.node) });
+        result.set(decl.id, {
+          sloc: computeSloc(decl.tsNode, decl.tsSourceFile),
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         throw new Error(

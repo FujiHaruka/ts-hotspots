@@ -7,7 +7,7 @@
 ## 0. Progress
 
 - [x] **M1** — Bridge: `Declaration` に `tsNode` / `tsSourceFile` を追加 (`.compilerNode` 経由) し、ts-only の walk / parse ヘルパを新設。production 挙動は不変。
-- [ ] **M2-1** — complexity collectors (cognitive / sloc / parameter-count / max-nesting-depth) を ts-only に書き換え。
+- [x] **M2-1** — complexity collectors (cognitive / sloc / parameter-count / max-nesting-depth) を ts-only に書き換え。
 - [ ] **M2-2** — effects + call-graph collectors (await-count / mutation-count / try-catch-count / callee-count) を ts-only に書き換え。
 - [ ] **M2-3** — dismissal/hash と aggregator のテスト fixture を ts-only に書き換え。
 - [ ] **M3** — ts-morph 撤去: `Declaration.node` 削除 / `loadProject` を `ts.createSourceFile` 直接に書き換え / `enumerate-source-files.ts` を縮小 / `package.json` から `ts-morph` を削除 / dogfooding で性能・出力差確認。
@@ -252,3 +252,15 @@ src/dismissal/hash.test.ts
 - `src/collectors/internal/declarationHelpers.ts` は M1 では作らず、具体の consumer が出る M2-1 で導入する (YAGNI)。
 - `parseSource.test.ts` は dup 側に既存テストが無かったので新規作成。`scriptKind` / `parseDiagnostics` は public API ではなかったため、AST 構造 (`JsxSelfClosingElement` の有無) で TSX/TS の振る舞いを assert している。
 - `walk-ts` の挙動: nested function declaration に到達した時点で **その関数自身を visit せず** に return する (旧 `walk.ts` と同一)。テストもこの挙動を assert。
+
+### M2-1 (2026-05-01)
+
+- **D4**: テスト fixture ヘルパは `src/collectors/internal/parseFirstFunctionLike.test-helper.ts` に新設 (案 a)。`parseFirstFunctionLike(text, ext?)` と `parseAllFunctionLikes(text, ext?)` の 2 関数を提供 (nested function を扱う既存テストのため後者も用意)。
+- **D5 (部分)**: `compute*` ヘルパのシグネチャを `(node: FunctionLikeTsNode, sourceFile: ts.SourceFile)` (parameter-count のみ sourceFile 不要) に変更。collector からは `decl.tsNode` / `decl.tsSourceFile` を渡す。
+
+実装メモ:
+
+- `declarationHelpers.ts` は M2-1 でも作らなかった。complexity collectors では `getBody` / `getOwnName` のヘルパが各 collector ローカルで足り (cognitive と max-nesting-depth が共通の `getBody` を持つ程度の重複)、共有ヘルパを切り出す YAGNI 判定。M2-2 / M2-3 で他 collector が同様のヘルパを欲しがった時点で再評価する。
+- `BinaryExpression` の `getChildren()` ループは `ts.forEachChild` に置換。tokens (`operatorToken`) は構造的子ではないため `forEachChild` でスキップされるが、collector はトークンをカウントしないので score に影響なし (cognitive.test.ts 全 22 ケース pass で確認)。
+- 出力 dogfood: `node src/index.ts comp --format json --limit all --verbose` を pre/post で取得。`src/collectors/complexity/` 配下を除く 54 関数中 50 関数 (jq で除外) の metrics は **bit-identical**。complexity 配下の 4 ファイルは自身を書き換えたので metrics と bodyHash が変わる (期待動作)。
+- 副次効果: 書き直した cognitive.ts の `visit` arrow が `cognitiveComplexity 44 → 26`, `calleeCount 54 → 16` に低下 (ts-morph の chained method calls が直接 field access に置き換わったため)。挙動変化ではなく実装の slimming。
