@@ -862,12 +862,21 @@ export async function run(
   }
 
   try {
+    if (
+      (invocation.kind === "dismiss" || invocation.kind === "undismiss") &&
+      invocation.id.startsWith("dup:")
+    ) {
+      return runDupDismissalCommand(invocation, stdout, stderr);
+    }
     const tsconfigPath = resolveTsconfigPath(invocation.path);
+    const rootDir = dirname(tsconfigPath);
     if (invocation.kind === "dismiss") {
       return runDismiss(
         {
           id: invocation.id,
           reason: invocation.reason,
+          rootDir,
+          feature: "comp",
           tsconfigPath,
         },
         stdout,
@@ -876,15 +885,45 @@ export async function run(
     }
     if (invocation.kind === "list-dismissed") {
       return runListDismissed(
-        { tsconfigPath, json: invocation.json },
+        { rootDir, json: invocation.json },
         stdout,
         stderr,
       );
     }
-    return runUndismiss({ id: invocation.id, tsconfigPath }, stdout, stderr);
+    return runUndismiss({ id: invocation.id, rootDir }, stdout, stderr);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     stderr.write(`${message}\n`);
     return 1;
   }
+}
+
+/**
+ * Route `dup:<hex>` ids to the git-root registry instead of the
+ * tsconfig-dirname one used by `comp`. `dup` resolves "the project" via
+ * `findGitRoot`, so the registry key has to match — otherwise a dup run
+ * would never see entries written by `dismiss`.
+ */
+function runDupDismissalCommand(
+  invocation:
+    | { kind: "dismiss"; id: string; reason: string; path: string | undefined }
+    | { kind: "undismiss"; id: string; path: string | undefined },
+  stdout: WritableLike,
+  stderr: WritableLike,
+): number {
+  const start = invocation.path ?? process.cwd();
+  const rootDir = findGitRoot(resolve(start));
+  if (invocation.kind === "dismiss") {
+    return runDismiss(
+      {
+        id: invocation.id,
+        reason: invocation.reason,
+        rootDir,
+        feature: "dup",
+      },
+      stdout,
+      stderr,
+    );
+  }
+  return runUndismiss({ id: invocation.id, rootDir }, stdout, stderr);
 }

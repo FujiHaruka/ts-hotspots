@@ -15,7 +15,7 @@ import {
   saveRegistry,
   withProjectPath,
 } from "../dismissal/store.ts";
-import type { DismissalEntry } from "../dismissal/types.ts";
+import type { DismissalEntry, DismissalFeature } from "../dismissal/types.ts";
 import { loadProject } from "../loader/load-project.ts";
 
 export interface WritableLike {
@@ -25,7 +25,23 @@ export interface WritableLike {
 export interface DismissOptions {
   id: string;
   reason: string;
-  tsconfigPath: string;
+  /** Project root used as the registry key. */
+  rootDir: string;
+  /**
+   * Discriminator stored on the entry. Pre-M5 registries default
+   * legacy ids to `"comp"` on load (see `migrateLegacyId`); supplying
+   * the explicit feature here keeps freshly-added entries self-describing
+   * regardless of id format.
+   */
+  feature: DismissalFeature;
+  /**
+   * Optional ts-morph project entry point. When present (comp), the
+   * dismiss subcommand walks declarations to fill in the entry's
+   * `display` fields. Omit for `dup` ids — there is no equivalent
+   * cheap resolver, and dup display can be reconstructed by re-running
+   * the detector when needed.
+   */
+  tsconfigPath?: string;
 }
 
 export function runDismiss(
@@ -34,7 +50,7 @@ export function runDismiss(
   stderr: WritableLike,
 ): number {
   const id = normalizeDismissalId(options.id);
-  const rootDir = resolve(dirname(options.tsconfigPath));
+  const rootDir = resolve(options.rootDir);
   const registry = loadRegistry(rootDir, {
     onWarning: (msg) => {
       stderr.write(`${msg}\n`);
@@ -46,12 +62,14 @@ export function runDismiss(
   }
   const entry: DismissalEntry = {
     id,
-    feature: "comp",
+    feature: options.feature,
     reason: options.reason,
     dismissedAt: new Date().toISOString(),
   };
-  const display = tryResolveDisplay(options.tsconfigPath, id, stderr);
-  if (display !== undefined) entry.display = display;
+  if (options.feature === "comp" && options.tsconfigPath !== undefined) {
+    const display = tryResolveDisplay(options.tsconfigPath, id, stderr);
+    if (display !== undefined) entry.display = display;
+  }
   const { registry: next } = addEntry(registry, entry);
   saveRegistry(rootDir, withProjectPath(next, rootDir));
   stdout.write(`ts-hotspots: dismissed ${id} (${registryPath(rootDir)})\n`);
@@ -59,7 +77,7 @@ export function runDismiss(
 }
 
 export interface ListDismissedOptions {
-  tsconfigPath: string;
+  rootDir: string;
   json: boolean;
 }
 
@@ -68,7 +86,7 @@ export function runListDismissed(
   stdout: WritableLike,
   stderr: WritableLike,
 ): number {
-  const rootDir = resolve(dirname(options.tsconfigPath));
+  const rootDir = resolve(options.rootDir);
   const registry = loadRegistry(rootDir, {
     onWarning: (msg) => {
       stderr.write(`${msg}\n`);
@@ -94,7 +112,7 @@ export function runListDismissed(
 
 export interface UndismissOptions {
   id: string;
-  tsconfigPath: string;
+  rootDir: string;
 }
 
 export function runUndismiss(
@@ -103,7 +121,7 @@ export function runUndismiss(
   stderr: WritableLike,
 ): number {
   const id = normalizeDismissalId(options.id);
-  const rootDir = resolve(dirname(options.tsconfigPath));
+  const rootDir = resolve(options.rootDir);
   const registry = loadRegistry(rootDir, {
     onWarning: (msg) => {
       stderr.write(`${msg}\n`);

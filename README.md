@@ -52,25 +52,6 @@ Options:
 - `--file <path>` single-file drill-down (returns raw metrics for every function in the file)
 - `--full` include `functionRankings`, `functionAxisMeta`, `functionCoOccurrence`, and `functions[]` alongside the candidates
 
-### Dismissing false positives
-
-Hotspot candidates are heuristics — some will be fine as-is (intentional state-machine dispatchers, generated code, config tables). To keep the agent from re-evaluating the same false positives on every run, each candidate carries a `dismissalId`. Record a judgment with:
-
-```
-ts-hotspots dismiss <dismissalId> --reason "<why it's fine>"
-```
-
-Entries are stored per machine under `~/.config/ts-hotspots/<projectKey>/dismissed.json` (honoring `XDG_CONFIG_HOME` if set). This is a personal cache — nothing is written into your repository, and dismissals are not shared across machines or teammates. Subsequent runs filter that candidate out. The id is a hash of the function's source, so any meaningful edit auto-expires the dismissal and the candidate re-surfaces.
-
-Supporting subcommands:
-
-```
-ts-hotspots list-dismissed [--json]    # inspect the registry
-ts-hotspots undismiss <dismissalId>    # remove an entry
-```
-
-Stale entries (function deleted or edited) are pruned automatically on each run.
-
 ## Duplication candidates: `ts-hotspots duplication`
 
 `duplication` finds Type-3 duplicates: copy-pasted regions that have been lightly edited (renamed identifiers, reordered statements, slightly different argument shape). It is tuned for **recall** — the goal is to surface every spot worth a second look, not to declare a strict clone verdict.
@@ -110,6 +91,30 @@ Common options:
 Run `ts-hotspots duplication --help` for the full list.
 
 The exit code is 0 even when zero candidates are reported — detection is the tool's job, deciding what to do is the agent's.
+
+## Dismissing false positives
+
+Both features are heuristics — some surfaces will be fine as-is (intentional state-machine dispatchers, generated code, copy-pasted config tables, deliberate parallel structures). To keep the agent from re-evaluating the same false positives every run, each reported entry carries a `dismissalId`:
+
+- `comp:<hex>` for complexity hotspot candidates (one per function)
+- `dup:<hex>` for duplication groups (one per group, derived from the group's member set)
+
+Record a judgment with:
+
+```
+ts-hotspots dismiss <dismissalId> --reason "<why it's fine>"
+```
+
+Entries are stored per machine under `~/.config/ts-hotspots/<projectKey>/dismissed.json` (honoring `XDG_CONFIG_HOME` if set). This is a personal cache — nothing is written into your repository, and dismissals are not shared across machines or teammates. Subsequent runs filter the entry from the report.
+
+Auto-expiry is intentional: the id is a hash of the underlying source (the function body for `comp:`, the group's member fingerprints for `dup:`). Any meaningful edit invalidates the id, so a dismissal you made for a structure that has since changed is dropped and the candidate re-surfaces. Stale entries are pruned automatically on each run; you do not need to garbage-collect by hand.
+
+Supporting subcommands:
+
+```
+ts-hotspots list-dismissed [--json]    # inspect the registry
+ts-hotspots undismiss <dismissalId>    # remove an entry
+```
 
 ## Status
 

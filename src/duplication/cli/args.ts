@@ -121,6 +121,10 @@ Examples:
   ts-hotspots duplication --whole-repo --ref release/v2 --exclude 'src/legacy/**'
   ts-hotspots duplication --whole-repo --phase-timings 2> perf.log
   ts-hotspots duplication --whole-repo --phase-timings=verbose 2> perf.log
+
+Each reported group carries a 'dismissalId' (dup:<hex>) you can pass to
+'ts-hotspots dismiss <id> --reason <text>' to filter it from future runs.
+The id auto-expires when the group's membership changes.
 `;
 
 /**

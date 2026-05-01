@@ -1,3 +1,4 @@
+import { hashText, membersToDupDismissalId } from "../../dismissal/hash.ts";
 import type { Config } from "../config/config.ts";
 import type {
   AggregateAxis,
@@ -124,7 +125,14 @@ function buildGroup(
     baseIsThinWrapper: anyMemberIsThin,
   });
 
+  const memberHashes = [
+    hashText(anchorPair.changedFragment.text),
+    ...sortedBucket.map((p) => hashText(p.baseFragment.text)),
+  ];
+  const dismissalId = membersToDupDismissalId(memberHashes);
+
   return {
+    dismissalId,
     anchor,
     members: sortedMembers,
     size: 1 + sortedMembers.length,
