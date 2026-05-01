@@ -171,7 +171,12 @@ function normalizeRegistry(parsed: unknown): DismissalRegistry {
     const e = raw as Record<string, unknown>;
     if (typeof e.id !== "string" || typeof e.reason !== "string") continue;
     if (typeof e.dismissedAt !== "string") continue;
-    const feature = e.feature === "dup" ? "dup" : "comp";
+    const feature: DismissalEntry["feature"] =
+      e.feature === "dup"
+        ? "dup"
+        : e.feature === "arch"
+          ? "arch"
+          : "comp";
     const entry: DismissalEntry = {
       id: migrateLegacyId(e.id, feature),
       feature,
@@ -199,8 +204,17 @@ function normalizeRegistry(parsed: unknown): DismissalRegistry {
  * post-M2 they are `<feature>:<hex>`. Anything that already carries a
  * feature prefix passes through untouched.
  */
-function migrateLegacyId(rawId: string, feature: "comp" | "dup"): string {
-  if (rawId.startsWith("comp:") || rawId.startsWith("dup:")) return rawId;
+function migrateLegacyId(
+  rawId: string,
+  feature: DismissalEntry["feature"],
+): string {
+  if (
+    rawId.startsWith("comp:") ||
+    rawId.startsWith("dup:") ||
+    rawId.startsWith("arch:")
+  ) {
+    return rawId;
+  }
   const SHA256_PREFIX = "sha256:";
   const hex = rawId.startsWith(SHA256_PREFIX)
     ? rawId.slice(SHA256_PREFIX.length)

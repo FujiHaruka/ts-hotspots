@@ -2,12 +2,13 @@
 
 A CLI that statically analyzes a TypeScript project and points coding agents at the spots most worth reading first. It returns coordinates and metric facts as JSON (or a Markdown prompt wrap), and leaves the judgment of *what to do* to the agent or reviewer downstream.
 
-Two complementary readings of "worth reading first" are supported as subcommands of the same binary:
+Three complementary readings of "worth reading first" are supported as subcommands of the same binary:
 
 - `ts-hotspots complexity` (alias `comp`) — per-function metrics (cognitive complexity, sloc, parameters, churn, …) ranked into a small set of **hotspot candidates**. Best for "where in this codebase should I refactor?"
 - `ts-hotspots duplication` (alias `dup`) — Type-3 **duplication candidates** found across the tree or against a PR diff. Best for "is this change copy-pasting something we already have?"
+- `ts-hotspots architecture` (alias `arch`) — exported components ranked by **structural pressure** (fan-in / fan-out / centrality). Best for "which components are load-bearing in this codebase?"
 
-Both commands operate on a directory inside a git repository and emit machine-readable output. Neither tool proposes refactors itself — they hand the agent coordinates and evidence.
+All three commands operate on a directory inside a git repository and emit machine-readable output. None of them propose refactors themselves — they hand the agent coordinates and evidence.
 
 ## Install
 
@@ -100,12 +101,61 @@ Run `ts-hotspots duplication --help` for the full list.
 
 The exit code is 0 even when zero candidates are reported — detection is the tool's job, deciding what to do is the agent's.
 
+## Architecture hotspots: `ts-hotspots architecture`
+
+`architecture` ranks exported components — every named export, default export, function, class, const, type, interface, or enum — by structural pressure on the dependency graph. The graph is built parser-only (no `ts.Program`, no TypeChecker), with re-exports normalised to their original definitions, then six smell types compete for the candidate's primary slot:
+
+- `architectural_hub` — high fan-in, fan-out, and reverse closure simultaneously
+- `high_fanout_component` — depends on far more than its peers
+- `high_impact_component` — many callers and a wide downstream wavefront
+- `bridge_component` — sits on a large fraction of shortest paths (Brandes betweenness)
+- `unstable_dependency_candidate` — depends on less-stable modules (SDP violation)
+- `over_shared_component` — high fan-in / fan-out and previously suppressed
+
+```
+ts-hotspots architecture                        # scans the working tree
+ts-hotspots arch --ref release/v2               # build the graph at a specific commit
+ts-hotspots arch --diff origin/main...          # display only components in changed files
+```
+
+Each entry in `hotspots[]` has `kind: "architecture"`, the component's defining `file:line` coordinate, the export name and kind, a primary smell + up to two secondary smells, the contributing-axis breakdown for the primary smell (raw value, percentile, rank, threshold delta, z-score), an `edgeMix` summary (`fanIn` / `fanOut` / `runtimeShare`), and a `dismissalId` (`arch:<hex>`).
+
+Common options:
+
+- `--format markdown|json` output format (default: markdown)
+- `--exclude <glob>` extra path glob to drop (repeatable; built-in defaults already cover `node_modules`, `dist`, generated files, and tests)
+- `--limit <N|all>` cap `hotspots[]` at the top N by composite score (default: 20)
+- `--verbose` emit the rich schema (per-secondary metrics, project component count, summary)
+- `--diff <revrange>` display filter only — rankings are still computed against the full graph
+- `--ref <ref>` build the graph at the given commit (default: working tree)
+- `--include-tests` include test files (and stories / cypress / playwright) in the graph; off by default because test edges distort fan-in / fan-out
+- `--no-include-types` drop type-only edges entirely (default: keep them at weight 0.3)
+- `--phase-timings[=summary|verbose]` emit a JSON Lines perf log to stderr
+
+### Optional config
+
+You can place a `.ts-hotspots.json` at the repo root to downweight edges that touch glob-matched files. Use it for legacy areas you do not want to surface yet, or for barrel files whose fan-out is structurally inevitable:
+
+```json
+{
+  "architecture": {
+    "downweight": [
+      { "glob": "src/legacy/**", "factor": 0.5 },
+      { "glob": "**/*.barrel.ts", "factor": 0.3 }
+    ]
+  }
+}
+```
+
+`factor` is in `[0, 1]`. Edges where either endpoint matches a rule's glob have their weight multiplied; multiple matching rules compose multiplicatively.
+
 ## Dismissing false positives
 
-Both features are heuristics — some surfaces will be fine as-is (intentional state-machine dispatchers, generated code, copy-pasted config tables, deliberate parallel structures). To keep the agent from re-evaluating the same false positives every run, each reported entry carries a `dismissalId`:
+All three features are heuristics — some surfaces will be fine as-is (intentional state-machine dispatchers, generated code, copy-pasted config tables, deliberate parallel structures, load-bearing public APIs). To keep the agent from re-evaluating the same false positives every run, each reported entry carries a `dismissalId`:
 
 - `comp:<hex>` for complexity hotspot candidates (one per function)
 - `dup:<hex>` for duplication hotspots (one per group, derived from the group's member set)
+- `arch:<hex>` for architecture hotspots (one per component, derived from the component id)
 
 Record a judgment with:
 
@@ -115,7 +165,7 @@ ts-hotspots dismiss <dismissalId> --reason "<why it's fine>"
 
 Entries are stored per machine under `~/.config/ts-hotspots/<projectKey>/dismissed.json` (honoring `XDG_CONFIG_HOME` if set). This is a personal cache — nothing is written into your repository, and dismissals are not shared across machines or teammates. Subsequent runs filter the entry from the report.
 
-Auto-expiry is intentional: the id is a hash of the underlying source (the function body for `comp:`, the group's member fingerprints for `dup:`). Any meaningful edit invalidates the id, so a dismissal you made for a structure that has since changed is dropped and the candidate re-surfaces. Stale entries are pruned automatically on each run; you do not need to garbage-collect by hand.
+Auto-expiry is intentional: the id is a hash of the underlying source (the function body for `comp:`, the group's member fingerprints for `dup:`, the canonical component id for `arch:`). Any meaningful edit invalidates the id, so a dismissal you made for a structure that has since changed is dropped and the candidate re-surfaces. Stale entries are pruned automatically on each run; you do not need to garbage-collect by hand.
 
 Supporting subcommands:
 
