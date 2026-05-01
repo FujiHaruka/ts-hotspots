@@ -17,18 +17,31 @@
  */
 
 import { type Command, InvalidArgumentError } from "commander";
+import { EDGE_WEIGHTS } from "../graph/types.ts";
 import {
   parseRevRange,
   RevRangeParseError,
 } from "../../util/git/parseRevRange.ts";
 import {
   type ArchParsedArgs,
+  DEFAULT_FORMAT,
   DEFAULT_LIMIT,
   type PhaseTimingsLevel,
+  PHASE_TIMINGS_DEFAULT,
+  PHASE_TIMINGS_LEVELS,
   type ReportFormat,
 } from "./args.ts";
 
-const PHASE_TIMINGS_DEFAULT: PhaseTimingsLevel = "summary";
+/**
+ * Render the `LEVEL is 'a' (default) or 'b' or 'c'.` enumeration for
+ * `--phase-timings`'s help text from the runtime level list. Keeping
+ * this derived means adding a level updates the docs automatically.
+ */
+function renderPhaseTimingsLevels(): string {
+  return PHASE_TIMINGS_LEVELS.map((l) =>
+    l === PHASE_TIMINGS_DEFAULT ? `'${l}' (default)` : `'${l}'`,
+  ).join(" or ");
+}
 
 const SHORT_DESCRIPTION =
   "rank exported components by structural pressure (fan-in / fan-out / centrality)";
@@ -106,12 +119,12 @@ export function addArchitectureCommand(
     )
     .option(
       "--limit <N|all>",
-      "max entries in hotspots[] (default: 20). Pass 'all' to keep every candidate.",
+      `max entries in hotspots[] (default: ${String(DEFAULT_LIMIT)}). Pass 'all' to keep every candidate.`,
       parseLimitOption,
     )
     .option(
       "--format <markdown|json>",
-      "report format (default: markdown)",
+      `report format (default: ${DEFAULT_FORMAT})`,
       parseFormatOption,
     )
     .option(
@@ -129,7 +142,7 @@ export function addArchitectureCommand(
     )
     .option(
       "--phase-timings [level]",
-      "emit a JSON Lines perf-debug log to stderr. LEVEL is 'summary' (default) or 'verbose'. Pipe with '2> perf.log' to capture.",
+      `emit a JSON Lines perf-debug log to stderr. LEVEL is ${renderPhaseTimingsLevels()}. Pipe with '2> perf.log' to capture.`,
       parsePhaseTimingsOption,
     )
     .option(
@@ -138,7 +151,7 @@ export function addArchitectureCommand(
     )
     .option(
       "--no-include-types",
-      "drop type-only edges from the graph (default: include them, weight 0.3)",
+      `drop type-only edges from the graph (default: include them, weight ${String(EDGE_WEIGHTS.type)})`,
     )
     .action((pathArg: string | undefined, opts: ArchCliOptions) => {
       onParsed(buildParsedArgs(pathArg, opts));
@@ -150,7 +163,7 @@ function buildParsedArgs(
   opts: ArchCliOptions,
 ): ArchParsedArgs {
   const phaseTimings = resolvePhaseTimings(opts.phaseTimings);
-  const format: ReportFormat = opts.format ?? "markdown";
+  const format: ReportFormat = opts.format ?? DEFAULT_FORMAT;
   const limit = opts.limit ?? DEFAULT_LIMIT;
   return {
     kind: "run",

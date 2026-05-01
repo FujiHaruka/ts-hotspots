@@ -6,18 +6,31 @@ import {
 import {
   ArgParseError,
   DEFAULT_CHURN_WINDOW,
+  DEFAULT_FORMAT,
   DEFAULT_LIMIT,
+  DEFAULT_REF,
   type ParsedArgs,
+  PHASE_TIMINGS_DEFAULT,
+  PHASE_TIMINGS_LEVELS,
   type PhaseTimingsLevel,
   type ReportFormat,
 } from "./args.ts";
 
-const PHASE_TIMINGS_DEFAULT: PhaseTimingsLevel = "summary";
+/**
+ * Render the `LEVEL is 'a' (default) or 'b' or 'c'.` enumeration for
+ * `--phase-timings`'s help text from the runtime level list. Keeping
+ * this derived means adding a level updates the docs automatically.
+ */
+function renderPhaseTimingsLevels(): string {
+  return PHASE_TIMINGS_LEVELS.map((l) =>
+    l === PHASE_TIMINGS_DEFAULT ? `'${l}' (default)` : `'${l}'`,
+  ).join(" or ");
+}
 
 const SHORT_DESCRIPTION =
   "detect Type-3 duplication candidates (whole repo by default; --diff for PR scope)";
 
-const LONG_DESCRIPTION = `By default the entire repository is scanned at HEAD. Pass --diff <revrange>
+const LONG_DESCRIPTION = `By default the entire repository is scanned at ${DEFAULT_REF}. Pass --diff <revrange>
 to compare the head side of a diff against the rest of the codebase on the
 base side. The report is written to stdout; redirect it to a file if you
 want to keep it.
@@ -107,21 +120,21 @@ export function addDuplicationCommand(
     )
     .option(
       "--ref <ref>",
-      "commit/branch/tag to scan in whole-repo mode (default: HEAD). Mutually exclusive with --diff.",
+      `commit/branch/tag to scan in whole-repo mode (default: ${DEFAULT_REF}). Mutually exclusive with --diff.`,
     )
     .option(
       "--format <markdown|json>",
-      "report format (default: markdown)",
+      `report format (default: ${DEFAULT_FORMAT})`,
       parseFormatOption,
     )
     .option(
       "--phase-timings [level]",
-      "emit a JSON Lines perf-debug log to stderr. LEVEL is 'summary' (default) or 'verbose'. Pipe with '2> perf.log' to capture.",
+      `emit a JSON Lines perf-debug log to stderr. LEVEL is ${renderPhaseTimingsLevels()}. Pipe with '2> perf.log' to capture.`,
       parsePhaseTimingsOption,
     )
     .option(
       "--limit <N|all>",
-      "max entries in hotspots[] (default: 20). Pass 'all' to keep every group.",
+      `max entries in hotspots[] (default: ${String(DEFAULT_LIMIT)}). Pass 'all' to keep every group.`,
       parseLimitOption,
     )
     .option(
@@ -156,7 +169,7 @@ function buildParsedArgs(
     throw new ArgParseError("--ref and --diff are mutually exclusive");
   }
   const phaseTimings = resolvePhaseTimings(opts.phaseTimings);
-  const format: ReportFormat = opts.format ?? "markdown";
+  const format: ReportFormat = opts.format ?? DEFAULT_FORMAT;
   const limit = opts.limit ?? DEFAULT_LIMIT;
   const churn = {
     enabled: opts.churn !== false,
@@ -184,7 +197,7 @@ function buildParsedArgs(
   return {
     kind: "run",
     mode: "whole-repo",
-    ref: opts.ref ?? "HEAD",
+    ref: opts.ref ?? DEFAULT_REF,
     path: pathArg,
     format,
     excludeGlobs: opts.exclude,
