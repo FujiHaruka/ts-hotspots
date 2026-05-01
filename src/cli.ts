@@ -282,6 +282,98 @@ type PendingInvocation =
       parsedArgs: ArchParsedArgs;
     };
 
+const ROOT_LONG_DESCRIPTION = `ts-hotspots is a static analyzer that hands a coding agent a "where should
+I read first?" map of a TypeScript codebase. It points at coordinates
+(file:line) and reports metric facts; it does not propose refactors.
+
+Pick a subcommand by the question you have:
+
+  complexity   "Which functions are the riskiest to touch?"
+               Per-function ranking by cyclomatic / cognitive complexity,
+               length, parameter count, max nesting, branch density, and
+               git churn.
+
+  duplication  "Where is the same logic copy-pasted?"
+               Type-3 (near-miss) duplication groups with similarity and
+               shared evidence. Whole repo by default; --diff narrows to
+               PR scope (head-side fragments vs the rest of the codebase).
+
+  architecture "Which modules carry too much structural weight?"
+               Exported-component ranking on six structural smells —
+               hub / high-fanout / high-impact / bridge / unstable /
+               over-shared — from fan-in / fan-out / reverse closure /
+               PageRank / betweenness / instability.
+
+All three write a markdown report to stdout by default; pass --format json
+for machine-readable output. Each candidate carries a 'dismissalId' you
+can hand to 'ts-hotspots dismiss' to filter known false positives from
+future runs (auto-expires when the underlying code changes).
+
+All three require [path] (default: cwd) to be inside a git repository.`;
+
+const ROOT_HELP_AFTER = `
+Examples:
+  ts-hotspots complexity                       # rank functions in cwd
+  ts-hotspots dup --diff origin/main...        # duplication in PR scope
+  ts-hotspots arch --format json > arch.json   # JSON architecture report
+  ts-hotspots dismiss comp:abc123 --reason "intentional dispatch table"
+
+Run 'ts-hotspots <command> --help' for the full flag surface, examples,
+and per-command notes (output schema, --diff semantics, dismissal id
+prefixes).
+`;
+
+const COMPLEXITY_LONG_DESCRIPTION = `Per-function ranking of the working tree at [path] (default: cwd).
+Each function — including methods, arrow functions, and TSX components —
+is scored on six axes: cyclomatic complexity, cognitive complexity,
+length, parameter count, max nesting depth, branch density, plus git
+churn (commits touching the file in the last --churn-window commits).
+
+The hotspot list is the union of the per-axis top-N, ordered by how many
+axes flagged each function. File-level rankings are returned alongside.
+Output is written to stdout; redirect it to a file if you want to keep it.
+
+[path] points at a directory inside a git repository. The repo root is
+discovered by walking up from [path] until a .git entry is found.`;
+
+const COMPLEXITY_HELP_AFTER = `
+Examples:
+  ts-hotspots complexity > report.md
+  ts-hotspots complexity --format json > report.json
+  ts-hotspots comp --diff origin/main...        # narrow display to PR files
+  ts-hotspots comp --file src/big-module.ts     # raw metrics for one file
+  ts-hotspots comp -m cyclomatic,cognitive,length
+  ts-hotspots comp --no-churn                   # skip git churn collection
+  ts-hotspots comp --verbose                    # full schema (all axes, coOccurrence, functions[])
+
+<revrange> forms accepted by --diff:
+  A...B   diff from merge-base(A, B) to B (PR semantics; recommended)
+  A..B    diff base against head directly
+  A...    head side defaults to HEAD
+  ...B    base side defaults to HEAD
+
+Note: 'comp --diff' is a display filter — rankings are still computed
+against the full head ref so the distribution stays intact. ('dup --diff'
+instead defines the comparison's base/head sides.)
+
+Each reported candidate carries a 'dismissalId' (comp:<hex>) you can pass
+to 'ts-hotspots dismiss <id> --reason <text>' to filter it from future
+runs. The id auto-expires when the function body changes.
+`;
+
+const DISMISS_HELP_AFTER = `
+Typical flow:
+  1. Run an analysis:                ts-hotspots comp
+  2. Pick a candidate's dismissalId from the report (comp:<hex>, dup:<hex>,
+     or arch:<hex>) and dismiss it:  ts-hotspots dismiss comp:abc123 --reason "intentional dispatch table"
+  3. Future runs filter that id and report a 'dismissed' summary.
+
+Dismissals auto-expire when the underlying code changes (function body
+rewritten, duplication group membership shifts), so they don't shadow real
+regressions. To list active entries use 'ts-hotspots list-dismissed';
+to remove one explicitly use 'ts-hotspots undismiss <id>'.
+`;
+
 export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
   const program = new Command();
   program.enablePositionalOptions();
@@ -289,7 +381,9 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     .name("ts-hotspots")
     .description("TypeScript metrics reporter")
     .version(pkg.version)
-    .addHelpCommand(false);
+    .addHelpCommand(false)
+    .addHelpText("before", `\n${ROOT_LONG_DESCRIPTION}\n`)
+    .addHelpText("after", ROOT_HELP_AFTER);
 
   program
     .command("complexity [path]")
@@ -298,6 +392,8 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
       "rank functions and files by complexity / size / churn (per-function hotspot candidates)",
     )
     .helpGroup("Analysis commands:")
+    .addHelpText("before", `\n${COMPLEXITY_LONG_DESCRIPTION}\n`)
+    .addHelpText("after", COMPLEXITY_HELP_AFTER)
     .option(
       "-e, --exclude <glob>",
       "extra path glob to exclude (repeatable). Added on top of the built-in defaults (node_modules, dist, generated files, test files, ...)",
@@ -359,6 +455,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
       "record a dismissal so this candidate is filtered from future runs",
     )
     .helpGroup("Dismissal management:")
+    .addHelpText("after", DISMISS_HELP_AFTER)
     .requiredOption(
       "--reason <text>",
       "why this candidate is not a real hotspot",
