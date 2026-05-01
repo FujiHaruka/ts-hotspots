@@ -1,52 +1,55 @@
-import { type Node, SyntaxKind } from "ts-morph";
+import ts from "typescript";
 import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeNode,
+  FunctionLikeTsNode,
 } from "../types.ts";
 
 export interface CognitiveResult {
   cognitiveComplexity: number;
 }
 
-const NESTED_FUNCTION_KINDS = new Set<SyntaxKind>([
-  SyntaxKind.FunctionDeclaration,
-  SyntaxKind.MethodDeclaration,
-  SyntaxKind.ArrowFunction,
-  SyntaxKind.FunctionExpression,
-  SyntaxKind.GetAccessor,
-  SyntaxKind.SetAccessor,
-  SyntaxKind.Constructor,
+const NESTED_FUNCTION_KINDS = new Set<ts.SyntaxKind>([
+  ts.SyntaxKind.FunctionDeclaration,
+  ts.SyntaxKind.MethodDeclaration,
+  ts.SyntaxKind.ArrowFunction,
+  ts.SyntaxKind.FunctionExpression,
+  ts.SyntaxKind.GetAccessor,
+  ts.SyntaxKind.SetAccessor,
+  ts.SyntaxKind.Constructor,
 ]);
 
-const LOGICAL_OPERATOR_KINDS = new Set<SyntaxKind>([
-  SyntaxKind.AmpersandAmpersandToken,
-  SyntaxKind.BarBarToken,
-  SyntaxKind.QuestionQuestionToken,
+const LOGICAL_OPERATOR_KINDS = new Set<ts.SyntaxKind>([
+  ts.SyntaxKind.AmpersandAmpersandToken,
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.QuestionQuestionToken,
 ]);
 
-export function computeCognitive(node: FunctionLikeNode): number {
+export function computeCognitive(
+  node: FunctionLikeTsNode,
+  sourceFile: ts.SourceFile,
+): number {
   const body = getBody(node);
   if (!body) return 0;
 
   const ownName = getOwnName(node);
   let score = 0;
 
-  const visit = (n: Node, nesting: number): void => {
-    const kind = n.getKind();
+  const visit = (n: ts.Node, nesting: number): void => {
+    const kind = n.kind;
 
     // Stop descent into nested function-like declarations: each is scored standalone.
     if (NESTED_FUNCTION_KINDS.has(kind)) return;
 
     switch (kind) {
-      case SyntaxKind.IfStatement: {
-        const ifStmt = n.asKindOrThrow(SyntaxKind.IfStatement);
+      case ts.SyntaxKind.IfStatement: {
+        const ifStmt = n as ts.IfStatement;
         // "else if": an IfStatement whose parent is an IfStatement and is that parent's else branch.
-        const parent = n.getParent();
+        const parent = n.parent as ts.Node | undefined;
         const isElseIf =
-          parent?.getKind() === SyntaxKind.IfStatement &&
-          parent.asKindOrThrow(SyntaxKind.IfStatement).getElseStatement() === n;
+          parent?.kind === ts.SyntaxKind.IfStatement &&
+          (parent as ts.IfStatement).elseStatement === n;
         if (isElseIf) {
           // Special case: +1 with no nesting bonus, same nesting level as the parent if.
           score += 1;
@@ -54,12 +57,12 @@ export function computeCognitive(node: FunctionLikeNode): number {
           score += 1 + nesting;
         }
         // Condition: no nesting bump, but still walk for logical operators / ternaries.
-        visit(ifStmt.getExpression(), nesting);
+        visit(ifStmt.expression, nesting);
         // Then branch: nesting+1 (but only if it's not an "else if" pattern applying to its own then).
-        visit(ifStmt.getThenStatement(), nesting + 1);
-        const elseStmt = ifStmt.getElseStatement();
+        visit(ifStmt.thenStatement, nesting + 1);
+        const elseStmt = ifStmt.elseStatement;
         if (elseStmt) {
-          if (elseStmt.getKind() === SyntaxKind.IfStatement) {
+          if (elseStmt.kind === ts.SyntaxKind.IfStatement) {
             // Else-if: same nesting level; the inner IfStatement itself handles its own +1.
             visit(elseStmt, nesting);
           } else {
@@ -71,103 +74,100 @@ export function computeCognitive(node: FunctionLikeNode): number {
         return;
       }
 
-      case SyntaxKind.ForStatement:
-      case SyntaxKind.ForInStatement:
-      case SyntaxKind.ForOfStatement:
-      case SyntaxKind.WhileStatement:
-      case SyntaxKind.DoStatement: {
+      case ts.SyntaxKind.ForStatement:
+      case ts.SyntaxKind.ForInStatement:
+      case ts.SyntaxKind.ForOfStatement:
+      case ts.SyntaxKind.WhileStatement:
+      case ts.SyntaxKind.DoStatement: {
         score += 1 + nesting;
-        // Walk children at same nesting, except the loop body goes to nesting+1.
         const loopBody = (
-          n as unknown as { getStatement(): Node }
-        ).getStatement();
-        for (const child of n.getChildren()) {
+          n as
+            | ts.ForStatement
+            | ts.ForInStatement
+            | ts.ForOfStatement
+            | ts.WhileStatement
+            | ts.DoStatement
+        ).statement;
+        ts.forEachChild(n, (child) => {
           if (child === loopBody) {
             visit(child, nesting + 1);
           } else {
             visit(child, nesting);
           }
-        }
+        });
         return;
       }
 
-      case SyntaxKind.CatchClause: {
+      case ts.SyntaxKind.CatchClause: {
         score += 1 + nesting;
         // Walk children: the block runs at nesting+1, everything else at nesting.
-        for (const child of n.getChildren()) {
-          if (child.getKind() === SyntaxKind.Block) {
+        ts.forEachChild(n, (child) => {
+          if (child.kind === ts.SyntaxKind.Block) {
             visit(child, nesting + 1);
           } else {
             visit(child, nesting);
           }
-        }
+        });
         return;
       }
 
-      case SyntaxKind.ConditionalExpression: {
+      case ts.SyntaxKind.ConditionalExpression: {
         score += 1 + nesting;
-        const cond = n.asKindOrThrow(SyntaxKind.ConditionalExpression);
+        const cond = n as ts.ConditionalExpression;
         // Condition at same nesting; the two branches at nesting+1.
-        visit(cond.getCondition(), nesting);
-        visit(cond.getWhenTrue(), nesting + 1);
-        visit(cond.getWhenFalse(), nesting + 1);
+        visit(cond.condition, nesting);
+        visit(cond.whenTrue, nesting + 1);
+        visit(cond.whenFalse, nesting + 1);
         return;
       }
 
-      case SyntaxKind.SwitchStatement: {
+      case ts.SyntaxKind.SwitchStatement: {
         score += 1;
-        const sw = n.asKindOrThrow(SyntaxKind.SwitchStatement);
+        const sw = n as ts.SwitchStatement;
         // Switch expression at same nesting; case block at nesting+1.
-        visit(sw.getExpression(), nesting);
-        visit(sw.getCaseBlock(), nesting + 1);
+        visit(sw.expression, nesting);
+        visit(sw.caseBlock, nesting + 1);
         return;
       }
 
-      case SyntaxKind.BreakStatement:
-      case SyntaxKind.ContinueStatement: {
-        const labeled = (
-          n as unknown as { getLabel(): Node | undefined }
-        ).getLabel();
+      case ts.SyntaxKind.BreakStatement:
+      case ts.SyntaxKind.ContinueStatement: {
+        const labeled = (n as ts.BreakStatement | ts.ContinueStatement).label;
         if (labeled) score += 1;
         return;
       }
 
-      case SyntaxKind.BinaryExpression: {
-        const bin = n.asKindOrThrow(SyntaxKind.BinaryExpression);
-        const opKind = bin.getOperatorToken().getKind();
+      case ts.SyntaxKind.BinaryExpression: {
+        const bin = n as ts.BinaryExpression;
+        const opKind = bin.operatorToken.kind;
         if (LOGICAL_OPERATOR_KINDS.has(opKind)) {
           // Count only the top of a run of the same operator.
-          const parent = n.getParent();
+          const parent = n.parent as ts.Node | undefined;
           const parentIsSameOp =
-            parent?.getKind() === SyntaxKind.BinaryExpression &&
-            parent
-              .asKindOrThrow(SyntaxKind.BinaryExpression)
-              .getOperatorToken()
-              .getKind() === opKind;
+            parent?.kind === ts.SyntaxKind.BinaryExpression &&
+            (parent as ts.BinaryExpression).operatorToken.kind === opKind;
           if (!parentIsSameOp) score += 1;
         }
-        for (const child of n.getChildren()) visit(child, nesting);
+        ts.forEachChild(n, (child) => visit(child, nesting));
         return;
       }
 
-      case SyntaxKind.CallExpression: {
+      case ts.SyntaxKind.CallExpression: {
         if (ownName !== undefined) {
-          const callee = (
-            n as unknown as { getExpression(): Node }
-          ).getExpression();
+          const callee = (n as ts.CallExpression).expression;
           if (
-            callee.getKind() === SyntaxKind.Identifier &&
-            callee.getText() === ownName
+            callee.kind === ts.SyntaxKind.Identifier &&
+            (callee as ts.Identifier).text === ownName
           ) {
             score += 1;
           }
         }
-        for (const child of n.getChildren()) visit(child, nesting);
+        ts.forEachChild(n, (child) => visit(child, nesting));
         return;
       }
 
       default: {
-        for (const child of n.getChildren()) visit(child, nesting);
+        ts.forEachChild(n, (child) => visit(child, nesting));
         return;
       }
     }
@@ -177,21 +177,20 @@ export function computeCognitive(node: FunctionLikeNode): number {
   return score;
 }
 
-function getBody(node: FunctionLikeNode): Node | undefined {
-  if (node.getKind() === SyntaxKind.ArrowFunction) {
-    return node.asKindOrThrow(SyntaxKind.ArrowFunction).getBody();
+function getBody(node: FunctionLikeTsNode): ts.Node | undefined {
+  if (node.kind === ts.SyntaxKind.ArrowFunction) {
+    return (node as ts.ArrowFunction).body;
   }
-  return (node as unknown as { getBody(): Node | undefined }).getBody();
+  return (node as Exclude<FunctionLikeTsNode, ts.ArrowFunction>).body;
 }
 
-function getOwnName(node: FunctionLikeNode): string | undefined {
-  const kind = node.getKind();
-  if (kind === SyntaxKind.FunctionDeclaration) {
-    const name = node.asKindOrThrow(SyntaxKind.FunctionDeclaration).getName();
+function getOwnName(node: FunctionLikeTsNode): string | undefined {
+  if (node.kind === ts.SyntaxKind.FunctionDeclaration) {
+    const name = (node as ts.FunctionDeclaration).name?.text;
     return name === undefined || name === "" ? undefined : name;
   }
-  if (kind === SyntaxKind.FunctionExpression) {
-    const name = node.asKindOrThrow(SyntaxKind.FunctionExpression).getName();
+  if (node.kind === ts.SyntaxKind.FunctionExpression) {
+    const name = (node as ts.FunctionExpression).name?.text;
     return name === undefined || name === "" ? undefined : name;
   }
   // Methods/accessors/constructors/anonymous: recursion via `this.m()` not detected (out of scope).
@@ -205,7 +204,7 @@ export const cognitiveCollector: Collector<CognitiveResult> = {
     for (const decl of ctx.declarations) {
       try {
         result.set(decl.id, {
-          cognitiveComplexity: computeCognitive(decl.node),
+          cognitiveComplexity: computeCognitive(decl.tsNode, decl.tsSourceFile),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

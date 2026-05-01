@@ -1,23 +1,21 @@
-import { type FunctionDeclaration, Project } from "ts-morph";
+import { Project } from "ts-morph";
 import { describe, expect, test } from "vitest";
 import { enumerateDeclarations } from "../enumerate-declarations.ts";
+import { parseFirstFunctionLike } from "../internal/parseFirstFunctionLike.test-helper.ts";
 import { computeSloc, slocCollector } from "./sloc.ts";
 
-function parseFn(src: string): FunctionDeclaration {
-  const project = new Project({ useInMemoryFileSystem: true });
-  const sf = project.createSourceFile("/proj/t.ts", src);
-  const fn = sf.getFunctions()[0];
-  if (!fn) throw new Error("no function in source");
-  return fn;
+function compute(src: string): number {
+  const { sourceFile, fn } = parseFirstFunctionLike(src);
+  return computeSloc(fn, sourceFile);
 }
 
 describe("computeSloc", () => {
   test("empty single-line body → 1", () => {
-    expect(computeSloc(parseFn("function f(){}"))).toBe(1);
+    expect(compute("function f(){}")).toBe(1);
   });
 
   test("multi-line empty body → 2", () => {
-    expect(computeSloc(parseFn("function f(){\n}"))).toBe(2);
+    expect(compute("function f(){\n}")).toBe(2);
   });
 
   test("simple function with 3 code lines → 4 (incl. brace lines)", () => {
@@ -26,7 +24,7 @@ describe("computeSloc", () => {
     const src = ["function f(){", "  const x = 1;", "  return x;", "}"].join(
       "\n",
     );
-    expect(computeSloc(parseFn(src))).toBe(4);
+    expect(compute(src)).toBe(4);
   });
 
   test("blank lines between statements are not counted", () => {
@@ -38,7 +36,7 @@ describe("computeSloc", () => {
       "  return x;",
       "}",
     ].join("\n");
-    expect(computeSloc(parseFn(src))).toBe(4);
+    expect(compute(src)).toBe(4);
   });
 
   test("line-comment alone on a line is not counted", () => {
@@ -48,7 +46,7 @@ describe("computeSloc", () => {
       "  return 1;",
       "}",
     ].join("\n");
-    expect(computeSloc(parseFn(src))).toBe(3);
+    expect(compute(src)).toBe(3);
   });
 
   test("block comment spanning 3 lines (comment only) contributes 0", () => {
@@ -60,28 +58,23 @@ describe("computeSloc", () => {
       "  return 1;",
       "}",
     ].join("\n");
-    expect(computeSloc(parseFn(src))).toBe(3);
+    expect(compute(src)).toBe(3);
   });
 
   test("inline block comment on a code line counts as 1 code line", () => {
     const src = ["function f(){", "  return /* x */ 1;", "}"].join("\n");
-    expect(computeSloc(parseFn(src))).toBe(3);
+    expect(compute(src)).toBe(3);
   });
 
   test("arrow expression body single-line → 1", () => {
-    const project = new Project({ useInMemoryFileSystem: true });
-    const sf = project.createSourceFile(
-      "/proj/t.ts",
+    const { sourceFile, fn } = parseFirstFunctionLike(
       "const f = (x: number) => x + 1;",
     );
-    const arrow = sf.getVariableDeclarationOrThrow("f").getInitializerOrThrow();
-    expect(computeSloc(arrow as never)).toBe(1);
+    expect(computeSloc(fn, sourceFile)).toBe(1);
   });
 
   test("arrow with multi-line body with blanks", () => {
-    const project = new Project({ useInMemoryFileSystem: true });
-    const sf = project.createSourceFile(
-      "/proj/t.ts",
+    const { sourceFile, fn } = parseFirstFunctionLike(
       [
         "const f = (x: number) => {",
         "  const y = x;",
@@ -90,8 +83,7 @@ describe("computeSloc", () => {
         "};",
       ].join("\n"),
     );
-    const arrow = sf.getVariableDeclarationOrThrow("f").getInitializerOrThrow();
-    expect(computeSloc(arrow as never)).toBe(4);
+    expect(computeSloc(fn, sourceFile)).toBe(4);
   });
 });
 

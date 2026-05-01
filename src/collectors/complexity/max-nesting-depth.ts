@@ -1,87 +1,89 @@
-import { type Node, SyntaxKind } from "ts-morph";
+import ts from "typescript";
 import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeNode,
+  FunctionLikeTsNode,
 } from "../types.ts";
 
 export interface MaxNestingDepthResult {
   maxNestingDepth: number;
 }
 
-const NESTED_FUNCTION_KINDS = new Set<SyntaxKind>([
-  SyntaxKind.FunctionDeclaration,
-  SyntaxKind.MethodDeclaration,
-  SyntaxKind.ArrowFunction,
-  SyntaxKind.FunctionExpression,
-  SyntaxKind.GetAccessor,
-  SyntaxKind.SetAccessor,
-  SyntaxKind.Constructor,
+const NESTED_FUNCTION_KINDS = new Set<ts.SyntaxKind>([
+  ts.SyntaxKind.FunctionDeclaration,
+  ts.SyntaxKind.MethodDeclaration,
+  ts.SyntaxKind.ArrowFunction,
+  ts.SyntaxKind.FunctionExpression,
+  ts.SyntaxKind.GetAccessor,
+  ts.SyntaxKind.SetAccessor,
+  ts.SyntaxKind.Constructor,
 ]);
 
-export function computeMaxNestingDepth(node: FunctionLikeNode): number {
+export function computeMaxNestingDepth(node: FunctionLikeTsNode): number {
   const body = getBody(node);
   if (!body) return 0;
 
   let max = 0;
-  const walk = (n: Node, depth: number): void => {
+  const walk = (n: ts.Node, depth: number): void => {
     if (depth > max) max = depth;
-    const kind = n.getKind();
+    const kind = n.kind;
 
-    if (kind === SyntaxKind.IfStatement) {
-      const ifStmt = n.asKindOrThrow(SyntaxKind.IfStatement);
-      const thenStmt = ifStmt.getThenStatement();
-      walk(thenStmt, depth + 1);
-      const elseStmt = ifStmt.getElseStatement();
+    if (kind === ts.SyntaxKind.IfStatement) {
+      const ifStmt = n as ts.IfStatement;
+      walk(ifStmt.thenStatement, depth + 1);
+      const elseStmt = ifStmt.elseStatement;
       if (elseStmt) walk(elseStmt, depth + 1);
       return;
     }
 
     if (
-      kind === SyntaxKind.ForStatement ||
-      kind === SyntaxKind.ForInStatement ||
-      kind === SyntaxKind.ForOfStatement ||
-      kind === SyntaxKind.WhileStatement ||
-      kind === SyntaxKind.DoStatement
+      kind === ts.SyntaxKind.ForStatement ||
+      kind === ts.SyntaxKind.ForInStatement ||
+      kind === ts.SyntaxKind.ForOfStatement ||
+      kind === ts.SyntaxKind.WhileStatement ||
+      kind === ts.SyntaxKind.DoStatement
     ) {
-      const stmt = n as unknown as { getStatement(): Node };
-      walk(stmt.getStatement(), depth + 1);
+      const stmt = n as
+        | ts.ForStatement
+        | ts.ForInStatement
+        | ts.ForOfStatement
+        | ts.WhileStatement
+        | ts.DoStatement;
+      walk(stmt.statement, depth + 1);
       return;
     }
 
-    if (kind === SyntaxKind.SwitchStatement) {
-      const sw = n.asKindOrThrow(SyntaxKind.SwitchStatement);
-      walk(sw.getCaseBlock(), depth + 1);
+    if (kind === ts.SyntaxKind.SwitchStatement) {
+      const sw = n as ts.SwitchStatement;
+      walk(sw.caseBlock, depth + 1);
       return;
     }
 
-    if (kind === SyntaxKind.TryStatement) {
-      const tryStmt = n.asKindOrThrow(SyntaxKind.TryStatement);
-      walk(tryStmt.getTryBlock(), depth + 1);
-      const catchClause = tryStmt.getCatchClause();
-      if (catchClause) walk(catchClause, depth + 1);
-      const finallyBlock = tryStmt.getFinallyBlock();
-      if (finallyBlock) walk(finallyBlock, depth + 1);
+    if (kind === ts.SyntaxKind.TryStatement) {
+      const tryStmt = n as ts.TryStatement;
+      walk(tryStmt.tryBlock, depth + 1);
+      if (tryStmt.catchClause) walk(tryStmt.catchClause, depth + 1);
+      if (tryStmt.finallyBlock) walk(tryStmt.finallyBlock, depth + 1);
       return;
     }
 
     // Generic descent, stopping at nested function-like nodes.
-    for (const child of n.getChildren()) {
-      if (NESTED_FUNCTION_KINDS.has(child.getKind())) continue;
+    ts.forEachChild(n, (child) => {
+      if (NESTED_FUNCTION_KINDS.has(child.kind)) return;
       walk(child, depth);
-    }
+    });
   };
 
   walk(body, 0);
   return max;
 }
 
-function getBody(node: FunctionLikeNode): Node | undefined {
-  if (node.getKind() === SyntaxKind.ArrowFunction) {
-    return node.asKindOrThrow(SyntaxKind.ArrowFunction).getBody();
+function getBody(node: FunctionLikeTsNode): ts.Node | undefined {
+  if (node.kind === ts.SyntaxKind.ArrowFunction) {
+    return (node as ts.ArrowFunction).body;
   }
-  return (node as unknown as { getBody(): Node | undefined }).getBody();
+  return (node as Exclude<FunctionLikeTsNode, ts.ArrowFunction>).body;
 }
 
 export const maxNestingDepthCollector: Collector<MaxNestingDepthResult> = {
@@ -91,7 +93,7 @@ export const maxNestingDepthCollector: Collector<MaxNestingDepthResult> = {
     for (const decl of ctx.declarations) {
       try {
         result.set(decl.id, {
-          maxNestingDepth: computeMaxNestingDepth(decl.node),
+          maxNestingDepth: computeMaxNestingDepth(decl.tsNode),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
