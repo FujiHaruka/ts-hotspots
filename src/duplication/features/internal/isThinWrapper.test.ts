@@ -56,8 +56,7 @@ describe("isThinWrapperFragment", () => {
   it("3: prelude with one const = call() is thin", () => {
     expect(
       judge({
-        source:
-          "function F() { const t = useT(\"k\"); return <X t={t} />; }",
+        source: 'function F() { const t = useT("k"); return <X t={t} />; }',
       }),
     ).toBe(true);
   });
@@ -154,5 +153,4 @@ describe("isThinWrapperFragment", () => {
       }),
     ).toBe(false);
   });
-
 });

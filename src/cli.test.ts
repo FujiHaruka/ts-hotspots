@@ -1,11 +1,5 @@
-import {
-  cpSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,7 +17,32 @@ import type {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_DIR = resolve(HERE, "../test/fixtures/sample-project");
-const FIXTURE_TSCONFIG = resolve(FIXTURE_DIR, "tsconfig.json");
+
+function initGitRepo(repoRoot: string): void {
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_NAME: "t",
+    GIT_AUTHOR_EMAIL: "t@example.com",
+    GIT_COMMITTER_NAME: "t",
+    GIT_COMMITTER_EMAIL: "t@example.com",
+  };
+  for (const args of [
+    ["init", "--initial-branch=main"],
+    ["add", "."],
+    ["commit", "-m", "init"],
+  ] as const) {
+    const res = spawnSync("git", args, {
+      cwd: repoRoot,
+      env,
+      encoding: "utf8",
+    });
+    if (res.status !== 0) {
+      throw new Error(
+        `git ${args.join(" ")} failed: ${res.stderr || res.stdout}`,
+      );
+    }
+  }
+}
 
 class StringSink {
   chunks: string[] = [];
@@ -42,8 +61,6 @@ interface ParsedFunctionReport {
   tool: { name: string; version: string };
   project: {
     sourceFileCount: number;
-    /** `--verbose` only. */
-    tsconfigPath?: string;
     /** `--verbose` only. */
     functionCount?: number;
   };
@@ -65,7 +82,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--format", "json"],
       stdout,
       stderr,
     );
@@ -74,10 +91,8 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     expect(report.tool.name).toBe("ts-hotspots");
     expect(report.project.sourceFileCount).toBeGreaterThan(0);
-    // Slim default trims `tsconfigPath` and `functionCount` from the
-    // envelope — they remain on the stderr stats line and surface only
-    // under `--verbose`.
-    expect(report.project.tsconfigPath).toBeUndefined();
+    // Slim default trims `functionCount` from the envelope — it remains
+    // on the stderr stats line and surfaces only under `--verbose`.
     expect(report.project.functionCount).toBeUndefined();
 
     // Slim default: only hotspot candidates remain as the primary signal.
@@ -94,7 +109,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const code = await run(
       [
         ...COMPLEXITY_PREFIX,
-        FIXTURE_TSCONFIG,
+        FIXTURE_DIR,
         "--limit",
         "1",
         "--verbose",
@@ -117,14 +132,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [
-        ...COMPLEXITY_PREFIX,
-        FIXTURE_TSCONFIG,
-        "--limit",
-        "all",
-        "--format",
-        "json",
-      ],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--limit", "all", "--format", "json"],
       stdout,
       stderr,
     );
@@ -140,7 +148,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const code = await run(
       [
         ...COMPLEXITY_PREFIX,
-        FIXTURE_TSCONFIG,
+        FIXTURE_DIR,
         "--file",
         "src/a.ts",
         "--limit",
@@ -159,7 +167,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "-t", "2"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "-t", "2"],
       stdout,
       stderr,
     );
@@ -171,7 +179,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--json"],
       stdout,
       stderr,
     );
@@ -183,7 +191,15 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "-m", "sloc", "--verbose", "--format", "json"],
+      [
+        ...COMPLEXITY_PREFIX,
+        FIXTURE_DIR,
+        "-m",
+        "sloc",
+        "--verbose",
+        "--format",
+        "json",
+      ],
       stdout,
       stderr,
     );
@@ -200,11 +216,12 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const code = await run(
       [
         ...COMPLEXITY_PREFIX,
-        FIXTURE_TSCONFIG,
+        FIXTURE_DIR,
         "-m",
-        "callerCount,mutationSiteCount,tryCatchCount,awaitCount,calleeCount",
+        "mutationSiteCount,tryCatchCount,awaitCount,calleeCount",
         "--verbose",
-        "--format", "json",
+        "--format",
+        "json",
       ],
       stdout,
       stderr,
@@ -213,7 +230,6 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     // Meta is emitted for every axis under --verbose.
-    expect(report.functionAxisMeta?.callerCount).toBeDefined();
     expect(report.functionAxisMeta?.calleeCount).toBeDefined();
     expect(report.functionAxisMeta?.tryCatchCount).toBeDefined();
     expect(report.functionAxisMeta?.awaitCount).toBeDefined();
@@ -222,11 +238,41 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(report.functionRankings?.cognitiveComplexity).toEqual([]);
   });
 
+  test("--metrics rejects callerCount (axis was removed)", async () => {
+    const stdout = new StringSink();
+    const stderr = new StringSink();
+    const code = await run(
+      [
+        ...COMPLEXITY_PREFIX,
+        FIXTURE_DIR,
+        "-m",
+        "callerCount",
+        "--format",
+        "json",
+      ],
+      stdout,
+      stderr,
+    );
+    expect(code).toBe(1);
+    const err = JSON.parse(stdout.text) as {
+      error: { code: string; message: string };
+    };
+    expect(err.error.code).toBe("INVALID_METRIC");
+    expect(err.error.message).toContain("callerCount");
+  });
+
   test("--metrics rejects unknown axis ids", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "-m", "notARealAxis", "--format", "json"],
+      [
+        ...COMPLEXITY_PREFIX,
+        FIXTURE_DIR,
+        "-m",
+        "notARealAxis",
+        "--format",
+        "json",
+      ],
       stdout,
       stderr,
     );
@@ -242,7 +288,14 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--file", "src/a.ts", "--format", "json"],
+      [
+        ...COMPLEXITY_PREFIX,
+        FIXTURE_DIR,
+        "--file",
+        "src/a.ts",
+        "--format",
+        "json",
+      ],
       stdout,
       stderr,
     );
@@ -256,11 +309,9 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(report.functionAxisMeta).toBeUndefined();
   });
 
-  test("positional directory resolves to <dir>/tsconfig.json", async () => {
+  test("positional directory analyzes that directory's tracked sources", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
-    // `--verbose` is required to surface `project.tsconfigPath` (the slim
-    // default omits it).
     const code = await run(
       [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--verbose", "--format", "json"],
       stdout,
@@ -268,19 +319,28 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     );
     expect(code).toBe(0);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
-    expect(report.project.tsconfigPath).toBe(FIXTURE_TSCONFIG);
+    expect(report.project.sourceFileCount).toBeGreaterThan(0);
+    // All collected functions live in the fixture's `src/` tree (test files
+    // are dropped by the default exclude globs).
+    for (const f of report.functions ?? []) {
+      expect(f.location.startsWith("src/")).toBe(true);
+    }
   });
 
-  test("missing tsconfig with --json: stdout is error JSON, stderr has human message, exit 1", async () => {
+  test("missing path with --json: stdout is error JSON, stderr has human message, exit 1", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
-    const missing = resolve(FIXTURE_DIR, "nope.json");
-    const code = await run([...COMPLEXITY_PREFIX, missing, "--format", "json"], stdout, stderr);
+    const missing = resolve(FIXTURE_DIR, "no-such-dir");
+    const code = await run(
+      [...COMPLEXITY_PREFIX, missing, "--format", "json"],
+      stdout,
+      stderr,
+    );
     expect(code).toBe(1);
     const err = JSON.parse(stdout.text) as {
       error: { code: string; message: string };
     };
-    expect(err.error.code).toBe("TSCONFIG_NOT_FOUND");
+    expect(err.error.code).toBe("INVALID_ARGS");
     expect(err.error.message).toContain(missing);
     expect(stderr.text.length).toBeGreaterThan(0);
   });
@@ -289,7 +349,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--verbose", "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--verbose", "--format", "json"],
       stdout,
       stderr,
     );
@@ -317,7 +377,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const code = await run(
       [
         ...COMPLEXITY_PREFIX,
-        FIXTURE_TSCONFIG,
+        FIXTURE_DIR,
         "--file",
         "src/a.test.ts",
         "--exclude",
@@ -343,7 +403,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const code = await run(
       [
         ...COMPLEXITY_PREFIX,
-        FIXTURE_TSCONFIG,
+        FIXTURE_DIR,
         "--exclude",
         "**/a.ts",
         "--verbose",
@@ -363,7 +423,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--format", "json"],
       stdout,
       stderr,
     );
@@ -378,10 +438,11 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const code = await run(
       [
         ...COMPLEXITY_PREFIX,
-        FIXTURE_TSCONFIG,
+        FIXTURE_DIR,
         "-m",
         "cognitiveComplexity,sloc",
-        "--format", "json",
+        "--format",
+        "json",
       ],
       stdout,
       stderr,
@@ -402,7 +463,14 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--file", "src/a.ts", "--format", "json"],
+      [
+        ...COMPLEXITY_PREFIX,
+        FIXTURE_DIR,
+        "--file",
+        "src/a.ts",
+        "--format",
+        "json",
+      ],
       stdout,
       stderr,
     );
@@ -415,7 +483,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--verbose", "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--verbose", "--format", "json"],
       stdout,
       stderr,
     );
@@ -438,7 +506,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--verbose", "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--verbose", "--format", "json"],
       stdout,
       stderr,
     );
@@ -467,7 +535,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const fullStdout = new StringSink();
     const fullStderr = new StringSink();
     const fullCode = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--verbose", "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--verbose", "--format", "json"],
       fullStdout,
       fullStderr,
     );
@@ -476,7 +544,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const slimStdout = new StringSink();
     const slimStderr = new StringSink();
     const slimCode = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--format", "json"],
       slimStdout,
       slimStderr,
     );
@@ -484,16 +552,14 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
 
     const fullReport = JSON.parse(fullStdout.text) as ParsedFunctionReport;
     const slimReport = JSON.parse(slimStdout.text) as ParsedFunctionReport;
-    expect(slimReport.hotspots).toEqual(
-      fullReport.hotspots,
-    );
+    expect(slimReport.hotspots).toEqual(fullReport.hotspots);
   });
 
   test("emits a `ts-hotspots complexity:` stats line on stderr after a successful run", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--format", "json"],
       stdout,
       stderr,
     );
@@ -509,7 +575,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const code = await run(
       [
         ...COMPLEXITY_PREFIX,
-        FIXTURE_TSCONFIG,
+        FIXTURE_DIR,
         "--file",
         "src/a.ts",
         "--format",
@@ -519,13 +585,15 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toMatch(/ts-hotspots complexity: file=src\/a\.ts, functions=\d+/);
+    expect(stderr.text).toMatch(
+      /ts-hotspots complexity: file=src\/a\.ts, functions=\d+/,
+    );
   });
 
   test("default invocation emits Markdown with the Claude prompt and fenced JSON", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
-    const code = await run([...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG], stdout, stderr);
+    const code = await run([...COMPLEXITY_PREFIX, FIXTURE_DIR], stdout, stderr);
     expect(code).toBe(0);
     expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
     expect(stdout.text.startsWith("# ts-hotspots report")).toBe(true);
@@ -541,7 +609,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--format", "json"],
       stdout,
       stderr,
     );
@@ -552,10 +620,10 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     }).not.toThrow();
   });
 
-  test("missing tsconfig without --json emits Markdown error block", async () => {
+  test("missing path without --json emits Markdown error block", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
-    const missing = resolve(FIXTURE_DIR, "nope.json");
+    const missing = resolve(FIXTURE_DIR, "no-such-dir");
     const code = await run([...COMPLEXITY_PREFIX, missing], stdout, stderr);
     expect(code).toBe(1);
     expect(stdout.text.startsWith("# ts-hotspots error")).toBe(true);
@@ -567,7 +635,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--format", "markdown"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--format", "markdown"],
       stdout,
       stderr,
     );
@@ -579,7 +647,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--format", "yaml"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--format", "yaml"],
       stdout,
       stderr,
     );
@@ -591,7 +659,14 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--no-churn", "--verbose", "--format", "json"],
+      [
+        ...COMPLEXITY_PREFIX,
+        FIXTURE_DIR,
+        "--no-churn",
+        "--verbose",
+        "--format",
+        "json",
+      ],
       stdout,
       stderr,
     );
@@ -607,7 +682,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--churn-window", "0"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--churn-window", "0"],
       stdout,
       stderr,
     );
@@ -621,7 +696,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
   test("Markdown mode streams the preamble as a separate first write", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
-    const code = await run([...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG], stdout, stderr);
+    const code = await run([...COMPLEXITY_PREFIX, FIXTURE_DIR], stdout, stderr);
     expect(code).toBe(0);
     expect(stdout.chunks.length).toBeGreaterThanOrEqual(2);
     const head = stdout.chunks[0] ?? "";
@@ -637,7 +712,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, FIXTURE_TSCONFIG, "--format", "json"],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "--format", "json"],
       stdout,
       stderr,
     );
@@ -647,20 +722,16 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
   });
 
   test("mid-analysis failure closes the Markdown code fence with an error body", async () => {
-    // Construct a tsconfig that passes the pre-stream existsSync check but
-    // makes loadProject throw (a referenced tsconfig is missing). This
-    // exercises the post-head error path and must still produce a
-    // well-formed fenced-JSON Markdown document.
+    // Construct a directory that passes the pre-stream existsSync check
+    // but is not a git repo, so `listRepoSources` throws after the
+    // streaming preamble has been emitted. This exercises the post-head
+    // error path and must still produce a well-formed fenced-JSON
+    // Markdown document.
     const tmp = mkdtempSync(join(tmpdir(), "ts-hotspots-mid-err-"));
     try {
-      const broken = join(tmp, "tsconfig.json");
-      writeFileSync(
-        broken,
-        JSON.stringify({ references: [{ path: "./does-not-exist" }] }),
-      );
       const stdout = new StringSink();
       const stderr = new StringSink();
-      const code = await run([...COMPLEXITY_PREFIX, broken], stdout, stderr);
+      const code = await run([...COMPLEXITY_PREFIX, tmp], stdout, stderr);
       expect(code).toBe(1);
       expect(stdout.text.startsWith("# ts-hotspots report")).toBe(true);
       const match = /```json\n([\s\S]*?)\n```/.exec(stdout.text);
@@ -670,7 +741,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
         error: { code: string; message: string };
       };
       expect(parsed.status).toBe("error");
-      expect(parsed.error.code).toBe("TSCONFIG_NOT_FOUND");
+      expect(parsed.error.code).toBe("NOT_A_GIT_REPO");
       expect(stderr.text.length).toBeGreaterThan(0);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
@@ -680,14 +751,13 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
 
 describe("dismissal registry subcommands", () => {
   let projectDir: string;
-  let tsconfigPath: string;
   let tmpXdg: string;
   let savedXdg: string | undefined;
 
   beforeEach(() => {
     projectDir = mkdtempSync(join(tmpdir(), "ts-hotspots-cli-"));
     cpSync(FIXTURE_DIR, projectDir, { recursive: true });
-    tsconfigPath = resolve(projectDir, "tsconfig.json");
+    initGitRepo(projectDir);
     tmpXdg = mkdtempSync(join(tmpdir(), "ts-hotspots-xdg-"));
     savedXdg = process.env.XDG_CONFIG_HOME;
     process.env.XDG_CONFIG_HOME = tmpXdg;
@@ -704,7 +774,7 @@ describe("dismissal registry subcommands", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...COMPLEXITY_PREFIX, tsconfigPath, "--format", "json"],
+      [...COMPLEXITY_PREFIX, projectDir, "--format", "json"],
       stdout,
       stderr,
     );
@@ -740,7 +810,7 @@ describe("dismissal registry subcommands", () => {
         "--reason",
         "intentional pattern",
         "--path",
-        tsconfigPath,
+        projectDir,
       ],
       dismissOut,
       dismissErr,
@@ -762,9 +832,7 @@ describe("dismissal registry subcommands", () => {
 
     const second = await analyze();
     expect(
-      second.hotspots.find(
-        (c) => c.dismissalId === target.dismissalId,
-      ),
+      second.hotspots.find((c) => c.dismissalId === target.dismissalId),
     ).toBeUndefined();
     expect(second.dismissed).toEqual({
       active: 1,
@@ -784,7 +852,7 @@ describe("dismissal registry subcommands", () => {
         "--reason",
         "stale",
         "--path",
-        tsconfigPath,
+        projectDir,
       ],
       stdout,
       stderr,
@@ -800,7 +868,7 @@ describe("dismissal registry subcommands", () => {
     const analyzeOut = new StringSink();
     const analyzeErr = new StringSink();
     const analyzeCode = await run(
-      [...COMPLEXITY_PREFIX, tsconfigPath, "--format", "json"],
+      [...COMPLEXITY_PREFIX, projectDir, "--format", "json"],
       analyzeOut,
       analyzeErr,
     );
@@ -837,7 +905,7 @@ describe("dismissal registry subcommands", () => {
           "--reason",
           "first",
           "--path",
-          tsconfigPath,
+          projectDir,
         ],
         stdout,
         stderr,
@@ -865,7 +933,7 @@ describe("dismissal registry subcommands", () => {
         "--reason",
         "r",
         "--path",
-        tsconfigPath,
+        projectDir,
       ],
       new StringSink(),
       new StringSink(),
@@ -874,7 +942,7 @@ describe("dismissal registry subcommands", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [...ARGV_PREFIX, "list-dismissed", "--json", "--path", tsconfigPath],
+      [...ARGV_PREFIX, "list-dismissed", "--json", "--path", projectDir],
       stdout,
       stderr,
     );
@@ -898,14 +966,14 @@ describe("dismissal registry subcommands", () => {
         "--reason",
         "r",
         "--path",
-        tsconfigPath,
+        projectDir,
       ],
       new StringSink(),
       new StringSink(),
     );
 
     const ok = await run(
-      [...ARGV_PREFIX, "undismiss", target.dismissalId, "--path", tsconfigPath],
+      [...ARGV_PREFIX, "undismiss", target.dismissalId, "--path", projectDir],
       new StringSink(),
       new StringSink(),
     );
@@ -913,7 +981,7 @@ describe("dismissal registry subcommands", () => {
 
     const stderr = new StringSink();
     const miss = await run(
-      [...ARGV_PREFIX, "undismiss", target.dismissalId, "--path", tsconfigPath],
+      [...ARGV_PREFIX, "undismiss", target.dismissalId, "--path", projectDir],
       new StringSink(),
       stderr,
     );
@@ -940,11 +1008,7 @@ describe("duplication subcommand routing", () => {
   test("`duplication` with no args returns 1 with a missing-revrange hint", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
-    const code = await run(
-      [...ARGV_PREFIX, "duplication"],
-      stdout,
-      stderr,
-    );
+    const code = await run([...ARGV_PREFIX, "duplication"], stdout, stderr);
     expect(code).toBe(1);
     expect(stderr.text).toContain("missing revrange");
   });
@@ -991,7 +1055,7 @@ describe("complexity subcommand routing", () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      ["node", "ts-hotspots", "comp", FIXTURE_TSCONFIG, "--format", "json"],
+      ["node", "ts-hotspots", "comp", FIXTURE_DIR, "--format", "json"],
       stdout,
       stderr,
     );

@@ -150,11 +150,11 @@ describe("shouldReport", () => {
       // `combined` is computed from what axes remain enabled (size-only
       // in this case), but shouldReport only cares about the numeric value.
       expect(
-        shouldReport(
-          score({ combined: thresholds.combined }),
-          thresholds,
-          { token: false, statement: false, call: false },
-        ),
+        shouldReport(score({ combined: thresholds.combined }), thresholds, {
+          token: false,
+          statement: false,
+          call: false,
+        }),
       ).toBe(true);
     });
 

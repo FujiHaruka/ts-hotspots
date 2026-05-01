@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { defaultConfig } from "../config/index.ts";
 import type { Config } from "../config/index.ts";
+import { defaultConfig } from "../config/index.ts";
 import type { Fragment, FragmentFeatures } from "../domain/index.ts";
-import { buildInvertedIndex, type IndexInput } from "../index_/invertedIndex.ts";
+import {
+  buildInvertedIndex,
+  type IndexInput,
+} from "../index_/invertedIndex.ts";
 import { searchCandidates } from "./candidateSearch.ts";
 
 function makeFragment(id: string, overrides: Partial<Fragment> = {}): Fragment {
@@ -49,7 +52,12 @@ describe("searchCandidates", () => {
       ["call:c"],
     );
 
-    const result = searchCandidates(changed, changedFeats, index, defaultConfig);
+    const result = searchCandidates(
+      changed,
+      changedFeats,
+      index,
+      defaultConfig,
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0]?.baseFragmentId).toBe("base1");
@@ -78,7 +86,12 @@ describe("searchCandidates", () => {
       ["call:y"],
     );
 
-    const result = searchCandidates(changed, changedFeats, index, defaultConfig);
+    const result = searchCandidates(
+      changed,
+      changedFeats,
+      index,
+      defaultConfig,
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0]?.baseFragmentId).toBe("base1");
@@ -107,7 +120,12 @@ describe("searchCandidates", () => {
       ["call:findById"],
     );
 
-    const result = searchCandidates(changed, changedFeats, index, defaultConfig);
+    const result = searchCandidates(
+      changed,
+      changedFeats,
+      index,
+      defaultConfig,
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0]?.baseFragmentId).toBe("base1");
@@ -136,7 +154,12 @@ describe("searchCandidates", () => {
       ["call:c1", "call:c2", "call:c3"],
     );
 
-    const result = searchCandidates(changed, changedFeats, index, defaultConfig);
+    const result = searchCandidates(
+      changed,
+      changedFeats,
+      index,
+      defaultConfig,
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0]?.hitCounts).toEqual({ token: 2, statement: 1, call: 2 });
@@ -173,7 +196,12 @@ describe("searchCandidates", () => {
       ["call:c1"],
     );
 
-    const result = searchCandidates(changed, changedFeats, index, defaultConfig);
+    const result = searchCandidates(
+      changed,
+      changedFeats,
+      index,
+      defaultConfig,
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0]?.baseFragmentId).toBe("other");
@@ -235,7 +263,12 @@ describe("searchCandidates", () => {
     const changed = makeFragment("ch1");
     const changedFeats = makeFeatures("ch1", ["token:T"]);
 
-    const result = searchCandidates(changed, changedFeats, index, defaultConfig);
+    const result = searchCandidates(
+      changed,
+      changedFeats,
+      index,
+      defaultConfig,
+    );
 
     expect(result.map((c) => c.baseFragmentId)).toEqual(["aaa", "mmm", "zzz"]);
   });
@@ -262,7 +295,12 @@ describe("searchCandidates", () => {
       ["call:z"],
     );
 
-    const result = searchCandidates(changed, changedFeats, index, defaultConfig);
+    const result = searchCandidates(
+      changed,
+      changedFeats,
+      index,
+      defaultConfig,
+    );
     expect(result).toEqual([]);
   });
 
@@ -283,7 +321,12 @@ describe("searchCandidates", () => {
     const changed = makeFragment("ch1");
     const changedFeats = makeFeatures("ch1", [], [], []);
 
-    const result = searchCandidates(changed, changedFeats, index, defaultConfig);
+    const result = searchCandidates(
+      changed,
+      changedFeats,
+      index,
+      defaultConfig,
+    );
     expect(result).toEqual([]);
   });
 

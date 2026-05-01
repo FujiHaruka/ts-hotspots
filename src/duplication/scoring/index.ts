@@ -6,9 +6,9 @@ export { meetsMinSize } from "./minSize.ts";
 export {
   buildIntersectionsFromSets,
   type DetailedScore,
-  scoreCandidateDetailedFromSets,
-  scoreCandidateFromSets,
   type ScoreInputsFromSets,
   type ScoreIntersections,
+  scoreCandidateDetailedFromSets,
+  scoreCandidateFromSets,
 } from "./scoreCandidate.ts";
 export { sizeCompatibility } from "./sizeCompatibility.ts";

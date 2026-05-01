@@ -87,7 +87,12 @@ function mkPair(
 describe("buildJsonReport", () => {
   it("passes baseSha / headSha through verbatim", () => {
     const input: ReportInput = {
-      pr: { baseSha: "deadbeef", headSha: "cafef00d", threeDot: true, changedFiles: 5 },
+      pr: {
+        baseSha: "deadbeef",
+        headSha: "cafef00d",
+        threeDot: true,
+        changedFiles: 5,
+      },
       pairs: [],
       config: defaultConfig,
       summary: STUB_PR_SUMMARY,

@@ -80,9 +80,7 @@ describe("runDetector", () => {
     const hasPair = result.groups.some(
       (g) =>
         g.anchor?.location.startsWith("src/util.ts:") === true &&
-        g.members.some((m) =>
-          m.fragment.location.startsWith("src/math.ts:"),
-        ),
+        g.members.some((m) => m.fragment.location.startsWith("src/math.ts:")),
     );
     expect(hasPair).toBe(true);
   });

@@ -6,7 +6,10 @@ import { extractFragments } from "../indexer/extractFragments.ts";
 import { parseSource } from "../indexer/parseSource.ts";
 import { buildStatementKindNgrams } from "./statementKindNgram.ts";
 
-function allFragments(src: string, filePath = "a.ts"): {
+function allFragments(
+  src: string,
+  filePath = "a.ts",
+): {
   fragments: Fragment[];
   sourceFile: ReturnType<typeof parseSource>["sourceFile"];
 } {

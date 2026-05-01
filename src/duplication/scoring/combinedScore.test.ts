@@ -116,11 +116,11 @@ describe("combinedScore", () => {
       };
       // token off — token weight (0.35) drops out of both num and denom.
       // All remaining axes are 0, so combined is 0.
-      const combined = combinedScore(
-        breakdown,
-        defaultConfig.scoring.weights,
-        { token: false, statement: true, call: true },
-      );
+      const combined = combinedScore(breakdown, defaultConfig.scoring.weights, {
+        token: false,
+        statement: true,
+        call: true,
+      });
       expect(combined).toBe(0);
     });
 
@@ -135,11 +135,11 @@ describe("combinedScore", () => {
       // token off → denominator = 0.15 + 0.25 + 0.05 + 0.20 = 0.65.
       // numerator = 0.15*1 + 0.25*1 + 0.05*1 + 0.20*1 = 0.65.
       // combined = 1.0 (all remaining axes at max).
-      const combined = combinedScore(
-        breakdown,
-        defaultConfig.scoring.weights,
-        { token: false, statement: true, call: true },
-      );
+      const combined = combinedScore(breakdown, defaultConfig.scoring.weights, {
+        token: false,
+        statement: true,
+        call: true,
+      });
       expect(combined).toBeCloseTo(1, 10);
     });
 
@@ -154,11 +154,11 @@ describe("combinedScore", () => {
       // denominator = 0.35 + 0.25 + 0.05 + 0.20 = 0.85.
       // numerator = 0.35*0.5 = 0.175.
       // combined = 0.175 / 0.85.
-      const combined = combinedScore(
-        breakdown,
-        defaultConfig.scoring.weights,
-        { token: true, statement: false, call: true },
-      );
+      const combined = combinedScore(breakdown, defaultConfig.scoring.weights, {
+        token: true,
+        statement: false,
+        call: true,
+      });
       expect(combined).toBeCloseTo(0.175 / 0.85, 10);
     });
 
@@ -173,11 +173,11 @@ describe("combinedScore", () => {
       // denominator = size + length = 0.05 + 0.20 = 0.25.
       // numerator = 0.05*0.5 + 0.20*0.5 = 0.125.
       // combined = 0.5.
-      const combined = combinedScore(
-        breakdown,
-        defaultConfig.scoring.weights,
-        { token: false, statement: false, call: false },
-      );
+      const combined = combinedScore(breakdown, defaultConfig.scoring.weights, {
+        token: false,
+        statement: false,
+        call: false,
+      });
       expect(combined).toBeCloseTo(0.5, 10);
     });
 

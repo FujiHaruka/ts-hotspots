@@ -2,12 +2,7 @@ import type { Config } from "../config/config.ts";
 import type { CandidateScore } from "../domain/candidate.ts";
 import type { InvertedIndex } from "../domain/posting.ts";
 import type { LshParams, LshStats } from "../index_/index.ts";
-import {
-  distSummary,
-  meanMax,
-  type PerfLogger,
-  round2,
-} from "./perfLog.ts";
+import { distSummary, meanMax, type PerfLogger, round2 } from "./perfLog.ts";
 
 /**
  * Per-headSearch loop accumulators. The runners build this in-place so the
@@ -106,7 +101,10 @@ export function recordPassReasons(
   if (anyAxis) tracker.passAnyAxis += 1;
 }
 
-export function emitPhaseStart(perfLog: PerfLogger | undefined, phase: string): void {
+export function emitPhaseStart(
+  perfLog: PerfLogger | undefined,
+  phase: string,
+): void {
   perfLog?.emit("phase.start", { phase });
 }
 
@@ -226,7 +224,9 @@ export function emitScoringSummary(
     uniquePairs,
     wallMs: round2(tracker.tScore),
     usPerPair:
-      tracker.scored === 0 ? 0 : round2((tracker.tScore * 1000) / tracker.scored),
+      tracker.scored === 0
+        ? 0
+        : round2((tracker.tScore * 1000) / tracker.scored),
     intersectionSizes: {
       token: meanMax(tracker.intersectionTokens),
       statement: meanMax(tracker.intersectionStatements),

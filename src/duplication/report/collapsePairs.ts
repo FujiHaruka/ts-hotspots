@@ -20,9 +20,7 @@ import type { ScoredPair } from "./jsonReport.ts";
  * order before the one-pass survival check, so the kept set is identical on
  * repeated runs.
  */
-export function collapsePairs(
-  pairs: readonly ScoredPair[],
-): ScoredPair[] {
+export function collapsePairs(pairs: readonly ScoredPair[]): ScoredPair[] {
   if (pairs.length === 0) return [];
 
   const buckets = new Map<string, ScoredPair[]>();
@@ -68,9 +66,7 @@ function containsRange(
   outer: { startLine: number; endLine: number },
   inner: { startLine: number; endLine: number },
 ): boolean {
-  return (
-    outer.startLine <= inner.startLine && outer.endLine >= inner.endLine
-  );
+  return outer.startLine <= inner.startLine && outer.endLine >= inner.endLine;
 }
 
 /**

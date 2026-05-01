@@ -1,6 +1,6 @@
 import ts from "typescript";
-import type { Fragment } from "../domain/fragment.ts";
 import type { FeatureKey } from "../domain/feature.ts";
+import type { Fragment } from "../domain/fragment.ts";
 import { leftmostIdentifierText } from "./internal/expressionText.ts";
 import {
   type LocatedFragment,

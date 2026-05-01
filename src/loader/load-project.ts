@@ -1,22 +1,16 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
 import { type CompilerOptions, Project, ts } from "ts-morph";
 
-export class TsconfigNotFoundError extends Error {
-  readonly code = "TSCONFIG_NOT_FOUND";
-  constructor(tsconfigPath: string) {
-    super(`tsconfig not found: ${tsconfigPath}`);
-    this.name = "TsconfigNotFoundError";
-  }
-}
-
 export interface LoadProjectOptions {
-  tsconfigPath: string;
+  /**
+   * Absolute paths of TypeScript sources to seed the ts-morph `Project`
+   * with. The caller (typically `listRepoSources`) decides which files
+   * count — `loadProject` does not consult any tsconfig.
+   */
+  sourcePaths: readonly string[];
 }
 
 export interface LoadedProject {
   project: Project;
-  tsconfigPath: string;
 }
 
 const PROJECT_COMPILER_OPTIONS: CompilerOptions = {
@@ -31,66 +25,19 @@ const PROJECT_COMPILER_OPTIONS: CompilerOptions = {
   resolveJsonModule: true,
 };
 
+/**
+ * Build a ts-morph `Project` from an explicit list of source files, with no
+ * tsconfig discovery and no TypeChecker materialization. The compiler
+ * options above are deliberately permissive — collectors only need ts-morph
+ * to wrap the AST, not to type-check anything.
+ */
 export function loadProject(options: LoadProjectOptions): LoadedProject {
-  const rootPath = resolve(options.tsconfigPath);
-
-  if (!existsSync(rootPath)) {
-    throw new TsconfigNotFoundError(rootPath);
-  }
-
-  const allTsconfigs = walkTsconfigReferences(rootPath);
-
   const project = new Project({
     skipAddingFilesFromTsConfig: true,
     compilerOptions: { ...PROJECT_COMPILER_OPTIONS },
   });
-  for (const cfg of allTsconfigs) {
-    project.addSourceFilesFromTsConfig(cfg);
+  if (options.sourcePaths.length > 0) {
+    project.addSourceFilesAtPaths([...options.sourcePaths]);
   }
-  project.getTypeChecker();
-
-  return { project, tsconfigPath: rootPath };
-}
-
-function walkTsconfigReferences(rootPath: string): string[] {
-  const visited = new Set<string>();
-  const queue: string[] = [rootPath];
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (current === undefined) break;
-    if (visited.has(current)) continue;
-    if (!existsSync(current)) {
-      throw new TsconfigNotFoundError(current);
-    }
-    visited.add(current);
-    const raw = readTsconfigJson(current);
-    const refs = Array.isArray(raw.references) ? raw.references : [];
-    for (const ref of refs) {
-      if (typeof ref.path !== "string") continue;
-      queue.push(resolveReferencePath(current, ref.path));
-    }
-  }
-  return [...visited];
-}
-
-function resolveReferencePath(owner: string, refPath: string): string {
-  const abs = resolve(dirname(owner), refPath);
-  if (existsSync(abs) && statSync(abs).isDirectory()) {
-    return join(abs, "tsconfig.json");
-  }
-  return abs;
-}
-
-interface RawTsconfig {
-  references?: { path?: string }[];
-}
-
-function readTsconfigJson(tsconfigPath: string): RawTsconfig {
-  const result = ts.readConfigFile(tsconfigPath, (path) =>
-    readFileSync(path, "utf8"),
-  );
-  if (result.error || !result.config) {
-    return {};
-  }
-  return result.config as RawTsconfig;
+  return { project };
 }

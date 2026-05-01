@@ -227,10 +227,7 @@ describe("main", () => {
 
   it("returns 1 and writes an error to stderr when the path is not in a git repo", async () => {
     const cap = captureIO();
-    const code = await main(
-      ["main..feature", "/path/does/not/exist"],
-      cap.io,
-    );
+    const code = await main(["main..feature", "/path/does/not/exist"], cap.io);
     expect(code).toBe(1);
     expect(cap.stderr()).toMatch(/ts-hotspots duplication:/);
     expect(cap.stderr()).toContain("not in a git repository");
@@ -562,7 +559,10 @@ describe("main", () => {
       r.commit("mutate");
 
       const cap = captureIO();
-      const code = await main(["--whole-repo", r.path, "--format", "json"], cap.io);
+      const code = await main(
+        ["--whole-repo", r.path, "--format", "json"],
+        cap.io,
+      );
       expect(code).toBe(0);
       const second = JSON.parse(cap.stdout()) as ParsedReport;
       expect(second.dismissed).toEqual({

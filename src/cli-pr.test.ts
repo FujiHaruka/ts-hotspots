@@ -96,13 +96,22 @@ function buildFixtureRepo(repoRoot: string): void {
   git(repoRoot, ["commit", "-m", "c1"]);
 
   // Modify only src/a.ts in the second commit. src/b.ts is unchanged.
-  touch(repoRoot, "src/a.ts", `${complexFn("processA")}\nexport const x = 1;\n`);
+  touch(
+    repoRoot,
+    "src/a.ts",
+    `${complexFn("processA")}\nexport const x = 1;\n`,
+  );
   git(repoRoot, ["add", "."]);
   git(repoRoot, ["commit", "-m", "c2"]);
 }
 
 interface PrEnvelope {
-  pr?: { baseSha: string; headSha: string; threeDot: boolean; changedFiles: number };
+  pr?: {
+    baseSha: string;
+    headSha: string;
+    threeDot: boolean;
+    changedFiles: number;
+  };
   hotspots: { ref: { location: string } }[];
   functionRankings?: Record<string, { ref: { location: string } }[]>;
   functionCoOccurrence?: { ref: { location: string } }[];
@@ -135,9 +144,7 @@ describe("complexity --pr (PR scope filter)", () => {
     const baseline = JSON.parse(baselineStdout.text) as PrEnvelope;
     expect(baseline.pr).toBeUndefined();
     const baselineFiles = new Set(
-      baseline.hotspots.map((c) =>
-        c.ref.location.split(":")[0],
-      ),
+      baseline.hotspots.map((c) => c.ref.location.split(":")[0]),
     );
     expect(baselineFiles.has("src/a.ts")).toBe(true);
     expect(baselineFiles.has("src/b.ts")).toBe(true);

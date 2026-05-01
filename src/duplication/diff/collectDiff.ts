@@ -41,7 +41,9 @@ export interface CollectDiffResult {
  * `excludedCount` reports how many `.ts`/`.tsx` files rule (2) dropped, so
  * the caller can surface that in the analysis summary.
  */
-export async function collectDiff(req: DiffRequest): Promise<CollectDiffResult> {
+export async function collectDiff(
+  req: DiffRequest,
+): Promise<CollectDiffResult> {
   const { repoPath, baseRef, headRef, threeDot, config } = req;
 
   const { baseSha, headSha } = await resolveDiffEndpoints(
@@ -67,7 +69,9 @@ export async function collectDiff(req: DiffRequest): Promise<CollectDiffResult> 
   }
 
   // Sort by path for determinism.
-  filtered.sort((a, b) => (a.filePath < b.filePath ? -1 : a.filePath > b.filePath ? 1 : 0));
+  filtered.sort((a, b) =>
+    a.filePath < b.filePath ? -1 : a.filePath > b.filePath ? 1 : 0,
+  );
 
   const result: ChangedFile[] = [];
   for (const p of filtered) {

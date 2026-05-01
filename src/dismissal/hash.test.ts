@@ -1,10 +1,6 @@
 import { Project, SyntaxKind } from "ts-morph";
 import { describe, expect, test } from "vitest";
-import {
-  computeBodyHash,
-  hashText,
-  membersToDupDismissalId,
-} from "./hash.ts";
+import { computeBodyHash, hashText, membersToDupDismissalId } from "./hash.ts";
 
 function firstFunction(source: string) {
   const project = new Project({ useInMemoryFileSystem: true });

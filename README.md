@@ -4,10 +4,10 @@ A CLI that statically analyzes a TypeScript project and points coding agents at 
 
 Two complementary readings of "worth reading first" are supported as subcommands of the same binary:
 
-- `ts-hotspots complexity` (alias `comp`) — per-function metrics (cognitive complexity, churn, caller count, …) ranked into a small set of **hotspot candidates**. Best for "where in this codebase should I refactor?"
+- `ts-hotspots complexity` (alias `comp`) — per-function metrics (cognitive complexity, sloc, parameters, churn, …) ranked into a small set of **hotspot candidates**. Best for "where in this codebase should I refactor?"
 - `ts-hotspots duplication` (alias `dup`) — Type-3 **duplication candidates** found across the tree or against a PR diff. Best for "is this change copy-pasting something we already have?"
 
-Both commands take a TypeScript project as input and emit machine-readable output. Neither tool proposes refactors itself — they hand the agent coordinates and evidence.
+Both commands operate on a directory inside a git repository and emit machine-readable output. Neither tool proposes refactors itself — they hand the agent coordinates and evidence.
 
 ## Install
 
@@ -30,18 +30,18 @@ By default the tool emits a Markdown document containing a short instruction blo
 ### Usage
 
 ```
-ts-hotspots complexity                  # scans tsconfig.json in the current directory
-ts-hotspots complexity <path>           # directory or tsconfig.json
+ts-hotspots complexity                  # scans the current directory
+ts-hotspots complexity <path>           # directory inside a git repo
 ts-hotspots comp <path>                 # short alias
 ```
+
+`<path>` points at a directory inside a git working tree. Sources are enumerated via `git ls-files` (`.ts`, `.tsx`, `.mts`, `.cts`), so untracked files are skipped — commit before analyzing. No `tsconfig.json` is required; monorepos work without further configuration.
 
 The output is focused on hotspot candidates — the coordinates an agent should read first. By default it contains only the primary signal:
 
 - `hotspots` — refs that co-occur across multiple metric axes, or that rank near the top of a discriminative axis. Each candidate has `kind: "complexity"`, a `ref` whose `location` is `file:start-end` (or `file:line` for single-line functions), a `score` (`{ axis, value }` — the metric where this candidate ranked highest), and a `metrics` map with the raw values for the axes that triggered it. Candidates flagged by more axes come first.
 
 Pass `--verbose` to also get `functionRankings` (top-N per axis), `functionAxisMeta` (per-axis dispersion metadata), `functionCoOccurrence` (raw co-occurrence entries), and `functions[]` (every function with its full metrics).
-
-Solution-style monorepos (root `tsconfig.json` with `references`) are supported — referenced projects are walked transitively and loaded into a single TypeChecker, so cross-package analysis works out of the box.
 
 Options:
 

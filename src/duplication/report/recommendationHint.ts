@@ -73,7 +73,8 @@ export function deriveHint(args: DeriveHintArgs): RecommendationHint {
   const changedSize = fragmentLineCount(changed);
   const baseSize = fragmentLineCount(base);
   if (changedSize > 0 && baseSize > 0) {
-    const ratio = Math.min(changedSize, baseSize) / Math.max(changedSize, baseSize);
+    const ratio =
+      Math.min(changedSize, baseSize) / Math.max(changedSize, baseSize);
     if (ratio < SIZE_MISMATCH_RATIO) {
       riskFlags.push("size-mismatch");
     }
@@ -118,4 +119,3 @@ export function deriveHint(args: DeriveHintArgs): RecommendationHint {
     riskFlags,
   };
 }
-

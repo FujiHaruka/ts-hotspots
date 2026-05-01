@@ -61,7 +61,10 @@ export function globToRegExp(glob: string): RegExp {
  * Paths must use forward slashes. Patterns without an explicit `**` do not
  * implicitly cross path separators.
  */
-export function matchesAnyGlob(path: string, globs: readonly string[]): boolean {
+export function matchesAnyGlob(
+  path: string,
+  globs: readonly string[],
+): boolean {
   for (const g of globs) {
     if (globToRegExp(g).test(path)) {
       return true;

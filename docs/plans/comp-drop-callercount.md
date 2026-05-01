@@ -1,14 +1,20 @@
 ## `comp` の callerCount 削除 + tsconfig 依存撤廃 計画
 
-> Status: Decisions pending, implementation pending
+> Status: Shipped (2026-05-01)
 > Goal: `comp` から `callerCount` 軸を削除し、付随して TypeChecker / tsconfig 依存を落とす。`comp` の入力モデルを `dup` と揃える (git ls-files + 1 ファイル単位の `ts` パース)。
 > 非 Goal: 他の軸 (cognitiveComplexity / sloc / commitCount 等) の削除や挙動変更。`dup` 側の挙動変更。`comp` と `dup` の単一コマンド化。
 
 ## 0. Progress
 
-- [ ] **M1** — `callerCount` 削除 + TypeChecker 無効化 (依然 ts-morph + tsconfig は使う)
-- [ ] **M2** — tsconfig 依存撤廃 + ソース列挙を git ls-files に切替
-- [ ] **M3** — ドキュメント書き直し (README / requirements.md / dogfooding) + `comp-monorepo-tsconfig-discovery.md` の supersede
+- [x] **M1** — `callerCount` 削除 + TypeChecker 無効化 (依然 ts-morph + tsconfig は使う)
+- [x] **M2** — tsconfig 依存撤廃 + ソース列挙を git ls-files に切替
+- [x] **M3** — ドキュメント書き直し (README / requirements.md / dogfooding) + `comp-monorepo-tsconfig-discovery.md` の supersede
+
+実装メモ:
+
+- D1 (a) を採用 — `callerCount` を schema / collector / test / CLI 受理から完全削除。`--metrics callerCount` は既存の `parseFunctionAxes` が `INVALID_METRIC` で弾く (追加実装不要)。
+- D5 を「(a) repo 全体を ls-files」ではなく「(b) 指定ディレクトリ配下のみを ls-files」に微修正。`git -C rootDir ls-files` で十分目的を果たし、既存 fixture-based テストが破壊されないため。`dup` は `findGitRoot` + prefix scoping を使うが、`comp` はディレクトリ自体を rootDir として扱う。
+- D6 / D7: registry rootDir = positional path (findGitRoot を介さない)。`dup:` 系のみ既存通り `findGitRoot` で repo root に書き込む。エラーコードは既存の `NOT_A_GIT_REPO` に統一 (D7 の `NOT_A_GIT_REPOSITORY` は採用せず)。
 
 ## 1. 経緯
 

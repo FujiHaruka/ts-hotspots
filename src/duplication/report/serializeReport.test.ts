@@ -70,12 +70,7 @@ function mkPair(
 }
 
 const SEMANTIC = {
-  tokens: [
-    "token:foo bar",
-    "token:bar baz",
-    "token:baz qux",
-    "token:qux quux",
-  ],
+  tokens: ["token:foo bar", "token:bar baz", "token:baz qux", "token:qux quux"],
   statements: ["statement:IfStatement|ReturnStatement"],
   calls: [
     "call:CALL:findById",

@@ -31,7 +31,9 @@ export interface CollectedTypeInfo {
   readonly typeIntroducerColonPositions: Set<number>;
 }
 
-export function collectTypeRanges(sourceFile: ts.SourceFile): CollectedTypeInfo {
+export function collectTypeRanges(
+  sourceFile: ts.SourceFile,
+): CollectedTypeInfo {
   const ranges: TypeRange[] = [];
   const colons = new Set<number>();
 

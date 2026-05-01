@@ -268,9 +268,7 @@ function foo(a: number): number {
     const unique = new Set(ids);
     expect(unique.size).toBe(ids.length);
     // At least one id must carry a `-2` (or higher) disambiguator.
-    expect(ids.some((id) => /-\d+$/.test(id) && id.endsWith("-2"))).toBe(
-      true,
-    );
+    expect(ids.some((id) => /-\d+$/.test(id) && id.endsWith("-2"))).toBe(true);
   });
 
   it("handles .tsx sources (JSX) without crashing and still extracts functions", () => {

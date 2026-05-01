@@ -50,40 +50,42 @@ describe("normalizeTokenKind", () => {
     // n-gram bucket. The only intended merges are the placeholder buckets
     // (`i`, `s`, `n`, `b`) that collapse a small family of kinds; all other
     // collisions indicate a typo in the table.
-    const intendedMerges: ReadonlyMap<string, ReadonlySet<ts.SyntaxKind>> =
-      new Map([
-        [
-          "i",
-          new Set<ts.SyntaxKind>([
-            ts.SyntaxKind.Identifier,
-            ts.SyntaxKind.PrivateIdentifier,
-          ]),
-        ],
-        [
-          "s",
-          new Set<ts.SyntaxKind>([
-            ts.SyntaxKind.StringLiteral,
-            ts.SyntaxKind.NoSubstitutionTemplateLiteral,
-            ts.SyntaxKind.TemplateHead,
-            ts.SyntaxKind.TemplateMiddle,
-            ts.SyntaxKind.TemplateTail,
-          ]),
-        ],
-        [
-          "n",
-          new Set<ts.SyntaxKind>([
-            ts.SyntaxKind.NumericLiteral,
-            ts.SyntaxKind.BigIntLiteral,
-          ]),
-        ],
-        [
-          "b",
-          new Set<ts.SyntaxKind>([
-            ts.SyntaxKind.TrueKeyword,
-            ts.SyntaxKind.FalseKeyword,
-          ]),
-        ],
-      ]);
+    const intendedMerges: ReadonlyMap<
+      string,
+      ReadonlySet<ts.SyntaxKind>
+    > = new Map([
+      [
+        "i",
+        new Set<ts.SyntaxKind>([
+          ts.SyntaxKind.Identifier,
+          ts.SyntaxKind.PrivateIdentifier,
+        ]),
+      ],
+      [
+        "s",
+        new Set<ts.SyntaxKind>([
+          ts.SyntaxKind.StringLiteral,
+          ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+          ts.SyntaxKind.TemplateHead,
+          ts.SyntaxKind.TemplateMiddle,
+          ts.SyntaxKind.TemplateTail,
+        ]),
+      ],
+      [
+        "n",
+        new Set<ts.SyntaxKind>([
+          ts.SyntaxKind.NumericLiteral,
+          ts.SyntaxKind.BigIntLiteral,
+        ]),
+      ],
+      [
+        "b",
+        new Set<ts.SyntaxKind>([
+          ts.SyntaxKind.TrueKeyword,
+          ts.SyntaxKind.FalseKeyword,
+        ]),
+      ],
+    ]);
 
     const seen = new Map<string, ts.SyntaxKind>();
     for (const k of Object.values(ts.SyntaxKind)) {
@@ -99,7 +101,8 @@ describe("normalizeTokenKind", () => {
         continue;
       }
       const allowed = intendedMerges.get(form);
-      const ok = allowed !== undefined && allowed.has(prev) && allowed.has(kind);
+      const ok =
+        allowed !== undefined && allowed.has(prev) && allowed.has(kind);
       expect(ok, `unexpected form collision on ${form}`).toBe(true);
     }
   });

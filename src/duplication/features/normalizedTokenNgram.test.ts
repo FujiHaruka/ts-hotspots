@@ -6,7 +6,10 @@ import { extractFragments } from "../indexer/extractFragments.ts";
 import { parseSource } from "../indexer/parseSource.ts";
 import { buildTokenNgrams } from "./normalizedTokenNgram.ts";
 
-function firstFunction(src: string, filePath = "a.ts"): {
+function firstFunction(
+  src: string,
+  filePath = "a.ts",
+): {
   fragment: Fragment;
   sourceFile: ReturnType<typeof parseSource>["sourceFile"];
 } {

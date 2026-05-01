@@ -183,10 +183,7 @@ describe("scoreCandidateDetailedFromSets — combined score", () => {
       defaultConfig,
     );
     expect(result.score.breakdown.tokenOverlap).toBeCloseTo(0.85, 6);
-    expect(result.score.breakdown.statementKindSimilarity).toBeCloseTo(
-      0.85,
-      6,
-    );
+    expect(result.score.breakdown.statementKindSimilarity).toBeCloseTo(0.85, 6);
     expect(result.score.breakdown.callOverlap).toBeCloseTo(0.85, 6);
   });
 

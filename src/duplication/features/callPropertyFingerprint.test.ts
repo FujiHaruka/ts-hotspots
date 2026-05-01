@@ -5,7 +5,10 @@ import { extractFragments } from "../indexer/extractFragments.ts";
 import { parseSource } from "../indexer/parseSource.ts";
 import { buildCallPropertyFingerprints } from "./callPropertyFingerprint.ts";
 
-function firstFunction(src: string, filePath = "a.ts"): {
+function firstFunction(
+  src: string,
+  filePath = "a.ts",
+): {
   fragment: Fragment;
   sourceFile: ReturnType<typeof parseSource>["sourceFile"];
 } {
@@ -86,7 +89,7 @@ describe("buildCallPropertyFingerprints", () => {
     expect(keys).toContain("call:CALL:this.foo");
   });
 
-  it("element access with string key: obj[\"key\"] → PROP:obj.key", () => {
+  it('element access with string key: obj["key"] → PROP:obj.key', () => {
     const src = `function f(obj: Record<string, string>) {
   const v = obj["key"];
   return v;

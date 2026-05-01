@@ -82,9 +82,9 @@ describe("parseCliArgs", () => {
   });
 
   it("throws ArgParseError when more than two positionals are given", () => {
-    expect(() =>
-      parseCliArgs(["main..feature", "/tmp/repo", "extra"]),
-    ).toThrow(ArgParseError);
+    expect(() => parseCliArgs(["main..feature", "/tmp/repo", "extra"])).toThrow(
+      ArgParseError,
+    );
   });
 
   it("throws ArgParseError on unknown flags", () => {
@@ -201,9 +201,9 @@ describe("parseCliArgs", () => {
   });
 
   it("rejects more than one positional alongside --whole-repo", () => {
-    expect(() =>
-      parseCliArgs(["--whole-repo", "/tmp/a", "/tmp/b"]),
-    ).toThrow(ArgParseError);
+    expect(() => parseCliArgs(["--whole-repo", "/tmp/a", "/tmp/b"])).toThrow(
+      ArgParseError,
+    );
   });
 
   it("rejects --ref without --whole-repo", () => {

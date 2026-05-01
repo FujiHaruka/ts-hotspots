@@ -31,10 +31,7 @@ describe("jaccardWithIntersection", () => {
   });
 
   it("returns 0 / [] when sets are disjoint", () => {
-    const r = jaccardWithIntersection(
-      new Set(["a", "b"]),
-      new Set(["c", "d"]),
-    );
+    const r = jaccardWithIntersection(new Set(["a", "b"]), new Set(["c", "d"]));
     expect(r.jaccard).toBe(0);
     expect(r.intersection).toEqual([]);
   });
