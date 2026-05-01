@@ -5,6 +5,7 @@ import {
   computeFunctionAxisMeta,
   computeFunctionCoOccurrence,
   computeFunctionHotspotCandidates,
+  emptyFunctionAxisMeta,
   emptyFunctionRankings,
   filterFunctionRankings,
   rankFunctions,
@@ -326,7 +327,7 @@ describe("computeFunctionHotspotCandidates", () => {
         paramCount: 4,
       }),
       fn({ file: "b.ts", name: "two", cognitive: 8, sloc: 7 }),
-      fn({ file: "c.ts", name: "solo", cognitive: 6 }),
+      fn({ file: "c.ts", name: "solo", cognitive: 6, paramCount: 1 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const meta = computeFunctionAxisMeta(entries, rankings);
@@ -344,8 +345,7 @@ describe("computeFunctionHotspotCandidates", () => {
       "sloc",
       "parameterCount",
     ]);
-    // "two" has only 2 axes → not in A; only 1 axis is discriminative so it
-    // can still appear via B.
+    // "two" has only 2 axes → not in A but rescued via discriminative top-3.
     const two = candidates.find((c) => c.ref.name === "two");
     expect(two).toBeDefined();
   });
@@ -477,6 +477,9 @@ describe("computeFunctionHotspotCandidates", () => {
         paramCount: 3,
         mutationSiteCount: 3,
       }),
+      // Second mutation entry keeps mutationSiteCount non-degenerate so
+      // "four"'s 4th axis survives the degeneracy filter.
+      fn({ file: "z.ts", name: "muta", mutationSiteCount: 1 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const meta = computeFunctionAxisMeta(entries, rankings);
@@ -487,11 +490,13 @@ describe("computeFunctionHotspotCandidates", () => {
       meta,
       co,
     );
-    // "four" has 4 axes → first. Ties at 3 broken by location asc.
+    // "four" has 4 axes → first. Ties at 3 broken by location asc. "muta" is
+    // rescued via the mutation axis with one hit.
     expect(candidates.map((c) => c.ref.name)).toEqual([
       "four",
       "also-three",
       "three",
+      "muta",
     ]);
   });
 
@@ -692,6 +697,174 @@ describe("computeFunctionHotspotCandidates", () => {
     expect(Object.hasOwn(leverageCandidate?.metrics ?? {}, "commitCount")).toBe(
       true,
     );
+  });
+
+  test("co-occurrence: degenerate axis is stripped, falling below 3-axis gate", () => {
+    // Synthetic entry with 3 axes hit; commitCount has uniqueTopNValues=1
+    // (all top-N tied). After the degeneracy filter, only 2 axes survive,
+    // so the entry no longer clears the co-occurrence gate. Rankings are
+    // empty so rescue cannot pull it in either.
+    const ref = { location: "a.ts:1", name: "f", kind: "function" as const };
+    const meta = emptyFunctionAxisMeta();
+    meta.sloc = {
+      nonZeroCount: 5,
+      maxTieLength: 1,
+      topNSpread: 5,
+      uniqueTopNValues: 3,
+    };
+    meta.parameterCount = {
+      nonZeroCount: 5,
+      maxTieLength: 1,
+      topNSpread: 3,
+      uniqueTopNValues: 2,
+    };
+    meta.commitCount = {
+      nonZeroCount: 10,
+      maxTieLength: 10,
+      topNSpread: 0,
+      uniqueTopNValues: 1,
+    };
+    const candidates = computeFunctionHotspotCandidates(
+      [
+        {
+          location: "a.ts:1",
+          name: "f",
+          kind: "function",
+          metrics: { sloc: 10, parameterCount: 5, commitCount: 15 },
+          bodyHash: "sha256:f",
+        },
+      ],
+      emptyFunctionRankings(),
+      meta,
+      [
+        {
+          ref,
+          axisHitCount: 3,
+          axes: ["sloc", "parameterCount", "commitCount"],
+        },
+      ],
+    );
+    expect(candidates).toEqual([]);
+  });
+
+  test("co-occurrence: degenerate axis is stripped from metrics block", () => {
+    // 4 axes hit; commitCount is degenerate. After strip, 3 axes survive
+    // → still gated in. metrics excludes commitCount even though the entry
+    // has a non-zero raw value.
+    const ref = { location: "a.ts:1", name: "f", kind: "function" as const };
+    const meta = emptyFunctionAxisMeta();
+    meta.cognitiveComplexity = {
+      nonZeroCount: 5,
+      maxTieLength: 1,
+      topNSpread: 8,
+      uniqueTopNValues: 4,
+    };
+    meta.sloc = {
+      nonZeroCount: 5,
+      maxTieLength: 1,
+      topNSpread: 5,
+      uniqueTopNValues: 3,
+    };
+    meta.parameterCount = {
+      nonZeroCount: 5,
+      maxTieLength: 1,
+      topNSpread: 3,
+      uniqueTopNValues: 2,
+    };
+    meta.commitCount = {
+      nonZeroCount: 10,
+      maxTieLength: 10,
+      topNSpread: 0,
+      uniqueTopNValues: 1,
+    };
+    const candidates = computeFunctionHotspotCandidates(
+      [
+        {
+          location: "a.ts:1",
+          name: "f",
+          kind: "function",
+          metrics: {
+            cognitiveComplexity: 9,
+            sloc: 10,
+            parameterCount: 5,
+            commitCount: 15,
+          },
+          bodyHash: "sha256:f",
+        },
+      ],
+      emptyFunctionRankings(),
+      meta,
+      [
+        {
+          ref,
+          axisHitCount: 4,
+          axes: [
+            "cognitiveComplexity",
+            "sloc",
+            "parameterCount",
+            "commitCount",
+          ],
+        },
+      ],
+    );
+    expect(candidates).toHaveLength(1);
+    expect(Object.keys(candidates[0]?.metrics ?? {})).toEqual([
+      "cognitiveComplexity",
+      "sloc",
+      "parameterCount",
+    ]);
+    expect(Object.hasOwn(candidates[0]?.metrics ?? {}, "commitCount")).toBe(
+      false,
+    );
+  });
+
+  test("rescue: sparse axis (nonZero ratio < 5%) does not rescue top-3", () => {
+    // 2 nonzero in 100 entries → 0.02 < 0.05. paramCount is non-degenerate
+    // (spread > 0, unique > 1) but too sparse for the rescue gate.
+    const filler: FunctionEntry[] = Array.from({ length: 98 }, (_, i) =>
+      fn({ file: `filler/f${String(i)}.ts`, name: `n${String(i)}` }),
+    );
+    const entries: FunctionEntry[] = [
+      ...filler,
+      fn({ file: "hot.ts", name: "hot", paramCount: 10 }),
+      fn({ file: "warm.ts", name: "warm", paramCount: 5 }),
+    ];
+    const rankings = rankFunctions(entries, { topN: 5 });
+    const meta = computeFunctionAxisMeta(entries, rankings);
+    const co = computeFunctionCoOccurrence(rankings);
+    const candidates = computeFunctionHotspotCandidates(
+      entries,
+      rankings,
+      meta,
+      co,
+    );
+    expect(candidates).toEqual([]);
+  });
+
+  test("rescue: axis with sufficient nonZero ratio (>= 5%) rescues top-3", () => {
+    // 10 nonzero in 100 entries → 0.10 >= 0.05.
+    const sparse: FunctionEntry[] = Array.from({ length: 90 }, (_, i) =>
+      fn({ file: `filler/f${String(i)}.ts`, name: `n${String(i)}` }),
+    );
+    const dense: FunctionEntry[] = Array.from({ length: 10 }, (_, i) =>
+      fn({
+        file: `hot/h${String(i)}.ts`,
+        name: `h${String(i)}`,
+        paramCount: 10 - i,
+      }),
+    );
+    const entries: FunctionEntry[] = [...sparse, ...dense];
+    const rankings = rankFunctions(entries, { topN: 5 });
+    const meta = computeFunctionAxisMeta(entries, rankings);
+    const co = computeFunctionCoOccurrence(rankings);
+    const candidates = computeFunctionHotspotCandidates(
+      entries,
+      rankings,
+      meta,
+      co,
+    );
+    // Top-3 of paramCount rescued.
+    expect(candidates.map((c) => c.ref.name)).toEqual(["h0", "h1", "h2"]);
   });
 });
 
