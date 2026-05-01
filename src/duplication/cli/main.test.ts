@@ -1,8 +1,13 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createTempRepo,
   type TempRepo,
 } from "../../../test/dedup/e2e/helpers/tempRepo.ts";
+import { run as runRoot } from "../../cli.ts";
+import { registryPath } from "../../dismissal/store.ts";
 import { type MainIO, main } from "./main.ts";
 
 interface CapturedIO {
@@ -342,6 +347,219 @@ describe("main", () => {
     const cap = captureIO();
     await main([`${sha}..${sha}`, r.path], cap.io);
     expect(cap.stderr()).toMatch(/displayed=\d+(?! of)/);
+  });
+
+  describe("dismissal round-trip", () => {
+    let tmpXdg: string;
+    let savedXdg: string | undefined;
+
+    beforeEach(() => {
+      tmpXdg = mkdtempSync(join(tmpdir(), "ts-hotspots-xdg-"));
+      savedXdg = process.env.XDG_CONFIG_HOME;
+      process.env.XDG_CONFIG_HOME = tmpXdg;
+    });
+
+    afterEach(() => {
+      rmSync(tmpXdg, { recursive: true, force: true });
+      if (savedXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = savedXdg;
+    });
+
+    function makeDupRepo(): TempRepo {
+      const r = newRepo();
+      // Two near-identical functions in distinct files. Bodies pad past the
+      // default minLines gate (5 lines) so they reach the report.
+      r.write(
+        "src/a.ts",
+        `export function add(a: number, b: number) {
+  if (a < 0) throw new Error("negative a");
+  if (b < 0) throw new Error("negative b");
+  const total = a + b;
+  return total;
+}
+`,
+      );
+      r.write(
+        "src/b.ts",
+        `export function addCopy(a: number, b: number) {
+  if (a < 0) throw new Error("negative a");
+  if (b < 0) throw new Error("negative b");
+  const total = a + b;
+  return total;
+}
+`,
+      );
+      r.commit("only");
+      return r;
+    }
+
+    interface ParsedReport {
+      groups: { dismissalId: string }[];
+      dismissed?: {
+        active: number;
+        filteredThisRun: number;
+        prunedThisRun: number;
+      };
+    }
+
+    async function runDup(repoPath: string): Promise<ParsedReport> {
+      const cap = captureIO();
+      const code = await main(
+        ["--whole-repo", repoPath, "--format", "json"],
+        cap.io,
+      );
+      expect(code).toBe(0);
+      return JSON.parse(cap.stdout()) as ParsedReport;
+    }
+
+    it("every reported group exposes a dup:<hex> dismissalId", async () => {
+      const r = makeDupRepo();
+      const report = await runDup(r.path);
+      expect(report.groups.length).toBeGreaterThan(0);
+      for (const g of report.groups) {
+        expect(g.dismissalId.startsWith("dup:")).toBe(true);
+        expect(g.dismissalId.length).toBe("dup:".length + 64);
+      }
+      expect(report.dismissed).toBeUndefined();
+    });
+
+    it("dismiss → re-run filters the group and reports the summary", async () => {
+      const r = makeDupRepo();
+      const first = await runDup(r.path);
+      const target = first.groups[0];
+      if (target === undefined) throw new Error("fixture has no dup groups");
+
+      class StringSink {
+        chunks: string[] = [];
+        write(c: string): void {
+          this.chunks.push(c);
+        }
+        get text(): string {
+          return this.chunks.join("");
+        }
+      }
+
+      const out = new StringSink();
+      const err = new StringSink();
+      const dismissCode = await runRoot(
+        [
+          "node",
+          "ts-hotspots",
+          "dismiss",
+          target.dismissalId,
+          "--reason",
+          "test pattern",
+          "--path",
+          r.path,
+        ],
+        out,
+        err,
+      );
+      expect(dismissCode).toBe(0);
+
+      // Registry sits at the git-root key (dup uses findGitRoot, not tsconfig).
+      const regPath = registryPath(r.path);
+      const saved = JSON.parse(readFileSync(regPath, "utf-8")) as {
+        entries: { id: string; feature: string; reason: string }[];
+      };
+      expect(saved.entries).toHaveLength(1);
+      expect(saved.entries[0]?.id).toBe(target.dismissalId);
+      expect(saved.entries[0]?.feature).toBe("dup");
+
+      const second = await runDup(r.path);
+      const stillThere = second.groups.find(
+        (g) => g.dismissalId === target.dismissalId,
+      );
+      expect(stillThere).toBeUndefined();
+      expect(second.dismissed).toEqual({
+        active: 1,
+        filteredThisRun: 1,
+        prunedThisRun: 0,
+      });
+
+      const undismissCode = await runRoot(
+        [
+          "node",
+          "ts-hotspots",
+          "undismiss",
+          target.dismissalId,
+          "--path",
+          r.path,
+        ],
+        out,
+        err,
+      );
+      expect(undismissCode).toBe(0);
+
+      const third = await runDup(r.path);
+      expect(
+        third.groups.find((g) => g.dismissalId === target.dismissalId),
+      ).toBeDefined();
+      expect(third.dismissed).toBeUndefined();
+    });
+
+    it("stale dup entries get pruned automatically when membership shifts", async () => {
+      const r = makeDupRepo();
+      const first = await runDup(r.path);
+      const target = first.groups[0];
+      if (target === undefined) throw new Error("fixture has no dup groups");
+
+      class StringSink {
+        chunks: string[] = [];
+        write(c: string): void {
+          this.chunks.push(c);
+        }
+        get text(): string {
+          return this.chunks.join("");
+        }
+      }
+      const out = new StringSink();
+      const err = new StringSink();
+      const dismissCode = await runRoot(
+        [
+          "node",
+          "ts-hotspots",
+          "dismiss",
+          target.dismissalId,
+          "--reason",
+          "stale-on-purpose",
+          "--path",
+          r.path,
+        ],
+        out,
+        err,
+      );
+      expect(dismissCode).toBe(0);
+
+      // Mutate one of the duplicates so the group's normalized member-hash
+      // set changes — the dismissal id from the previous run no longer
+      // matches anything reportable, and applyDismissalRegistry should
+      // prune it on the next run.
+      r.write(
+        "src/b.ts",
+        `export function addCopy(a: number, b: number) {
+  if (a < 0) throw new Error("negative a");
+  if (b < 0) throw new Error("negative b");
+  if (a === b) throw new Error("equal inputs");
+  const total = a + b;
+  return total + 1;
+}
+`,
+      );
+      r.commit("mutate");
+
+      const second = await runDup(r.path);
+      expect(second.dismissed).toEqual({
+        active: 0,
+        filteredThisRun: 0,
+        prunedThisRun: 1,
+      });
+      const regPath = registryPath(r.path);
+      const after = JSON.parse(readFileSync(regPath, "utf-8")) as {
+        entries: unknown[];
+      };
+      expect(after.entries).toEqual([]);
+    });
   });
 
   it("runs whole-repo mode end-to-end and prints a summary line with repo=", async () => {

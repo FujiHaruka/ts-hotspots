@@ -56,6 +56,22 @@ export interface AnalysisSummary {
   };
 }
 
+/**
+ * Dismissal accounting parallel to `comp`'s `DismissedSummary`. Present
+ * only when the registry held at least one entry at run time.
+ *
+ * - `active`: entries still recognised in the post-prune registry.
+ * - `filteredThisRun`: groups removed from this run's output because their
+ *   id appears in the registry.
+ * - `prunedThisRun`: registry entries dropped because their group is no
+ *   longer reported (group composition changed → id auto-expired).
+ */
+export interface DismissedSummary {
+  active: number;
+  filteredThisRun: number;
+  prunedThisRun: number;
+}
+
 export interface CloneCandidateReport {
   status: "ok";
   tool: ReportTool;
@@ -65,6 +81,7 @@ export interface CloneCandidateReport {
   };
   summary: AnalysisSummary;
   groups: CloneGroup[];
+  dismissed?: DismissedSummary;
 }
 
 /**

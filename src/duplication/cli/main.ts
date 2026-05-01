@@ -1,5 +1,12 @@
 import pkg from "../../../package.json" with { type: "json" };
 import {
+  loadRegistry,
+  pruneRegistry,
+  registryIdSet,
+  saveRegistry,
+  withProjectPath,
+} from "../../dismissal/store.ts";
+import {
   renderJson,
   renderMarkdownBody,
   renderMarkdownErrorBody,
@@ -11,6 +18,7 @@ import { findGitRoot } from "../../util/git/findGitRoot.ts";
 import { defaultConfig } from "../config/index.ts";
 import type {
   CloneCandidateReport,
+  DismissedSummary,
   DuplicationErrorReport,
   ReportTool,
 } from "../domain/index.ts";
@@ -151,10 +159,59 @@ function buildStatsPayload(
     displayed === fullCount
       ? `displayed=${String(displayed)} groups (${String(fragmentsAcross)} fragments)`
       : `displayed=${String(displayed)} of ${String(fullCount)} groups (${String(fragmentsAcross)} fragments)`;
-  return (
+  let payload =
     `${sizeLine}, ` +
-    `candidates=${String(pipeline.candidatePairs)}, reported=${String(pipeline.reportedPairs)}, ${displayedNote}`
-  );
+    `candidates=${String(pipeline.candidatePairs)}, reported=${String(pipeline.reportedPairs)}, ${displayedNote}`;
+  if (report.dismissed !== undefined && report.dismissed.active > 0) {
+    payload += `, dismissed=${String(report.dismissed.active)}`;
+  }
+  return payload;
+}
+
+/**
+ * Apply the dismissal registry to a freshly built report. Prunes entries
+ * whose group is no longer reported (group composition changed — see
+ * `membersToDupDismissalId` for the auto-expiration bias) and filters
+ * surviving entries out of the displayed groups list.
+ *
+ * Returns the mutated report (groups list shortened in place) and a
+ * `DismissedSummary` parallel to `comp`'s. Side-effect: the registry is
+ * rewritten when at least one entry was pruned.
+ */
+function applyDismissalRegistry(
+  rootDir: string,
+  report: CloneCandidateReport,
+  stderr: DuplicationWritable,
+): DismissedSummary | undefined {
+  const original = loadRegistry(rootDir, {
+    onWarning: (msg) => {
+      stderr.write(`${msg}\n`);
+    },
+  });
+  if (original.entries.length === 0) return undefined;
+
+  const currentIds = new Set<string>();
+  for (const g of report.groups) currentIds.add(g.dismissalId);
+  const { registry: pruned, prunedCount } = pruneRegistry(original, currentIds);
+  if (prunedCount > 0) {
+    saveRegistry(rootDir, withProjectPath(pruned, rootDir));
+  }
+  const activeIds = registryIdSet(pruned);
+  const kept: CloneCandidateReport["groups"] = [];
+  let filteredThisRun = 0;
+  for (const g of report.groups) {
+    if (activeIds.has(g.dismissalId)) {
+      filteredThisRun += 1;
+    } else {
+      kept.push(g);
+    }
+  }
+  report.groups = kept;
+  return {
+    active: pruned.entries.length,
+    filteredThisRun,
+    prunedThisRun: prunedCount,
+  };
 }
 
 /**
@@ -263,6 +320,12 @@ export async function main(
             includeCode: args.includeCode,
             tool: TOOL,
           });
+
+    // Apply dismissal registry before the limit cap so the registry sees
+    // the full reported set when pruning, and the cap counts the
+    // post-filter list.
+    const dismissed = applyDismissalRegistry(repoPath, report, io.stderr);
+    if (dismissed !== undefined) report.dismissed = dismissed;
 
     // Cap the group list at `--limit` (default 50). The runner produces
     // the full sorted list; we truncate at the display layer so the limit is

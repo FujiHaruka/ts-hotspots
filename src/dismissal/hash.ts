@@ -26,6 +26,26 @@ export function bodyHashToCompDismissalId(bodyHash: string): string {
 }
 
 /**
+ * Compute a `dup:<hex>` group dismissal id from the per-member body
+ * hashes. The hashes are sorted lexicographically before concatenation
+ * so the id is independent of group member ordering, then SHA-256 is
+ * folded over the joined string to give a stable group identity.
+ *
+ * Bias: the id changes whenever the group's member set changes, so a
+ * dismissed group auto-expires once its membership shifts (M5 / D10
+ * "recall over precision" — false expiration is preferred over false
+ * persistence; the plan accepts the re-dismiss cost).
+ */
+export function membersToDupDismissalId(
+  memberBodyHashes: readonly string[],
+): string {
+  const normalized = memberBodyHashes.map(stripSha256Prefix).sort();
+  const joined = normalized.join("\n");
+  const hex = createHash("sha256").update(joined).digest("hex");
+  return `dup:${hex}`;
+}
+
+/**
  * Normalize a user-provided dismissal id into the post-M2 `<feature>:<hex>`
  * form. Pre-M2 reports surfaced the raw `sha256:<hex>`; users who script
  * against those still pass them in. Anything already carrying a feature

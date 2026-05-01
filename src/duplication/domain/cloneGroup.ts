@@ -44,6 +44,13 @@ export interface AggregateScores {
 
 export interface CloneGroup {
   /**
+   * `dup:<sha256>` id used by `ts-hotspots dismiss` to filter this group
+   * from future runs. Derived from every member's normalized body hash
+   * (sorted, joined, hashed) so the id is stable under member reordering
+   * but auto-expires when the group's membership changes.
+   */
+  dismissalId: string;
+  /**
    * In PR mode this is the changed-side fragment that anchors the group.
    * In whole-repo mode there is no privileged direction, so `anchor` is
    * `undefined` and every cluster member sits in `members`.

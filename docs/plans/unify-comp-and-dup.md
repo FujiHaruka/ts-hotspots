@@ -12,7 +12,7 @@
 - [x] **M2** — JSON 封筒の統一 (破壊変更含): `status` / `tool` / エラー envelope / 座標文字列化 / `comp:` prefix 先取り + registry migration
 - [x] **M3** — Markdown 表現の統一 (加算): agent-first wrap を `dup` にも / streaming head / stderr stats line
 - [x] **M4** — `comp --pr <revrange>` 追加 (加算): changed files に絞った hotspot 出力 / `parseRevRange` 共有
-- [ ] **M5** — `dup` の dismissal 追加 (加算): 群正規化 hash + `dup:` prefix routing
+- [x] **M5** — `dup` の dismissal 追加 (加算): 群正規化 hash + `dup:` prefix routing
 
 ## 1. 経緯
 
