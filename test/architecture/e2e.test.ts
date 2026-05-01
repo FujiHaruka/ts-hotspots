@@ -40,10 +40,25 @@ describe("architecture e2e", () => {
     repos.push(r);
     // Build a star: 8 callers all importing the same hub. This gives the
     // hub a fan-in of 8 — high outlier in a graph of 9 nodes — so the
-    // small-N gate (N=9 < 100) passes via the z-score floor.
+    // small-N gate (N=9 < 100) passes via the z-score floor. The hub is
+    // padded above the size-floor (>= 10 lines) so it is not filtered
+    // by the small-component gate.
     r.write(
       "src/hub.ts",
-      `export function hub(): number {\n  return 42;\n}\n`,
+      [
+        "export function hub(): number {",
+        "  const a = 1;",
+        "  const b = 2;",
+        "  const c = 3;",
+        "  const d = 4;",
+        "  const e = 5;",
+        "  const f = 6;",
+        "  const g = 7;",
+        "  const h = 8;",
+        "  return a + b + c + d + e + f + g + h;",
+        "}",
+        "",
+      ].join("\n"),
     );
     for (let i = 0; i < 8; i++) {
       r.write(

@@ -65,6 +65,13 @@ export interface Component {
   readonly exportKind: ExportKind;
   /** 1-based line number of the export's defining declaration. */
   readonly line: number;
+  /**
+   * 1-based, inclusive end line of the declaration node. Used by the
+   * scoring layer's size axis and hard-floor filter; raw span (includes
+   * blanks and comments) is sufficient for the "is this trivially small"
+   * question scoring asks.
+   */
+  readonly endLine: number;
 }
 
 export interface Edge {

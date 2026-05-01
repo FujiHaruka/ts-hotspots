@@ -64,6 +64,10 @@ import {
 import { serializeReport } from "../report/serializeReport.ts";
 import type { ArchHotspot, ArchReport, ArchTool } from "../report/types.ts";
 import { score } from "../scoring/score.ts";
+import {
+  buildLineCounts,
+  collectSmallNodeIds,
+} from "../scoring/sizeFloor.ts";
 import { collectTypeOnlyNodeIds } from "../scoring/typeOnlyNodes.ts";
 import {
   type ArchParsedArgs,
@@ -286,8 +290,13 @@ export async function runPipeline(
     });
     const metrics = withBetweenness(baseMetrics, adjacency);
 
+    const excludedNodeIds = new Set<string>();
+    for (const id of collectTypeOnlyNodeIds(graph)) excludedNodeIds.add(id);
+    for (const id of collectSmallNodeIds(graph.nodes)) excludedNodeIds.add(id);
+
     const candidates = score(metrics, {
-      excludedNodeIds: collectTypeOnlyNodeIds(graph),
+      excludedNodeIds,
+      lineCounts: buildLineCounts(graph.nodes),
     });
 
     const refLabel = args.ref ?? "working-tree";

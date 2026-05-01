@@ -17,6 +17,7 @@ function comp(file: string, name: string): Component {
     exportName: name,
     exportKind: "function",
     line: 12,
+    endLine: 12,
   };
 }
 

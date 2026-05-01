@@ -108,3 +108,65 @@ describe("extractExports — re-exports", () => {
     expect(result.namedReexports.get("C")?.isTypeOnly).toBe(false);
   });
 });
+
+describe("extractExports — endLine", () => {
+  it("captures the last line of multi-line function declarations", () => {
+    const result = exportsOf(
+      "export function fn() {\n  const x = 1;\n  return x;\n}\n",
+    );
+    const fn = result.local.get("fn");
+    expect(fn?.line).toBe(1);
+    expect(fn?.endLine).toBe(4);
+  });
+
+  it("captures multi-line classes including the closing brace line", () => {
+    const result = exportsOf(
+      "export class Cls {\n  foo() {}\n  bar() {}\n}\n",
+    );
+    const cls = result.local.get("Cls");
+    expect(cls?.line).toBe(1);
+    expect(cls?.endLine).toBe(4);
+  });
+
+  it("captures spans for `export const` arrow bodies", () => {
+    const result = exportsOf(
+      "export const fn = () => {\n  return 1;\n};\n",
+    );
+    const fn = result.local.get("fn");
+    expect(fn?.line).toBe(1);
+    expect(fn?.endLine).toBe(3);
+  });
+
+  it("treats single-line declarations as line === endLine", () => {
+    const result = exportsOf(`export const PI = 3.14;`);
+    const c = result.local.get("PI");
+    expect(c?.line).toBe(1);
+    expect(c?.endLine).toBe(1);
+  });
+
+  it("captures spans for type and interface declarations", () => {
+    const result = exportsOf(
+      "export type T =\n  | 'a'\n  | 'b';\nexport interface I {\n  x: number;\n}\n",
+    );
+    expect(result.local.get("T")?.line).toBe(1);
+    expect(result.local.get("T")?.endLine).toBe(3);
+    expect(result.local.get("I")?.line).toBe(4);
+    expect(result.local.get("I")?.endLine).toBe(6);
+  });
+
+  it("captures spans for default exports of expressions", () => {
+    const result = exportsOf(`const x = 1;\nexport default x;`);
+    const def = result.local.get("default");
+    expect(def?.line).toBe(2);
+    expect(def?.endLine).toBe(2);
+  });
+
+  it("captures spans for `const foo; export { foo };` (pass-3 promotion)", () => {
+    const result = exportsOf(
+      "const foo = (x: number) => {\n  return x + 1;\n};\nexport { foo };\n",
+    );
+    const foo = result.local.get("foo");
+    expect(foo?.line).toBe(1);
+    expect(foo?.endLine).toBe(3);
+  });
+});
