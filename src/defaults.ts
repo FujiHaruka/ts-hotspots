@@ -21,10 +21,18 @@ export const DEFAULT_EXCLUDE_GLOBS: readonly string[] = [
   "**/migrations/**",
   "**/fixtures/**",
   // Test files: structurally similar describe/it blocks otherwise dominate
-  // the candidate list and drown out real refactor opportunities.
+  // the candidate list and drown out real refactor opportunities. The same
+  // distortion applies to Storybook stories and end-to-end suites — they
+  // import production code broadly and skew per-component fan-in.
   "**/*.test.ts",
   "**/*.test.tsx",
   "**/*.spec.ts",
   "**/*.spec.tsx",
   "**/__tests__/**",
+  "**/*.stories.ts",
+  "**/*.stories.tsx",
+  "**/*.cy.ts",
+  "**/*.cy.tsx",
+  "**/cypress/**",
+  "**/playwright/**",
 ];
