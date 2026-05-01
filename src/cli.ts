@@ -236,7 +236,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     )
     .option(
       "--diff <revrange>",
-      "scope hotspot output to functions in files changed by <revrange> (e.g. origin/main...). Rankings are still computed against the full head ref so the distribution is intact.",
+      "scope hotspot output to functions in files changed by <revrange> (e.g. origin/main...). Display filter only — rankings are still computed against the full head ref so the distribution is intact. (Note: `dup --diff` instead defines the comparison's base/head sides.)",
       parseDiff,
     )
     .action((pathArg: string | undefined, opts: FunctionCliOptions) => {
