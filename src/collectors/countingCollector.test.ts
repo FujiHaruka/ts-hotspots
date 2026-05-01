@@ -34,7 +34,7 @@ describe("countMatches", () => {
 
 describe("makeCountingCollector", () => {
   test("returns a collector keyed by resultKey", () => {
-    const collector = makeCountingCollector({
+    const { collector } = makeCountingCollector({
       name: "thrown",
       resultKey: "thrown",
       matches: (n) => n.kind === ts.SyntaxKind.ThrowStatement,
@@ -53,7 +53,7 @@ describe("makeCountingCollector", () => {
   });
 
   test("wraps predicate errors with collector name and decl coords", () => {
-    const collector = makeCountingCollector({
+    const { collector } = makeCountingCollector({
       name: "boom",
       resultKey: "boom",
       matches: () => {
@@ -67,5 +67,17 @@ describe("makeCountingCollector", () => {
     expect(() =>
       collector.collect({ rootDir: "/proj", declarations }),
     ).toThrowError(/boomCollector failed at src\/a\.ts:1.*kaboom/);
+  });
+
+  test("exposes a count function that uses the same predicate", () => {
+    const { count } = makeCountingCollector({
+      name: "calls",
+      resultKey: "calls",
+      matches: (n) => n.kind === ts.SyntaxKind.CallExpression,
+    });
+    const { fn } = parseFirstFunctionLike(
+      "function f(){ a(); b(); c(); return 1; }",
+    );
+    expect(count(fn)).toBe(3);
   });
 });

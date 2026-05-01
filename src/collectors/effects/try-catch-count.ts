@@ -1,6 +1,5 @@
 import ts from "typescript";
-import { makeCountingCollector, countMatches } from "../countingCollector.ts";
-import type { FunctionLikeNode } from "../types.ts";
+import { makeCountingCollector } from "../countingCollector.ts";
 
 export interface TryCatchCountResult {
   tryCatchCount: number;
@@ -9,11 +8,10 @@ export interface TryCatchCountResult {
 const matches = (n: ts.Node): boolean =>
   n.kind === ts.SyntaxKind.TryStatement;
 
-export function computeTryCatchCount(node: FunctionLikeNode): number {
-  return countMatches(node, matches);
-}
-
-export const tryCatchCountCollector = makeCountingCollector({
+export const {
+  collector: tryCatchCountCollector,
+  count: computeTryCatchCount,
+} = makeCountingCollector({
   name: "tryCatchCount",
   resultKey: "tryCatchCount",
   matches,

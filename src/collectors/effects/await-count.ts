@@ -1,6 +1,5 @@
 import ts from "typescript";
-import { makeCountingCollector, countMatches } from "../countingCollector.ts";
-import type { FunctionLikeNode } from "../types.ts";
+import { makeCountingCollector } from "../countingCollector.ts";
 
 export interface AwaitCountResult {
   awaitCount: number;
@@ -14,12 +13,9 @@ function matches(n: ts.Node): boolean {
   return false;
 }
 
-export function computeAwaitCount(node: FunctionLikeNode): number {
-  return countMatches(node, matches);
-}
-
-export const awaitCountCollector = makeCountingCollector({
-  name: "awaitCount",
-  resultKey: "awaitCount",
-  matches,
-});
+export const { collector: awaitCountCollector, count: computeAwaitCount } =
+  makeCountingCollector({
+    name: "awaitCount",
+    resultKey: "awaitCount",
+    matches,
+  });
