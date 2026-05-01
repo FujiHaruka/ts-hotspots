@@ -790,12 +790,23 @@ describe("dismissal registry subcommands", () => {
     };
     expect(before.entries).toHaveLength(1);
 
-    const report = await analyze();
+    const analyzeOut = new StringSink();
+    const analyzeErr = new StringSink();
+    const analyzeCode = await run(
+      [...COMPLEXITY_PREFIX, tsconfigPath, "--format", "json"],
+      analyzeOut,
+      analyzeErr,
+    );
+    expect(analyzeCode).toBe(0);
+    const report = JSON.parse(analyzeOut.text) as ParsedFunctionReport;
     expect(report.dismissed).toEqual({
       active: 0,
       filteredThisRun: 0,
       prunedThisRun: 1,
     });
+    expect(analyzeErr.text).toContain(
+      "ts-hotspots complexity: pruned 1 expired dismissal (function changed since dismiss)",
+    );
 
     const after = JSON.parse(readFileSync(registryFile, "utf8")) as {
       entries: unknown[];
