@@ -305,6 +305,17 @@ export async function main(
     io.stdout.write(renderMarkdownHead("duplication"));
   }
 
+  const churnRunOpts = args.churn.enabled
+    ? {
+        window: args.churn.window,
+        ref:
+          args.churn.ref ?? (args.mode === "pr" ? args.headRef : args.ref),
+        onWarning: (msg: string) => {
+          io.stderr.write(`${msg}\n`);
+        },
+      }
+    : undefined;
+
   try {
     const report: CloneCandidateReport =
       args.mode === "pr"
@@ -317,6 +328,7 @@ export async function main(
             perfLog,
             includeCode: args.verbose,
             tool: TOOL,
+            churn: churnRunOpts,
           })
         : await runWholeRepoDetector({
             repoPath,
@@ -325,6 +337,7 @@ export async function main(
             perfLog,
             includeCode: args.verbose,
             tool: TOOL,
+            churn: churnRunOpts,
           });
 
     // Apply dismissal registry before the limit cap so the registry sees

@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 import type ts from "typescript";
+import { collectChurn } from "../../collectors/churn/commit-count.ts";
 import type { Config } from "../config/index.ts";
 import { resolveSha } from "../diff/gitRunner.ts";
 import type {
@@ -31,6 +32,7 @@ import {
   searchCandidates,
 } from "../search/index.ts";
 import { countLines, listBaseSources } from "./listBaseSources.ts";
+import type { ChurnRunOptions } from "./runDetector.ts";
 import type { PerfLogger } from "./perfLog.ts";
 import {
   emitDecideSummary,
@@ -66,6 +68,8 @@ export interface WholeRepoOptions {
   includeCode?: boolean;
   /** Stamped onto the report's `tool` envelope. */
   tool?: ReportTool;
+  /** See `RunOptions.churn`. */
+  churn?: ChurnRunOptions;
 }
 
 /**
@@ -92,7 +96,7 @@ export interface WholeRepoOptions {
 export async function runWholeRepoDetector(
   opts: WholeRepoOptions,
 ): Promise<CloneCandidateReport> {
-  const { repoPath, ref, config, perfLog, includeCode, tool } = opts;
+  const { repoPath, ref, config, perfLog, includeCode, tool, churn } = opts;
   const now: () => number =
     perfLog !== undefined ? () => performance.now() : () => 0;
 
@@ -108,6 +112,20 @@ export async function runWholeRepoDetector(
   let totalLines = 0;
   for (const source of sources) totalLines += countLines(source.text);
   emitPhaseEnd(perfLog, "listBase", now() - t0);
+
+  let churnByFile: ReadonlyMap<string, number> | undefined;
+  if (churn !== undefined) {
+    t0 = now();
+    emitPhaseStart(perfLog, "churn");
+    churnByFile = collectChurn({
+      rootDir: repoPath,
+      files: sources.map((s) => ({ path: s.path })),
+      window: churn.window,
+      ref: churn.ref,
+      onWarning: churn.onWarning,
+    });
+    emitPhaseEnd(perfLog, "churn", now() - t0);
+  }
 
   t0 = now();
   emitPhaseStart(perfLog, "baseIndex");
@@ -351,6 +369,7 @@ export async function runWholeRepoDetector(
       },
       includeCode,
       getSourceFile: (filePath) => sourceFileByPath.get(filePath),
+      churnByFile,
     },
     perfLog,
   );

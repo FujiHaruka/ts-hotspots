@@ -2,6 +2,7 @@ import { hashText, membersToDupDismissalId } from "../../dismissal/hash.ts";
 import type { Config } from "../config/config.ts";
 import type {
   AggregateAxis,
+  AggregateChurn,
   AggregateScores,
   CloneGroup,
   Fragment,
@@ -9,6 +10,7 @@ import type {
   GroupMember,
   RecommendationHint,
 } from "../domain/index.ts";
+import { churnAmplifier } from "../scoring/churnAmplifier.ts";
 import { buildLocation } from "../util/location.ts";
 import { nonNull } from "../util/nonNull.ts";
 import { buildEvidence } from "./evidence.ts";
@@ -32,6 +34,7 @@ export function buildCloneGroups(
   config: Config,
   includeCode: boolean,
   isThinById: ReadonlyMap<string, boolean>,
+  churnByFile?: ReadonlyMap<string, number>,
 ): CloneGroup[] {
   // Bucket pairs by changedFragment.id, preserving the input order so
   // members within a group inherit the upstream ranking before the
@@ -52,7 +55,7 @@ export function buildCloneGroups(
     if (bucket.length === 0) continue;
     decorated.push({
       anchorId,
-      group: buildGroup(bucket, config, includeCode, isThinById),
+      group: buildGroup(bucket, config, includeCode, isThinById, churnByFile),
     });
   }
 
@@ -65,6 +68,7 @@ function buildGroup(
   config: Config,
   includeCode: boolean,
   isThinById: ReadonlyMap<string, boolean>,
+  churnByFile: ReadonlyMap<string, number> | undefined,
 ): CloneGroup {
   const anchorPair = nonNull(bucket[0]);
   const anchor = fragmentView(anchorPair.changedFragment, includeCode);
@@ -95,7 +99,25 @@ function buildGroup(
   const sortedMembers = memberOrder.map(({ idx }) => nonNull(members[idx]));
   const sortedBucket = memberOrder.map(({ pair }) => pair);
 
-  const aggregateScores = aggregate(sortedBucket);
+  const baseAggregate = aggregate(sortedBucket);
+  const memberFiles = collectMemberFiles(
+    anchorPair.changedFragment,
+    sortedBucket,
+  );
+  const aggregateChurn = computeAggregateChurn(memberFiles, churnByFile);
+  const aggregateScores: AggregateScores = {
+    ...baseAggregate,
+    combined: {
+      ...baseAggregate.combined,
+      amplified:
+        baseAggregate.combined.max *
+        churnAmplifier(
+          aggregateChurn?.max ?? 0,
+          config.scoring.churn.alpha,
+          config.scoring.churn.cap,
+        ),
+    },
+  };
   const sharedEvidence = buildEvidence(
     intersectIntersections(sortedBucket.map((p) => p.intersections)),
     config,
@@ -131,7 +153,7 @@ function buildGroup(
   ];
   const dismissalId = membersToDupDismissalId(memberHashes);
 
-  return {
+  const group: CloneGroup = {
     dismissalId,
     anchor,
     members: sortedMembers,
@@ -140,6 +162,36 @@ function buildGroup(
     sharedEvidence,
     recommendationHint,
   };
+  if (aggregateChurn !== undefined) group.aggregateChurn = aggregateChurn;
+  return group;
+}
+
+function collectMemberFiles(
+  anchor: Fragment,
+  bucket: readonly ScoredPair[],
+): readonly string[] {
+  const seen = new Set<string>();
+  seen.add(anchor.filePath);
+  for (const pair of bucket) seen.add(pair.baseFragment.filePath);
+  return [...seen].sort();
+}
+
+function computeAggregateChurn(
+  files: readonly string[],
+  churnByFile: ReadonlyMap<string, number> | undefined,
+): AggregateChurn | undefined {
+  if (churnByFile === undefined || files.length === 0) return undefined;
+  const perFile: Record<string, number> = {};
+  let max = 0;
+  let min = Number.POSITIVE_INFINITY;
+  for (const file of files) {
+    const count = churnByFile.get(file) ?? 0;
+    perFile[file] = count;
+    if (count > max) max = count;
+    if (count < min) min = count;
+  }
+  if (!Number.isFinite(min)) min = 0;
+  return { max, min, perFile };
 }
 
 function pickWeakest(bucket: readonly ScoredPair[]): ScoredPair {
@@ -160,7 +212,14 @@ function pickWeakest(bucket: readonly ScoredPair[]): ScoredPair {
   return weakest;
 }
 
-function aggregate(bucket: readonly ScoredPair[]): AggregateScores {
+interface BaseAggregate {
+  combined: AggregateAxis;
+  tokenOverlap: AggregateAxis;
+  statementKindSimilarity: AggregateAxis;
+  callOverlap: AggregateAxis;
+}
+
+function aggregate(bucket: readonly ScoredPair[]): BaseAggregate {
   const combined: number[] = [];
   const token: number[] = [];
   const statement: number[] = [];
@@ -201,8 +260,8 @@ function compareDecorated(
   a: { anchorId: string; group: CloneGroup },
   b: { anchorId: string; group: CloneGroup },
 ): number {
-  const ax = a.group.aggregateScores.combined.max;
-  const bx = b.group.aggregateScores.combined.max;
+  const ax = a.group.aggregateScores.combined.amplified;
+  const bx = b.group.aggregateScores.combined.amplified;
   if (ax !== bx) return bx - ax;
   if (a.group.members.length !== b.group.members.length) {
     return b.group.members.length - a.group.members.length;

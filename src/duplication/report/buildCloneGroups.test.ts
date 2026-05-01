@@ -120,7 +120,12 @@ describe("buildCloneGroups", () => {
     );
     const agg = groups[0]?.aggregateScores;
     if (agg === undefined) throw new Error("expected aggregate");
-    expect(agg.combined).toEqual({ min: 0.4, median: 0.6, max: 0.8 });
+    expect(agg.combined).toEqual({
+      min: 0.4,
+      median: 0.6,
+      max: 0.8,
+      amplified: 0.8,
+    });
     expect(agg.tokenOverlap).toEqual({ min: 0.3, median: 0.5, max: 0.9 });
   });
 
@@ -240,6 +245,68 @@ describe("buildCloneGroups", () => {
     );
     expect(groups[0]?.size).toBe(3);
     expect(groups[0]?.members).toHaveLength(2);
+  });
+
+  it("amplified equals max when churnByFile is undefined", () => {
+    const groups = buildCloneGroups(
+      [mkPair("c", "b", 0.6)],
+      defaultConfig,
+      true,
+      noThin,
+    );
+    const combined = groups[0]?.aggregateScores.combined;
+    expect(combined?.max).toBe(0.6);
+    expect(combined?.amplified).toBe(0.6);
+    expect(groups[0]?.aggregateChurn).toBeUndefined();
+  });
+
+  it("amplifies the group's combined.max by churnAmplifier(groupChurnMax)", () => {
+    // Anchor c.ts churn=20 (cap), member b.ts churn=0 → groupMax=20
+    // amplifier = 1 + 0.5 * (20/20) = 1.5; combined.max=0.6 → amplified=0.9.
+    const churn = new Map<string, number>([
+      ["c.ts", 20],
+      ["b.ts", 0],
+    ]);
+    const groups = buildCloneGroups(
+      [mkPair("c", "b", 0.6)],
+      defaultConfig,
+      true,
+      noThin,
+      churn,
+    );
+    const combined = groups[0]?.aggregateScores.combined;
+    expect(combined?.max).toBeCloseTo(0.6, 10);
+    expect(combined?.amplified).toBeCloseTo(0.9, 10);
+    expect(groups[0]?.aggregateChurn).toEqual({
+      max: 20,
+      min: 0,
+      perFile: { "c.ts": 20, "b.ts": 0 },
+    });
+  });
+
+  it("hot group leapfrogs a colder higher-similarity group", () => {
+    // Cold group: combined=0.7, churn=0 → amplified=0.7
+    // Hot  group: combined=0.6, churn=20 → amplified=0.6 * 1.5 = 0.9
+    const churn = new Map<string, number>([
+      ["hot.ts", 20],
+      ["hotB.ts", 0],
+      ["cold.ts", 0],
+      ["coldB.ts", 0],
+    ]);
+    const groups = buildCloneGroups(
+      [
+        mkPair("cold", "coldB", 0.7),
+        mkPair("hot", "hotB", 0.6),
+      ],
+      defaultConfig,
+      true,
+      noThin,
+      churn,
+    );
+    expect(groups.map((g) => g.anchor?.location)).toEqual([
+      "hot.ts:1-10",
+      "cold.ts:1-10",
+    ]);
   });
 
   it("is deterministic: identical input → identical output", () => {

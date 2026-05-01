@@ -2,6 +2,7 @@ import { hashText, membersToDupDismissalId } from "../../dismissal/hash.ts";
 import type { Config } from "../config/config.ts";
 import type {
   AggregateAxis,
+  AggregateChurn,
   AggregateScores,
   CloneGroup,
   Fragment,
@@ -9,6 +10,7 @@ import type {
   GroupMember,
   RecommendationHint,
 } from "../domain/index.ts";
+import { churnAmplifier } from "../scoring/churnAmplifier.ts";
 import { buildLocation } from "../util/location.ts";
 import { nonNull } from "../util/nonNull.ts";
 import type { Cluster } from "./clusterPairs.ts";
@@ -38,11 +40,18 @@ export function buildCloneGroupsFromClusters(
   config: Config,
   includeCode: boolean,
   isThinById: ReadonlyMap<string, boolean>,
+  churnByFile?: ReadonlyMap<string, number>,
 ): CloneGroup[] {
   const decorated: { firstId: string; group: CloneGroup }[] = [];
   for (const cluster of clusters) {
     if (cluster.fragments.length < 2 || cluster.pairs.length === 0) continue;
-    const group = buildOneGroup(cluster, config, includeCode, isThinById);
+    const group = buildOneGroup(
+      cluster,
+      config,
+      includeCode,
+      isThinById,
+      churnByFile,
+    );
     decorated.push({ firstId: nonNull(cluster.fragments[0]).id, group });
   }
   decorated.sort(compareDecorated);
@@ -54,6 +63,7 @@ function buildOneGroup(
   config: Config,
   includeCode: boolean,
   isThinById: ReadonlyMap<string, boolean>,
+  churnByFile: ReadonlyMap<string, number> | undefined,
 ): CloneGroup {
   const sortedFragments = [...cluster.fragments].sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
@@ -115,7 +125,22 @@ function buildOneGroup(
     };
   });
 
-  const aggregateScores = aggregate(cluster.pairs);
+  const baseAggregate = aggregate(cluster.pairs);
+  const memberFiles = collectClusterFiles(sortedFragments);
+  const aggregateChurn = computeAggregateChurn(memberFiles, churnByFile);
+  const aggregateScores: AggregateScores = {
+    ...baseAggregate,
+    combined: {
+      ...baseAggregate.combined,
+      amplified:
+        baseAggregate.combined.max *
+        churnAmplifier(
+          aggregateChurn?.max ?? 0,
+          config.scoring.churn.alpha,
+          config.scoring.churn.cap,
+        ),
+    },
+  };
   const sharedEvidence = buildEvidence(
     intersectIntersections(cluster.pairs.map((p) => p.intersections)),
     config,
@@ -139,7 +164,7 @@ function buildOneGroup(
   const memberHashes = sortedFragments.map((f) => hashText(f.text));
   const dismissalId = membersToDupDismissalId(memberHashes);
 
-  return {
+  const group: CloneGroup = {
     dismissalId,
     members,
     size: members.length,
@@ -147,6 +172,32 @@ function buildOneGroup(
     sharedEvidence,
     recommendationHint,
   };
+  if (aggregateChurn !== undefined) group.aggregateChurn = aggregateChurn;
+  return group;
+}
+
+function collectClusterFiles(fragments: readonly Fragment[]): readonly string[] {
+  const seen = new Set<string>();
+  for (const f of fragments) seen.add(f.filePath);
+  return [...seen].sort();
+}
+
+function computeAggregateChurn(
+  files: readonly string[],
+  churnByFile: ReadonlyMap<string, number> | undefined,
+): AggregateChurn | undefined {
+  if (churnByFile === undefined || files.length === 0) return undefined;
+  const perFile: Record<string, number> = {};
+  let max = 0;
+  let min = Number.POSITIVE_INFINITY;
+  for (const file of files) {
+    const count = churnByFile.get(file) ?? 0;
+    perFile[file] = count;
+    if (count > max) max = count;
+    if (count < min) min = count;
+  }
+  if (!Number.isFinite(min)) min = 0;
+  return { max, min, perFile };
 }
 
 function record(
@@ -202,7 +253,14 @@ function canonicalEdgeKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
-function aggregate(pairs: readonly ScoredPair[]): AggregateScores {
+interface BaseAggregate {
+  combined: AggregateAxis;
+  tokenOverlap: AggregateAxis;
+  statementKindSimilarity: AggregateAxis;
+  callOverlap: AggregateAxis;
+}
+
+function aggregate(pairs: readonly ScoredPair[]): BaseAggregate {
   const combined: number[] = [];
   const token: number[] = [];
   const statement: number[] = [];
@@ -243,8 +301,8 @@ function compareDecorated(
   a: { firstId: string; group: CloneGroup },
   b: { firstId: string; group: CloneGroup },
 ): number {
-  const ax = a.group.aggregateScores.combined.max;
-  const bx = b.group.aggregateScores.combined.max;
+  const ax = a.group.aggregateScores.combined.amplified;
+  const bx = b.group.aggregateScores.combined.amplified;
   if (ax !== bx) return bx - ax;
   if (a.group.size !== b.group.size) return b.group.size - a.group.size;
   if (a.firstId === b.firstId) return 0;

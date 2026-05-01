@@ -5,6 +5,8 @@ export type {
 } from "./candidate.ts";
 export type {
   AggregateAxis,
+  AggregateChurn,
+  AggregateCombinedAxis,
   AggregateScores,
   CloneGroup,
   FragmentView,

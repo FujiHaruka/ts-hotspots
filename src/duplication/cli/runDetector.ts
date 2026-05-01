@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 import type ts from "typescript";
+import { collectChurn } from "../../collectors/churn/commit-count.ts";
 import type { Config } from "../config/index.ts";
 import { collectChangedFragments } from "../diff/pipeline.ts";
 import type {
@@ -35,6 +36,19 @@ import {
   recordPassReasons,
 } from "./perfLogEvents.ts";
 
+export interface ChurnRunOptions {
+  /** Number of commits to walk via `git log` for per-file commit counts. */
+  window: number;
+  /**
+   * Ref to walk. PR mode defaults to the head ref of the diff (so the
+   * churn window matches the PR head); pass an explicit value to
+   * override. Whole-repo mode passes the scan ref.
+   */
+  ref: string;
+  /** Sink for non-fatal collector warnings (shallow clone, git missing). */
+  onWarning?: (msg: string) => void;
+}
+
 export interface RunOptions {
   repoPath: string;
   baseRef: string;
@@ -55,6 +69,13 @@ export interface RunOptions {
   includeCode?: boolean;
   /** Stamped onto the report's `tool` envelope. */
   tool?: ReportTool;
+  /**
+   * Churn-collector wiring. Omitted (`undefined`) skips churn collection
+   * entirely — group ranking falls back to raw `combined.max` and no
+   * `aggregateChurn` is attached. Passed via `--no-churn`, non-git
+   * environments, and tests that don't want git access.
+   */
+  churn?: ChurnRunOptions;
 }
 
 /**
@@ -80,6 +101,7 @@ export async function runDetector(
     perfLog,
     includeCode,
     tool,
+    churn,
   } = opts;
   const now: () => number =
     perfLog !== undefined ? () => performance.now() : () => 0;
@@ -106,6 +128,23 @@ export async function runDetector(
   let baseLines = 0;
   for (const source of baseSources) baseLines += countLines(source.text);
   emitPhaseEnd(perfLog, "listBase", now() - t0);
+
+  let churnByFile: ReadonlyMap<string, number> | undefined;
+  if (churn !== undefined) {
+    t0 = now();
+    emitPhaseStart(perfLog, "churn");
+    const fileSet = new Set<string>();
+    for (const s of baseSources) fileSet.add(s.path);
+    for (const f of diff.files) fileSet.add(f.filePath);
+    churnByFile = collectChurn({
+      rootDir: repoPath,
+      files: [...fileSet].map((path) => ({ path })),
+      window: churn.window,
+      ref: churn.ref,
+      onWarning: churn.onWarning,
+    });
+    emitPhaseEnd(perfLog, "churn", now() - t0);
+  }
 
   t0 = now();
   emitPhaseStart(perfLog, "baseIndex");
@@ -326,6 +365,7 @@ export async function runDetector(
       },
       includeCode,
       getSourceFile: (filePath) => sourceFileByPath.get(filePath),
+      churnByFile,
     },
     perfLog,
   );

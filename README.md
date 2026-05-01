@@ -79,7 +79,9 @@ ts-hotspots duplication --whole-repo --exclude 'src/legacy/**'
 
 By default the tool emits a Markdown document containing a short instruction block followed by the report data inside a fenced JSON code block — pipeable straight into an agent in plan mode. Each entry in `hotspots[]` has `kind: "duplication"`, the coordinates of every fragment in the group (`anchor` in PR mode, `members[]` always), a `score` (`{ axis: "combined", value }` — the median similarity across pairs, in 0..1), and an `evidence` block listing the top shared `calls` and `properties` — just enough to point at why the group surfaced and where to read first. Pass `--format json` for the machine-readable form.
 
-For deeper diagnostics — per-member scores, fragment source, full evidence (statement kinds and token n-grams), the recommendation hint, and the analysis summary — re-run with `--verbose`.
+Group order is biased toward refactor value: when two groups have similar shapes, the one whose files have been edited more often in the recent commit window comes first. Cold groups are not hidden — only re-ranked behind hotter ones.
+
+For deeper diagnostics — per-member scores, fragment source, full evidence (statement kinds and token n-grams), the recommendation hint, and the analysis summary — re-run with `--verbose`. The verbose output also includes `aggregateChurn` (the recent-commit counts of the files involved), so an agent can see why a group climbed.
 
 Common options:
 
@@ -88,6 +90,7 @@ Common options:
 - `--limit <N|all>` cap `hotspots[]` at the top N by combined score (default: 20)
 - `--verbose` emit the rich schema (per-member scores, fragment source, full evidence, recommendation hint, analysis summary)
 - `--ref <ref>` ref to scan in `--whole-repo` mode (default: `HEAD`)
+- `--churn-window <N>` how many recent commits the churn-aware ranker walks (default: 200; pass `--no-churn` to disable)
 - `--phase-timings[=summary|verbose]` emit a JSON Lines perf log to stderr
 
 Run `ts-hotspots duplication --help` for the full list.

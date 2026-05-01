@@ -86,6 +86,10 @@ export const defaultConfig: Config = {
       minLines: 20,
       alpha: 0.85,
     },
+    churn: {
+      alpha: 0.5,
+      cap: 20,
+    },
   },
   report: {
     tokenNgramSampleSize: 5,

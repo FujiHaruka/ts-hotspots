@@ -100,7 +100,12 @@ describe("buildCloneGroupsFromClusters", () => {
     );
     const agg = groups[0]?.aggregateScores;
     if (agg === undefined) throw new Error("expected aggregate");
-    expect(agg.combined).toEqual({ min: 0.4, median: 0.6, max: 0.8 });
+    expect(agg.combined).toEqual({
+      min: 0.4,
+      median: 0.6,
+      max: 0.8,
+      amplified: 0.8,
+    });
   });
 
   it("sharedEvidence keeps only keys present in every cluster pair", () => {
@@ -197,6 +202,80 @@ describe("buildCloneGroupsFromClusters", () => {
       noThin,
     );
     expect(groups.map((g) => g.size)).toEqual([2, 3, 2]);
+  });
+
+  it("amplified equals max when churnByFile is undefined", () => {
+    const a = mkFragment("a");
+    const b = mkFragment("b");
+    const cluster: Cluster = {
+      fragments: [a, b],
+      pairs: [mkPair(a, b, 0.7)],
+    };
+    const groups = buildCloneGroupsFromClusters(
+      [cluster],
+      defaultConfig,
+      true,
+      noThin,
+    );
+    const combined = groups[0]?.aggregateScores.combined;
+    expect(combined?.max).toBe(0.7);
+    expect(combined?.amplified).toBe(0.7);
+    expect(groups[0]?.aggregateChurn).toBeUndefined();
+  });
+
+  it("hot cluster leapfrogs a colder higher-similarity cluster", () => {
+    // Cold cluster: combined=0.8, churn=0 → amplified=0.8
+    // Hot  cluster: combined=0.7, churn=20 → amplified=0.7 * 1.5 = 1.05
+    const aA = mkFragment("aA");
+    const bB = mkFragment("bB");
+    const cC = mkFragment("cC");
+    const dD = mkFragment("dD");
+    const churn = new Map<string, number>([
+      ["aA.ts", 0],
+      ["bB.ts", 0],
+      ["cC.ts", 20],
+      ["dD.ts", 0],
+    ]);
+    const clusters: Cluster[] = [
+      { fragments: [aA, bB], pairs: [mkPair(aA, bB, 0.8)] },
+      { fragments: [cC, dD], pairs: [mkPair(cC, dD, 0.7)] },
+    ];
+    const groups = buildCloneGroupsFromClusters(
+      clusters,
+      defaultConfig,
+      true,
+      noThin,
+      churn,
+    );
+    expect(groups.map((g) => g.members[0]?.fragment.location)).toEqual([
+      "cC.ts:1-10",
+      "aA.ts:1-10",
+    ]);
+  });
+
+  it("aggregateChurn lists max/min/perFile across cluster files", () => {
+    const a = mkFragment("a");
+    const b = mkFragment("b");
+    const cluster: Cluster = {
+      fragments: [a, b],
+      pairs: [mkPair(a, b, 0.7)],
+    };
+    const churn = new Map<string, number>([
+      ["a.ts", 5],
+      ["b.ts", 12],
+    ]);
+    const groups = buildCloneGroupsFromClusters(
+      [cluster],
+      defaultConfig,
+      true,
+      noThin,
+      churn,
+    );
+    expect(groups[0]?.aggregateChurn).toEqual({
+      max: 12,
+      min: 5,
+      perFile: { "a.ts": 5, "b.ts": 12 },
+    });
   });
 
   it("is deterministic across repeated calls", () => {

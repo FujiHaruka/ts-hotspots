@@ -1,9 +1,22 @@
 import { spawnSync } from "node:child_process";
-import type { SourceFileInfo } from "../../loader/types.ts";
+
+/**
+ * Minimal file descriptor accepted by `collectChurn`.
+ *
+ * The collector only needs each file's repo-root-relative POSIX path; it
+ * does not read the AST. `SourceFileInfo` from the loader is structurally
+ * compatible (it carries `path` plus a parsed `sourceFile`), so existing
+ * callers that pass `SourceFileInfo[]` continue to work unchanged. The
+ * wider type lets the duplication pipeline pass plain `{ path }` records
+ * sourced from `git ls-tree` without re-parsing.
+ */
+export interface ChurnFileInput {
+  path: string;
+}
 
 export interface ChurnCollectorOptions {
   rootDir: string;
-  files: readonly SourceFileInfo[];
+  files: readonly ChurnFileInput[];
   window: number;
   ref: string;
   onWarning?: (msg: string) => void;

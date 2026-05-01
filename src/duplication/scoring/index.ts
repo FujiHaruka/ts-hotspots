@@ -1,3 +1,4 @@
+export { churnAmplifier } from "./churnAmplifier.ts";
 export { combinedScore } from "./combinedScore.ts";
 export { shouldReport } from "./decide.ts";
 export { buildFeatureSets, type FragmentFeatureSets } from "./featureSets.ts";
