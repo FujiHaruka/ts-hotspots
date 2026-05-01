@@ -119,7 +119,7 @@ export function addArchitectureCommand(
     )
     .option(
       "--diff <revrange>",
-      "scope hotspot output to components in files changed by <revrange>. Display filter only — rankings are computed against the full graph.",
+      "scope hotspot output to components in files changed by <revrange> (e.g. origin/main...). Display filter only — rankings are computed against the full graph. (Note: `dup --diff` instead defines the comparison's base/head sides.)",
       parseDiffOption,
     )
     .option(

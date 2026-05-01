@@ -24,12 +24,12 @@ See `docs/requirements.md` for the full spec (Part A = complexity, Part B = dupl
 
 - **Keep `comp`, `dup`, and `arch` flag surfaces in sync.** When adding, removing, or renaming a flag on any subcommand, look at the others and decide explicitly: mirror it, document a justified asymmetry, or align the spelling. All three are wired through `commander`: `comp` is registered inline in `src/cli.ts`, `dup` lives in `src/duplication/cli/registerCommand.ts` (`addDuplicationCommand`), and `arch` lives in `src/architecture/cli/registerCommand.ts` (`addArchitectureCommand`); all three are mounted on the same root program. Option configurations are written separately, so drift is silent — the discipline lives in review, not in types. Justified structural asymmetries today:
   - `--diff` semantics — `comp` and `arch` both treat it as a display filter (rankings still computed against the full ref); `dup` instead defines the comparison's base/head sides at build time.
-  - `--ref` — `dup` and `arch` build the analysis at a specific commit; `comp` reads the working tree.
+  - `--ref` — `dup` always builds at a ref (default `HEAD`, mutex with `--diff`); `arch` reads the working tree by default but builds at `<ref>` when `--ref` is passed (orthogonal to `--diff`); `comp` always reads the working tree.
   - `--metrics` / `--file` — `comp`-only. Single-file drill-down doesn't map to a pairwise metric (`dup`) or a graph node (`arch`).
   - `--phase-timings` — `dup` and `arch` only (pipeline diagnostic).
   - `--include-tests` — `arch`-only. Test edges distort fan-in/fan-out far more than they distort per-function complexity or per-fragment duplication.
   - `--no-include-types` — `arch`-only. Type-only edges have a meaningful but lower weight than runtime edges; arch surfaces a toggle so users can drop them entirely.
-  - `--churn-window` / `--churn-ref` / `--no-churn` — `comp` and `dup` only. `arch` deliberately omits churn integration in v1; folding it in is a follow-up plan tracked under "Deferred" in `docs/plans/architecture-subcommand.md`.
+  - `--churn-window` / `--churn-ref` / `--no-churn` — `comp` and `dup` only. `arch` deliberately omits churn integration in v1; folding it in is a follow-up plan tracked under "Deferred" in `docs/plans/architecture-subcommand.md`. `--churn-ref` defaults differ between the two: `comp` hard-codes `HEAD`; `dup` adapts (the diff head ref in diff mode, `--ref` in whole-repo mode).
 
   Anything else should match.
 
