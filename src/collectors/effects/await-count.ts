@@ -1,30 +1,29 @@
-import { type Node, SyntaxKind } from "ts-morph";
+import ts from "typescript";
 import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeNode,
+  FunctionLikeTsNode,
 } from "../types.ts";
-import { walkBodyExcludingNestedFunctions } from "../walk.ts";
+import { walkBodyExcludingNestedFunctions } from "../walk-ts.ts";
 
 export interface AwaitCountResult {
   awaitCount: number;
 }
 
-export function computeAwaitCount(node: FunctionLikeNode): number {
+export function computeAwaitCount(node: FunctionLikeTsNode): number {
   const body = getBody(node);
   if (!body) return 0;
 
   let count = 0;
   walkBodyExcludingNestedFunctions(body, (n) => {
-    const kind = n.getKind();
-    if (kind === SyntaxKind.AwaitExpression) {
+    if (n.kind === ts.SyntaxKind.AwaitExpression) {
       count += 1;
       return;
     }
-    if (kind === SyntaxKind.ForOfStatement) {
-      const forOf = n.asKindOrThrow(SyntaxKind.ForOfStatement);
-      if (forOf.isAwaited()) {
+    if (n.kind === ts.SyntaxKind.ForOfStatement) {
+      const forOf = n as ts.ForOfStatement;
+      if (forOf.awaitModifier !== undefined) {
         count += 1;
       }
     }
@@ -32,11 +31,11 @@ export function computeAwaitCount(node: FunctionLikeNode): number {
   return count;
 }
 
-function getBody(node: FunctionLikeNode): Node | undefined {
-  if (node.getKind() === SyntaxKind.ArrowFunction) {
-    return node.asKindOrThrow(SyntaxKind.ArrowFunction).getBody();
+function getBody(node: FunctionLikeTsNode): ts.Node | undefined {
+  if (node.kind === ts.SyntaxKind.ArrowFunction) {
+    return (node as ts.ArrowFunction).body;
   }
-  return (node as unknown as { getBody(): Node | undefined }).getBody();
+  return (node as Exclude<FunctionLikeTsNode, ts.ArrowFunction>).body;
 }
 
 export const awaitCountCollector: Collector<AwaitCountResult> = {
@@ -45,7 +44,7 @@ export const awaitCountCollector: Collector<AwaitCountResult> = {
     const result = new Map<DeclarationId, AwaitCountResult>();
     for (const decl of ctx.declarations) {
       try {
-        result.set(decl.id, { awaitCount: computeAwaitCount(decl.node) });
+        result.set(decl.id, { awaitCount: computeAwaitCount(decl.tsNode) });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         throw new Error(

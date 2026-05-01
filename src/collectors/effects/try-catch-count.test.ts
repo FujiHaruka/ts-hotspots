@@ -1,70 +1,54 @@
-import { type FunctionDeclaration, Project } from "ts-morph";
+import { Project } from "ts-morph";
+import ts from "typescript";
 import { describe, expect, test } from "vitest";
 import { enumerateDeclarations } from "../enumerate-declarations.ts";
+import {
+  parseAllFunctionLikes,
+  parseFirstFunctionLike,
+} from "../internal/parseFirstFunctionLike.test-helper.ts";
 import {
   computeTryCatchCount,
   tryCatchCountCollector,
 } from "./try-catch-count.ts";
 
-function parseFn(src: string): FunctionDeclaration {
-  const project = new Project({ useInMemoryFileSystem: true });
-  const sf = project.createSourceFile("/proj/t.ts", src);
-  const fn = sf.getFunctions()[0];
-  if (!fn) throw new Error("no function in source");
-  return fn;
+function compute(src: string): number {
+  const { fn } = parseFirstFunctionLike(src);
+  return computeTryCatchCount(fn);
 }
 
 describe("computeTryCatchCount", () => {
   test("empty function → 0", () => {
-    expect(computeTryCatchCount(parseFn("function f(){}"))).toBe(0);
+    expect(compute("function f(){}")).toBe(0);
   });
 
   test("if statements are not counted", () => {
-    expect(
-      computeTryCatchCount(
-        parseFn("function f(x: number){ if (x) return 1; }"),
-      ),
-    ).toBe(0);
+    expect(compute("function f(x: number){ if (x) return 1; }")).toBe(0);
   });
 
   test("single try/catch → 1", () => {
-    expect(
-      computeTryCatchCount(
-        parseFn("function f(){ try { g(); } catch { return 0; } }"),
-      ),
-    ).toBe(1);
+    expect(compute("function f(){ try { g(); } catch { return 0; } }")).toBe(1);
   });
 
   test("try/finally (no catch) → 1", () => {
-    expect(
-      computeTryCatchCount(
-        parseFn("function f(){ try { g(); } finally { h(); } }"),
-      ),
-    ).toBe(1);
+    expect(compute("function f(){ try { g(); } finally { h(); } }")).toBe(1);
   });
 
   test("multiple try blocks sum up", () => {
     expect(
-      computeTryCatchCount(
-        parseFn(
-          "function f(){ try { a(); } catch {} try { b(); } catch {} try { c(); } catch {} }",
-        ),
+      compute(
+        "function f(){ try { a(); } catch {} try { b(); } catch {} try { c(); } catch {} }",
       ),
     ).toBe(3);
   });
 
   test("nested try inside try counts both", () => {
     expect(
-      computeTryCatchCount(
-        parseFn("function f(){ try { try { a(); } catch {} } catch {} }"),
-      ),
+      compute("function f(){ try { try { a(); } catch {} } catch {} }"),
     ).toBe(2);
   });
 
   test("nested function: inner try does not affect outer", () => {
-    const project = new Project({ useInMemoryFileSystem: true });
-    const sf = project.createSourceFile(
-      "/proj/t.ts",
+    const { fns } = parseAllFunctionLikes(
       [
         "function outer(){",
         "  function inner(){ try { a(); } catch {} try { b(); } catch {} }",
@@ -72,9 +56,15 @@ describe("computeTryCatchCount", () => {
         "}",
       ].join("\n"),
     );
-    const outer = sf.getFunctionOrThrow("outer");
-    const inner = outer.getFunctions()[0];
-    if (!inner) throw new Error("inner not found");
+    const outer = fns.find(
+      (f): f is ts.FunctionDeclaration =>
+        f.kind === ts.SyntaxKind.FunctionDeclaration && f.name?.text === "outer",
+    );
+    const inner = fns.find(
+      (f): f is ts.FunctionDeclaration =>
+        f.kind === ts.SyntaxKind.FunctionDeclaration && f.name?.text === "inner",
+    );
+    if (!outer || !inner) throw new Error("functions not found");
     expect(computeTryCatchCount(outer)).toBe(0);
     expect(computeTryCatchCount(inner)).toBe(2);
   });

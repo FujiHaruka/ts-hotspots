@@ -1,84 +1,79 @@
-import { type Node, SyntaxKind } from "ts-morph";
+import ts from "typescript";
 import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeNode,
+  FunctionLikeTsNode,
 } from "../types.ts";
-import { walkBodyExcludingNestedFunctions } from "../walk.ts";
+import { walkBodyExcludingNestedFunctions } from "../walk-ts.ts";
 
 export interface MutationCountResult {
   mutationSiteCount: number;
 }
 
-const ASSIGNMENT_OPERATORS = new Set<SyntaxKind>([
-  SyntaxKind.EqualsToken,
-  SyntaxKind.PlusEqualsToken,
-  SyntaxKind.MinusEqualsToken,
-  SyntaxKind.AsteriskEqualsToken,
-  SyntaxKind.SlashEqualsToken,
-  SyntaxKind.PercentEqualsToken,
-  SyntaxKind.AsteriskAsteriskEqualsToken,
-  SyntaxKind.AmpersandEqualsToken,
-  SyntaxKind.BarEqualsToken,
-  SyntaxKind.CaretEqualsToken,
-  SyntaxKind.LessThanLessThanEqualsToken,
-  SyntaxKind.GreaterThanGreaterThanEqualsToken,
-  SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken,
-  SyntaxKind.AmpersandAmpersandEqualsToken,
-  SyntaxKind.BarBarEqualsToken,
-  SyntaxKind.QuestionQuestionEqualsToken,
+const ASSIGNMENT_OPERATORS = new Set<ts.SyntaxKind>([
+  ts.SyntaxKind.EqualsToken,
+  ts.SyntaxKind.PlusEqualsToken,
+  ts.SyntaxKind.MinusEqualsToken,
+  ts.SyntaxKind.AsteriskEqualsToken,
+  ts.SyntaxKind.SlashEqualsToken,
+  ts.SyntaxKind.PercentEqualsToken,
+  ts.SyntaxKind.AsteriskAsteriskEqualsToken,
+  ts.SyntaxKind.AmpersandEqualsToken,
+  ts.SyntaxKind.BarEqualsToken,
+  ts.SyntaxKind.CaretEqualsToken,
+  ts.SyntaxKind.LessThanLessThanEqualsToken,
+  ts.SyntaxKind.GreaterThanGreaterThanEqualsToken,
+  ts.SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken,
+  ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+  ts.SyntaxKind.BarBarEqualsToken,
+  ts.SyntaxKind.QuestionQuestionEqualsToken,
 ]);
 
-const INCREMENT_DECREMENT = new Set<SyntaxKind>([
-  SyntaxKind.PlusPlusToken,
-  SyntaxKind.MinusMinusToken,
+const INCREMENT_DECREMENT = new Set<ts.SyntaxKind>([
+  ts.SyntaxKind.PlusPlusToken,
+  ts.SyntaxKind.MinusMinusToken,
 ]);
 
-export function computeMutationCount(node: FunctionLikeNode): number {
+export function computeMutationCount(node: FunctionLikeTsNode): number {
   const body = getBody(node);
   if (!body) return 0;
 
   let count = 0;
   walkBodyExcludingNestedFunctions(body, (n) => {
-    const kind = n.getKind();
-    if (kind === SyntaxKind.BinaryExpression) {
-      const bin = n.asKindOrThrow(SyntaxKind.BinaryExpression);
-      if (ASSIGNMENT_OPERATORS.has(bin.getOperatorToken().getKind())) {
+    if (n.kind === ts.SyntaxKind.BinaryExpression) {
+      const bin = n as ts.BinaryExpression;
+      if (ASSIGNMENT_OPERATORS.has(bin.operatorToken.kind)) {
         count += 1;
       }
       return;
     }
-    if (kind === SyntaxKind.PrefixUnaryExpression) {
-      const op = n
-        .asKindOrThrow(SyntaxKind.PrefixUnaryExpression)
-        .getOperatorToken();
+    if (n.kind === ts.SyntaxKind.PrefixUnaryExpression) {
+      const op = (n as ts.PrefixUnaryExpression).operator;
       if (INCREMENT_DECREMENT.has(op)) {
         count += 1;
       }
       return;
     }
-    if (kind === SyntaxKind.PostfixUnaryExpression) {
-      const op = n
-        .asKindOrThrow(SyntaxKind.PostfixUnaryExpression)
-        .getOperatorToken();
+    if (n.kind === ts.SyntaxKind.PostfixUnaryExpression) {
+      const op = (n as ts.PostfixUnaryExpression).operator;
       if (INCREMENT_DECREMENT.has(op)) {
         count += 1;
       }
       return;
     }
-    if (kind === SyntaxKind.DeleteExpression) {
+    if (n.kind === ts.SyntaxKind.DeleteExpression) {
       count += 1;
     }
   });
   return count;
 }
 
-function getBody(node: FunctionLikeNode): Node | undefined {
-  if (node.getKind() === SyntaxKind.ArrowFunction) {
-    return node.asKindOrThrow(SyntaxKind.ArrowFunction).getBody();
+function getBody(node: FunctionLikeTsNode): ts.Node | undefined {
+  if (node.kind === ts.SyntaxKind.ArrowFunction) {
+    return (node as ts.ArrowFunction).body;
   }
-  return (node as unknown as { getBody(): Node | undefined }).getBody();
+  return (node as Exclude<FunctionLikeTsNode, ts.ArrowFunction>).body;
 }
 
 export const mutationCountCollector: Collector<MutationCountResult> = {
@@ -88,7 +83,7 @@ export const mutationCountCollector: Collector<MutationCountResult> = {
     for (const decl of ctx.declarations) {
       try {
         result.set(decl.id, {
-          mutationSiteCount: computeMutationCount(decl.node),
+          mutationSiteCount: computeMutationCount(decl.tsNode),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
