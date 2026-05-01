@@ -210,3 +210,16 @@
 - **D11 (dismissal subcommands の所属 / registry 形)**: トップレベル `ts-hotspots dismiss <id>` を維持し、ID 自体に feature prefix を埋め込む形で routing (案 C)。`dismissalId` は `comp:<sha256>` / `dup:<sha256>` 形式。`--feature` フラグは不要。registry は単一 `dismissed.json`、entry に `feature` フィールドを追加 (案 X)。既存 entry は prefix 無し = `comp` として自動 migration。
 - **D3 派生 (`--repo` フラグの去就)**: M1 で完全廃止 (互換 alias 無し)。`--json` 廃止 (D2) と同じ姿勢で、M1 の破壊変更ウィンドウに集約する。
 - **D11 派生 (`comp:` prefix 化のタイミング)**: M5 ではなく M2 で先取り。`comp` の `dismissalId` を `comp:<sha256>` 化 + registry migration を M2 で完了させ、M5 は `dup` 側の加算のみに縮める。破壊変更を M1+M2 ウィンドウに集約してユーザー摩擦を最小化。
+
+## 8. 後日改題: parser 統一 (M-post)
+
+§6 で「CLI パーサ統一は本計画のスコープ外」と置いたが、後日 (2026-05-01) ヘルプ表示の "形" まで含めて揃えるために `dup` を `parseArgs` から `commander` へ移行した。詳細計画は `docs/plans/dup-migrate-to-commander.md`。
+
+判断を覆した理由は 2 つ:
+
+- 当時の主要根拠だった「`parseArgs` は依存ゼロ」は、`comp` 側でとっくに `commander` を使っているのですでに成立していなかった。
+- M1 bullet 5 で「ヘルプテキストの形を揃える」と決めたが、commander の auto help と手書き `USAGE` 文字列ではどう揃えても見た目に差が残った。両方を commander の auto help に揃えることで、`comp --help` と `dup --help` の Usage / Options / defaults の出方が一致した。
+
+統一後の構造: `dup` のオプション設定は `src/duplication/cli/registerCommand.ts` の `addDuplicationCommand` に集約され、ルート CLI (`src/cli.ts`) と dup 単体テスト用 entry point (`src/duplication/cli/main.ts` の `main(argv, io)`) の両方から同じ registrar を呼ぶ形になっている。`parseCliArgs` (公開 API) は維持し、内部実装だけ commander 経由に置き換えた。`args.test.ts` の 30+ テストは無変更で通る。
+
+§6 の "ツールの一体感" リスクはこれでクローズ。`scan` 復活の non-goal は維持。

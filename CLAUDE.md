@@ -21,7 +21,7 @@ See `docs/requirements.md` for the full spec (Part A = complexity, Part B = dupl
 
 ## CLI flag conventions
 
-- **Keep `comp` and `dup` flag surfaces in sync.** When adding, removing, or renaming a flag on either subcommand, look at the other and decide explicitly: mirror it, document a justified asymmetry, or align the spelling. The two parsers are independent (`commander` for `comp` in `src/cli.ts`, `node:util` `parseArgs` for `dup` in `src/duplication/cli/args.ts`), so drift is silent — the discipline lives in review, not in types. Justified structural asymmetries today: `--diff` semantics (display filter vs. base/head sides), `--ref` (dup-only — comp reads working tree), `--metrics` / `--file` (comp-only — single-file drill-down doesn't map to a pairwise metric), `--phase-timings` (dup-only pipeline diagnostic). Anything else should match.
+- **Keep `comp` and `dup` flag surfaces in sync.** When adding, removing, or renaming a flag on either subcommand, look at the other and decide explicitly: mirror it, document a justified asymmetry, or align the spelling. Both subcommands are wired through `commander`: `comp` is registered inline in `src/cli.ts`, `dup` lives in `src/duplication/cli/registerCommand.ts` (`addDuplicationCommand`) and is mounted on the same root program. Option configurations are still written separately, so drift is silent — the discipline lives in review, not in types. Justified structural asymmetries today: `--diff` semantics (display filter vs. base/head sides), `--ref` (dup-only — comp reads working tree), `--metrics` / `--file` (comp-only — single-file drill-down doesn't map to a pairwise metric), `--phase-timings` (dup-only pipeline diagnostic). Anything else should match.
 
 ## Development workflow
 

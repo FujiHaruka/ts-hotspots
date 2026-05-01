@@ -68,10 +68,10 @@ describe("main", () => {
     const cap = captureIO();
     const code = await main(["--help"], cap.io);
     expect(code).toBe(0);
-    expect(cap.stderr()).toContain("Usage:");
-    expect(cap.stderr()).toContain("ts-hotspots duplication");
-    expect(cap.stderr()).toContain("--diff <revrange>");
-    expect(cap.stdout()).toBe("");
+    expect(cap.stdout()).toContain("Usage:");
+    expect(cap.stdout()).toContain("ts-hotspots duplication");
+    expect(cap.stdout()).toContain("--diff <revrange>");
+    expect(cap.stderr()).toBe("");
   });
 
   it("writes Markdown to stdout by default and exits 0 on empty diff", async () => {

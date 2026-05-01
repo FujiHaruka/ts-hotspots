@@ -1,3 +1,4 @@
+import { Command, CommanderError } from "commander";
 import pkg from "../../../package.json" with { type: "json" };
 import {
   loadRegistry,
@@ -23,8 +24,12 @@ import type {
   ReportTool,
 } from "../domain/index.ts";
 import { serializeReport } from "../report/serializeReport.ts";
-import { ArgParseError, parseCliArgs, USAGE } from "./args.ts";
+import { ArgParseError, type ParsedArgs } from "./args.ts";
 import { JsonlPerfLogger, type PerfLogger } from "./perfLog.ts";
+import {
+  addDuplicationCommand,
+  normalizePhaseTimingsArgv,
+} from "./registerCommand.ts";
 import { runDetector } from "./runDetector.ts";
 import { runWholeRepoDetector } from "./runWholeRepoDetector.ts";
 
@@ -88,9 +93,9 @@ function writePostStreamError(
 }
 
 /**
- * Best-effort `--format` extraction for the case where `parseCliArgs`
- * throws before we have a `ParsedArgs`. We still want a `--format json`
- * caller to receive a JSON envelope on its arg-parse failure.
+ * Best-effort `--format` extraction for the case where commander throws
+ * before we have a `ParsedArgs`. We still want a `--format json` caller
+ * to receive a JSON envelope on its arg-parse failure.
  */
 function sniffFormat(argv: readonly string[]): "markdown" | "json" {
   for (let i = 0; i < argv.length; i++) {
@@ -104,6 +109,24 @@ function sniffFormat(argv: readonly string[]): "markdown" | "json" {
     }
   }
   return "markdown";
+}
+
+/**
+ * Format an arg-parse failure surfaced by commander at the root CLI
+ * level (e.g. `--ref` and `--diff` together, an unknown dup flag, a bad
+ * `--limit` value). Mirrors the in-process error envelope that dup's
+ * own `main(argv, io)` produces — markdown pre-error block or JSON
+ * envelope on stdout, `ts-hotspots duplication:` prefix on stderr — so
+ * dup's failure surface is identical whether the caller invoked us
+ * through `src/cli.ts` or through `main(argv, io)`.
+ */
+export function writeDuplicationParseError(
+  io: MainIO,
+  argv: readonly string[],
+  err: unknown,
+): void {
+  const message = err instanceof Error ? err.message : String(err);
+  writePreStreamError(io, sniffFormat(argv), "INVALID_ARGS", message, message);
 }
 
 function classifyError(err: unknown): { code: string; message: string } {
@@ -221,20 +244,10 @@ function applyDismissalRegistry(
 }
 
 /**
- * CLI entry point. Returns an exit code instead of calling `process.exit`
- * so it can be exercised from tests.
- *
- * Behaviour:
- *   - `--help` / `-h`        → write usage to stderr, return 0.
- *   - missing required flag  → write error + usage hint to stderr, return 1.
- *   - any other thrown error → message to stderr, return 1.
- *   - on success             → report to stdout (Markdown by default, JSON
- *                              with `--format json`), stats line to stderr,
- *                              return 0 even when zero candidates were
- *                              reported.
- *   - `--phase-timings`      → in addition to the stats line, emit a
- *                              JSON Lines perf log to stderr (one event
- *                              per line, interleaved with the run).
+ * Run the duplication detector pipeline against pre-parsed args. Used
+ * both from `main(argv, io)` here and from the root CLI in `src/cli.ts`
+ * once commander has handed us a `ParsedArgs`. Returns an exit code
+ * instead of calling `process.exit` so callers can compose.
  *
  * Markdown streaming: the agent-first head (instruction + opening JSON
  * fence) is flushed to stdout *before* the detector starts so consumers
@@ -243,37 +256,10 @@ function applyDismissalRegistry(
  * out, any post-stream failure closes the fence with the error envelope
  * as its JSON body so the document remains parseable.
  */
-export async function main(
-  argv: readonly string[],
-  io: MainIO = REAL_IO,
+export async function runPipeline(
+  args: ParsedArgs,
+  io: MainIO,
 ): Promise<number> {
-  let args: ReturnType<typeof parseCliArgs>;
-  try {
-    args = parseCliArgs(argv);
-  } catch (err) {
-    if (err instanceof ArgParseError) {
-      // `parseCliArgs` failed before yielding a `ParsedArgs`, so we don't
-      // have `args.format` to consult. Sniff `--format` directly from
-      // argv to honour the common `--format json` case; everything else
-      // defaults to markdown (the dup default).
-      const { code, message } = classifyError(err);
-      writePreStreamError(
-        io,
-        sniffFormat(argv),
-        code,
-        message,
-        `${err.message}\n\n${USAGE}`,
-      );
-      return 1;
-    }
-    throw err;
-  }
-
-  if (args.kind === "help") {
-    io.stderr.write(USAGE);
-    return 0;
-  }
-
   let repoPath: string;
   try {
     repoPath = findGitRoot(args.path ?? io.cwd());
@@ -298,9 +284,6 @@ export async function main(
       ? new JsonlPerfLogger(io.stderr, args.phaseTimings)
       : undefined;
 
-  // Stream the agent-first head before kicking off the detector. The head
-  // is data-independent (instruction prelude + opening JSON fence) so it
-  // is safe to emit before we know what we will report.
   if (args.format === "markdown") {
     io.stdout.write(renderMarkdownHead("duplication"));
   }
@@ -340,15 +323,9 @@ export async function main(
             churn: churnRunOpts,
           });
 
-    // Apply dismissal registry before the limit cap so the registry sees
-    // the full reported set when pruning, and the cap counts the
-    // post-filter list.
     const dismissed = applyDismissalRegistry(repoPath, report, io.stderr);
     if (dismissed !== undefined) report.dismissed = dismissed;
 
-    // Cap the group list at `--limit` (default 50). The runner produces
-    // the full sorted list; we truncate at the display layer so the limit is
-    // a presentation concern, not a pipeline one.
     const fullCount = report.groups.length;
     if (Number.isFinite(args.limit) && fullCount > args.limit) {
       report.groups = report.groups.slice(0, args.limit);
@@ -369,4 +346,86 @@ export async function main(
     writePostStreamError(io, args.format, code, message, humanDetail);
     return 1;
   }
+}
+
+/**
+ * CLI entry point used by the duplication-only test surface and as the
+ * legacy public API. The root CLI in `src/cli.ts` builds its own
+ * commander program with the same `addDuplicationCommand` registrar, so
+ * this function is not on the production path — it stays so tests can
+ * exercise the dup pipeline end-to-end without going through comp's
+ * top-level routing.
+ *
+ * Returns an exit code instead of calling `process.exit`.
+ *
+ * Behaviour:
+ *   - `--help` / `-h`        → commander writes usage to stdout, return 0.
+ *   - missing required flag  → write error envelope, return 1.
+ *   - any other thrown error → message to stderr, return 1.
+ *   - on success             → report to stdout (Markdown by default,
+ *                              JSON with `--format json`), stats line to
+ *                              stderr, return 0 even when zero candidates
+ *                              were reported.
+ *   - `--phase-timings`      → in addition to the stats line, emit a
+ *                              JSON Lines perf log to stderr (one event
+ *                              per line, interleaved with the run).
+ */
+export async function main(
+  argv: readonly string[],
+  io: MainIO = REAL_IO,
+): Promise<number> {
+  let parsed: ParsedArgs | undefined;
+  const program = new Command();
+  program.exitOverride();
+  program.configureOutput({
+    writeOut: (s) => {
+      io.stdout.write(s);
+    },
+    writeErr: (s) => {
+      io.stderr.write(s);
+    },
+  });
+
+  addDuplicationCommand(program, (args) => {
+    parsed = args;
+  });
+
+  try {
+    await program.parseAsync([
+      "node",
+      "ts-hotspots",
+      "duplication",
+      ...normalizePhaseTimingsArgv(argv),
+    ]);
+  } catch (err) {
+    if (err instanceof CommanderError) {
+      if (err.code === "commander.helpDisplayed") return 0;
+      const message = err.message;
+      writePreStreamError(io, sniffFormat(argv), "INVALID_ARGS", message, message);
+      return 1;
+    }
+    if (err instanceof ArgParseError) {
+      writePreStreamError(
+        io,
+        sniffFormat(argv),
+        "INVALID_ARGS",
+        err.message,
+        err.message,
+      );
+      return 1;
+    }
+    throw err;
+  }
+
+  if (parsed === undefined) {
+    // Unreachable in practice: commander either invokes the action
+    // (sets `parsed`) or throws. Belt-and-braces: surface the anomaly
+    // rather than silently returning 0.
+    io.stderr.write(
+      "ts-hotspots duplication: internal error — command did not run\n",
+    );
+    return 1;
+  }
+
+  return runPipeline(parsed, io);
 }

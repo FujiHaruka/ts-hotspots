@@ -210,6 +210,18 @@ describe("parseCliArgs", () => {
     expect(r.phaseTimings).toBeUndefined();
   });
 
+  it("does not consume a following [path] positional as the --phase-timings level", () => {
+    // commander's [optional value] would happily eat the next argv token
+    // if it does not start with '-'. Pinning the bare-flag-then-positional
+    // case so a path argument keeps its meaning.
+    const r = parseCliArgs(["--phase-timings", "/tmp/repo"]);
+    if (r.kind !== "run" || r.mode !== "whole-repo") {
+      throw new Error("expected whole-repo mode");
+    }
+    expect(r.phaseTimings).toBe("summary");
+    expect(r.path).toBe("/tmp/repo");
+  });
+
   it("uses --ref to pin the whole-repo scan to a non-HEAD ref", () => {
     const r = parseCliArgs(["--ref", "release/v2"]);
     if (r.kind !== "run" || r.mode !== "whole-repo") {

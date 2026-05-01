@@ -1027,12 +1027,12 @@ describe("duplication subcommand routing", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stdout.text).toBe("");
-    expect(stderr.text).toContain("Usage:");
-    expect(stderr.text).toContain("--diff <revrange>");
+    expect(stderr.text).toBe("");
+    expect(stdout.text).toContain("Usage:");
+    expect(stdout.text).toContain("--diff <revrange>");
   });
 
-  test("`duplication` forwards unknown flags to its parser (commander does not reject them)", async () => {
+  test("`duplication` rejects unknown flags with a dup-flavoured error envelope", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
@@ -1040,12 +1040,14 @@ describe("duplication subcommand routing", () => {
       stdout,
       stderr,
     );
-    // The duplication parser raises ArgParseError for unknown flag, not
-    // commander. The stderr message therefore comes from duplication,
-    // prefixed with "ts-hotspots duplication:" and ending with its USAGE.
+    // Commander rejects the unknown option, then the root catch routes
+    // the error through dup's writeDuplicationParseError so the agent
+    // surface (markdown pre-error block on stdout, prefixed line on
+    // stderr) is identical to the in-process `main(argv, io)` path.
     expect(code).toBe(1);
     expect(stderr.text).toContain("ts-hotspots duplication:");
-    expect(stderr.text).toContain("Usage:");
+    expect(stderr.text).toContain("--no-such-flag");
+    expect(stdout.text).toContain("# ts-hotspots duplication error");
   });
 
   test("`dup` alias routes to the same handler as `duplication`", async () => {
@@ -1053,7 +1055,7 @@ describe("duplication subcommand routing", () => {
     const stderr = new StringSink();
     const code = await run([...ARGV_PREFIX, "dup", "--help"], stdout, stderr);
     expect(code).toBe(0);
-    expect(stderr.text).toContain("--diff <revrange>");
+    expect(stdout.text).toContain("--diff <revrange>");
   });
 });
 
