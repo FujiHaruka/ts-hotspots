@@ -1,11 +1,6 @@
 import ts from "typescript";
-import type {
-  Collector,
-  CollectorContext,
-  DeclarationId,
-  FunctionLikeNode,
-} from "../types.ts";
-import { walkBodyExcludingNestedFunctions } from "../walk.ts";
+import { makeCountingCollector, countMatches } from "../countingCollector.ts";
+import type { FunctionLikeNode } from "../types.ts";
 
 export interface MutationCountResult {
   mutationSiteCount: number;
@@ -35,64 +30,27 @@ const INCREMENT_DECREMENT = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.MinusMinusToken,
 ]);
 
-export function computeMutationCount(node: FunctionLikeNode): number {
-  const body = getBody(node);
-  if (!body) return 0;
-
-  let count = 0;
-  walkBodyExcludingNestedFunctions(body, (n) => {
-    if (n.kind === ts.SyntaxKind.BinaryExpression) {
-      const bin = n as ts.BinaryExpression;
-      if (ASSIGNMENT_OPERATORS.has(bin.operatorToken.kind)) {
-        count += 1;
-      }
-      return;
-    }
-    if (n.kind === ts.SyntaxKind.PrefixUnaryExpression) {
-      const op = (n as ts.PrefixUnaryExpression).operator;
-      if (INCREMENT_DECREMENT.has(op)) {
-        count += 1;
-      }
-      return;
-    }
-    if (n.kind === ts.SyntaxKind.PostfixUnaryExpression) {
-      const op = (n as ts.PostfixUnaryExpression).operator;
-      if (INCREMENT_DECREMENT.has(op)) {
-        count += 1;
-      }
-      return;
-    }
-    if (n.kind === ts.SyntaxKind.DeleteExpression) {
-      count += 1;
-    }
-  });
-  return count;
-}
-
-function getBody(node: FunctionLikeNode): ts.Node | undefined {
-  if (node.kind === ts.SyntaxKind.ArrowFunction) {
-    return (node as ts.ArrowFunction).body;
+function matches(n: ts.Node): boolean {
+  if (n.kind === ts.SyntaxKind.BinaryExpression) {
+    return ASSIGNMENT_OPERATORS.has(
+      (n as ts.BinaryExpression).operatorToken.kind,
+    );
   }
-  return (node as Exclude<FunctionLikeNode, ts.ArrowFunction>).body;
+  if (n.kind === ts.SyntaxKind.PrefixUnaryExpression) {
+    return INCREMENT_DECREMENT.has((n as ts.PrefixUnaryExpression).operator);
+  }
+  if (n.kind === ts.SyntaxKind.PostfixUnaryExpression) {
+    return INCREMENT_DECREMENT.has((n as ts.PostfixUnaryExpression).operator);
+  }
+  return n.kind === ts.SyntaxKind.DeleteExpression;
 }
 
-export const mutationCountCollector: Collector<MutationCountResult> = {
+export function computeMutationCount(node: FunctionLikeNode): number {
+  return countMatches(node, matches);
+}
+
+export const mutationCountCollector = makeCountingCollector({
   name: "mutationCount",
-  collect(ctx: CollectorContext): Map<DeclarationId, MutationCountResult> {
-    const result = new Map<DeclarationId, MutationCountResult>();
-    for (const decl of ctx.declarations) {
-      try {
-        result.set(decl.id, {
-          mutationSiteCount: computeMutationCount(decl.node),
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(
-          `mutationCountCollector failed at ${decl.file}:${String(decl.line)} (${decl.id}): ${msg}`,
-          { cause: err },
-        );
-      }
-    }
-    return result;
-  },
-};
+  resultKey: "mutationSiteCount",
+  matches,
+});
