@@ -124,21 +124,18 @@ interface UndismissCliOptions {
   path?: string;
 }
 
-function parsePositiveInt(label: string, value: string): number {
-  const n = Number.parseInt(value, 10);
-  if (!Number.isFinite(n) || n <= 0 || String(n) !== value.trim()) {
-    throw new InvalidArgumentError(`${label} must be a positive integer`);
-  }
-  return n;
-}
-
 function parseLimit(value: string): number {
   const trimmed = value.trim();
   if (trimmed.toLowerCase() === "all") return Number.POSITIVE_INFINITY;
-  const n = Number.parseInt(trimmed, 10);
-  if (!Number.isFinite(n) || n <= 0 || !/^\d+$/.test(trimmed)) {
+  if (!/^\d+$/.test(trimmed)) {
     throw new InvalidArgumentError(
-      "--limit must be a positive integer or 'all'",
+      `invalid --limit '${value}' (expected a positive integer or 'all')`,
+    );
+  }
+  const n = Number.parseInt(trimmed, 10);
+  if (n <= 0) {
+    throw new InvalidArgumentError(
+      `invalid --limit '${value}' (expected a positive integer or 'all')`,
     );
   }
   return n;
@@ -146,7 +143,9 @@ function parseLimit(value: string): number {
 
 function parseFormat(value: string): ReportFormat {
   if (value === "markdown" || value === "json") return value;
-  throw new InvalidArgumentError("--format must be 'markdown' or 'json'");
+  throw new InvalidArgumentError(
+    `invalid --format '${value}' (expected 'markdown' or 'json')`,
+  );
 }
 
 function parseDiff(value: string): RevRange {
@@ -161,7 +160,19 @@ function parseDiff(value: string): RevRange {
 }
 
 function parseChurnWindow(value: string): number {
-  return parsePositiveInt("--churn-window", value);
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new InvalidArgumentError(
+      `invalid --churn-window '${value}' (expected a positive integer)`,
+    );
+  }
+  const n = Number.parseInt(trimmed, 10);
+  if (n <= 0) {
+    throw new InvalidArgumentError(
+      `invalid --churn-window '${value}' (expected a positive integer)`,
+    );
+  }
+  return n;
 }
 
 function parseMetrics(value: string): string[] {

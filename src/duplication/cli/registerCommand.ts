@@ -120,7 +120,7 @@ export function addDuplicationCommand(
     )
     .option(
       "--limit <N|all>",
-      "cap the hotspots list at the top N by combined score (default: 20). Pass 'all' to keep every group.",
+      "max entries in hotspots[] (default: 20). Pass 'all' to keep every group.",
       parseLimitOption,
     )
     .option(
