@@ -7,6 +7,8 @@ import {
   renderMarkdownBody,
   renderMarkdownErrorBody,
   renderMarkdownHead,
+  renderMarkdownPreError,
+  renderStatsLine,
 } from "./render.ts";
 
 function makeFunctionReport(
@@ -87,10 +89,10 @@ function extractJsonFence(markdown: string): string {
   return match[1] ?? "";
 }
 
-describe("renderMarkdown", () => {
+describe("renderMarkdown (complexity)", () => {
   test("FunctionReport: includes prompt header and JSON fence whose body matches renderJson", () => {
     const report = makeFunctionReport();
-    const md = renderMarkdown(report);
+    const md = renderMarkdown("complexity", report);
     expect(md.startsWith("# ts-hotspots report")).toBe(true);
     expect(md).toContain("## Data");
     const body = extractJsonFence(md);
@@ -102,7 +104,7 @@ describe("renderMarkdown", () => {
       status: "error",
       error: { code: "TSCONFIG_NOT_FOUND", message: "missing at /x" },
     };
-    const md = renderMarkdown(err);
+    const md = renderMarkdown("complexity", err);
     expect(md.startsWith("# ts-hotspots error")).toBe(true);
     expect(md).toContain("missing at /x");
     expect(md).not.toContain("```json");
@@ -113,8 +115,8 @@ describe("renderMarkdown", () => {
 
   test("head + body compose to the same string as renderMarkdown", () => {
     const report = makeFunctionReport();
-    const composed = `${renderMarkdownHead()}${renderMarkdownBody(report)}`;
-    expect(composed).toBe(renderMarkdown(report));
+    const composed = `${renderMarkdownHead("complexity")}${renderMarkdownBody(report)}`;
+    expect(composed).toBe(renderMarkdown("complexity", report));
   });
 
   test("head is data-independent (stable across different reports)", () => {
@@ -126,12 +128,13 @@ describe("renderMarkdown", () => {
         functionCount: 123,
       },
     });
-    expect(renderMarkdownHead()).toBe(renderMarkdownHead());
+    const head = renderMarkdownHead("complexity");
+    expect(renderMarkdownHead("complexity")).toBe(head);
     // Building the streamed form for two different reports yields the same head.
-    const headA = renderMarkdown(a).slice(0, renderMarkdownHead().length);
-    const headB = renderMarkdown(b).slice(0, renderMarkdownHead().length);
-    expect(headA).toBe(renderMarkdownHead());
-    expect(headB).toBe(renderMarkdownHead());
+    const headA = renderMarkdown("complexity", a).slice(0, head.length);
+    const headB = renderMarkdown("complexity", b).slice(0, head.length);
+    expect(headA).toBe(head);
+    expect(headB).toBe(head);
   });
 
   test("error body closes the fence and carries the error JSON", () => {
@@ -142,10 +145,59 @@ describe("renderMarkdown", () => {
     const body = renderMarkdownErrorBody(err);
     expect(body.endsWith("```\n")).toBe(true);
     // Head + errorBody must form a well-formed fenced-JSON Markdown document.
-    const doc = `${renderMarkdownHead()}${body}`;
+    const doc = `${renderMarkdownHead("complexity")}${body}`;
     const match = /```json\n([\s\S]*?)\n```/.exec(doc);
     expect(match).not.toBeNull();
     const parsed = JSON.parse(match?.[1] ?? "") as ErrorReport;
     expect(parsed).toEqual(err);
+  });
+});
+
+describe("renderMarkdown (duplication)", () => {
+  test("head starts with the duplication-specific instruction heading and opens a JSON fence", () => {
+    const head = renderMarkdownHead("duplication");
+    expect(head.startsWith("# ts-hotspots duplication report")).toBe(true);
+    expect(head).toContain("## Data");
+    expect(head.endsWith("```json\n")).toBe(true);
+  });
+
+  test("head + body compose to a parseable fenced-JSON Markdown document for any payload", () => {
+    const payload = {
+      status: "ok" as const,
+      tool: { name: "ts-hotspots", version: "0.1.0" },
+      groups: [],
+    };
+    const doc = `${renderMarkdownHead("duplication")}${renderMarkdownBody(payload)}`;
+    const fence = extractJsonFence(doc);
+    expect(JSON.parse(fence)).toEqual(payload);
+  });
+
+  test("renderMarkdownPreError emits a stand-alone duplication-error block (no JSON fence)", () => {
+    const md = renderMarkdownPreError("duplication", "git ref does not exist");
+    expect(md.startsWith("# ts-hotspots duplication error")).toBe(true);
+    expect(md).toContain("git ref does not exist");
+    expect(md).not.toContain("```json");
+  });
+
+  test("post-stream error closes the head's open JSON fence with the error envelope", () => {
+    const errPayload = {
+      status: "error" as const,
+      tool: { name: "ts-hotspots", version: "0.1.0" },
+      error: { code: "GIT_FAILED", message: "boom" },
+    };
+    const doc = `${renderMarkdownHead("duplication")}${renderMarkdownErrorBody(errPayload)}`;
+    expect(doc.endsWith("```\n")).toBe(true);
+    expect(JSON.parse(extractJsonFence(doc))).toEqual(errPayload);
+  });
+});
+
+describe("renderStatsLine", () => {
+  test("uses the `ts-hotspots <feature>: <payload>` format and ends with a newline", () => {
+    expect(renderStatsLine("complexity", "files=3, functions=5, candidates=2")).toBe(
+      "ts-hotspots complexity: files=3, functions=5, candidates=2\n",
+    );
+    expect(renderStatsLine("duplication", "repo=10 files/200 fragments")).toBe(
+      "ts-hotspots duplication: repo=10 files/200 fragments\n",
+    );
   });
 });

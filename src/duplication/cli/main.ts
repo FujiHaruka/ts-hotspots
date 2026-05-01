@@ -1,13 +1,20 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import pkg from "../../../package.json" with { type: "json" };
+import {
+  renderJson,
+  renderMarkdownBody,
+  renderMarkdownErrorBody,
+  renderMarkdownHead,
+  renderMarkdownPreError,
+  renderStatsLine,
+} from "../../reporter/render.ts";
 import { defaultConfig } from "../config/index.ts";
 import type {
   CloneCandidateReport,
   DuplicationErrorReport,
   ReportTool,
 } from "../domain/index.ts";
-import { buildMarkdownReport } from "../report/index.ts";
 import { ArgParseError, parseCliArgs, USAGE } from "./args.ts";
 import { JsonlPerfLogger, type PerfLogger } from "./perfLog.ts";
 import { runDetector } from "./runDetector.ts";
@@ -31,26 +38,12 @@ function buildErrorReport(
 }
 
 /**
- * Render the error envelope for `--format markdown`. Until M3 introduces
- * the agent-first prelude, this is a minimal heading + fenced JSON body
- * so the body shape stays in lockstep with `comp`'s error markdown.
+ * Write a fatal error before any streaming has begun. JSON mode emits
+ * the error envelope to stdout; Markdown mode emits the agent-first
+ * pre-error block (heading + message), since no head has been flushed
+ * yet so there is no JSON fence to close.
  */
-function renderMarkdownError(report: DuplicationErrorReport): string {
-  return `# ts-hotspots duplication error
-
-\`\`\`json
-${JSON.stringify(report, null, 2)}
-\`\`\`
-`;
-}
-
-/**
- * Write a fatal-error envelope to stdout in the requested format and the
- * raw human-readable message to stderr. `code` is one of the strings in
- * the dup error vocabulary (see comments below); `message` is what the
- * agent / human sees as the explanation.
- */
-function writeFatalError(
+function writePreStreamError(
   io: MainIO,
   format: "markdown" | "json",
   code: string,
@@ -60,8 +53,30 @@ function writeFatalError(
   const report = buildErrorReport(code, message);
   io.stdout.write(
     format === "json"
-      ? `${JSON.stringify(report, null, 2)}\n`
-      : renderMarkdownError(report),
+      ? renderJson(report)
+      : renderMarkdownPreError("duplication", message),
+  );
+  io.stderr.write(`ts-hotspots duplication: ${humanDetail}\n`);
+}
+
+/**
+ * Write a fatal error after the Markdown head has been flushed. JSON
+ * mode never streams a head, so JSON callers should use
+ * `writePreStreamError` exclusively; this branch is markdown-only and
+ * closes the open JSON fence with the error envelope as its body.
+ */
+function writePostStreamError(
+  io: MainIO,
+  format: "markdown" | "json",
+  code: string,
+  message: string,
+  humanDetail: string,
+): void {
+  const report = buildErrorReport(code, message);
+  io.stdout.write(
+    format === "json"
+      ? renderJson(report)
+      : renderMarkdownErrorBody(report),
   );
   io.stderr.write(`ts-hotspots duplication: ${humanDetail}\n`);
 }
@@ -93,7 +108,7 @@ function classifyError(err: unknown): { code: string; message: string } {
   // Heuristic mapping: detector failures bubble up `git`-flavoured
   // messages most of the time. A more exhaustive vocabulary lands when
   // M5 introduces dismissal-side error codes.
-  if (/^not in a git repository/.test(message)) {
+  if (message.startsWith("not in a git repository")) {
     return { code: "NOT_A_GIT_REPO", message };
   }
   if (/git/i.test(message) || /spawn/i.test(message)) {
@@ -135,6 +150,31 @@ const REAL_IO: MainIO = {
   cwd: () => process.cwd(),
 };
 
+function buildStatsPayload(
+  report: CloneCandidateReport,
+  fullCount: number,
+): string {
+  const summary = report.summary;
+  const base = summary.scope.base;
+  const pipeline = summary.pipeline;
+  const displayed = report.groups.length;
+  let fragmentsAcross = 0;
+  for (const g of report.groups) fragmentsAcross += g.size;
+  const sizeLine =
+    summary.mode === "pr" && summary.scope.changed !== undefined
+      ? `base=${String(base.files)} files/${String(base.fragments)} fragments, ` +
+        `changed=${String(summary.scope.changed.files)} files/${String(summary.scope.changed.fragments)} fragments`
+      : `repo=${String(base.files)} files/${String(base.fragments)} fragments`;
+  const displayedNote =
+    displayed === fullCount
+      ? `displayed=${String(displayed)} groups (${String(fragmentsAcross)} fragments)`
+      : `displayed=${String(displayed)} of ${String(fullCount)} groups (${String(fragmentsAcross)} fragments)`;
+  return (
+    `${sizeLine}, ` +
+    `candidates=${String(pipeline.candidatePairs)}, reported=${String(pipeline.reportedPairs)}, ${displayedNote}`
+  );
+}
+
 /**
  * CLI entry point. Returns an exit code instead of calling `process.exit`
  * so it can be exercised from tests.
@@ -150,6 +190,13 @@ const REAL_IO: MainIO = {
  *   - `--phase-timings`      → in addition to the stats line, emit a
  *                              JSON Lines perf log to stderr (one event
  *                              per line, interleaved with the run).
+ *
+ * Markdown streaming: the agent-first head (instruction + opening JSON
+ * fence) is flushed to stdout *before* the detector starts so consumers
+ * with short stdin timeouts (e.g. `claude --permission-mode plan`'s 3s
+ * detect window) see well-formed Markdown immediately. Once the head is
+ * out, any post-stream failure closes the fence with the error envelope
+ * as its JSON body so the document remains parseable.
  */
 export async function main(
   argv: readonly string[],
@@ -165,7 +212,7 @@ export async function main(
       // argv to honour the common `--format json` case; everything else
       // defaults to markdown (the dup default).
       const { code, message } = classifyError(err);
-      writeFatalError(
+      writePreStreamError(
         io,
         sniffFormat(argv),
         code,
@@ -187,7 +234,7 @@ export async function main(
     repoPath = findGitRoot(args.path ?? io.cwd());
   } catch (err) {
     const { code, message } = classifyError(err);
-    writeFatalError(io, args.format, code, message, message);
+    writePreStreamError(io, args.format, code, message, message);
     return 1;
   }
 
@@ -205,6 +252,13 @@ export async function main(
     args.phaseTimings !== undefined
       ? new JsonlPerfLogger(io.stderr, args.phaseTimings)
       : undefined;
+
+  // Stream the agent-first head before kicking off the detector. The head
+  // is data-independent (instruction prelude + opening JSON fence) so it
+  // is safe to emit before we know what we will report.
+  if (args.format === "markdown") {
+    io.stdout.write(renderMarkdownHead("duplication"));
+  }
 
   try {
     const report: CloneCandidateReport =
@@ -236,37 +290,18 @@ export async function main(
       report.groups = report.groups.slice(0, args.limit);
     }
 
-    const output =
-      args.format === "json"
-        ? `${JSON.stringify(report, null, 2)}\n`
-        : buildMarkdownReport(report);
-    io.stdout.write(output);
-
-    const summary = report.summary;
-    const base = summary.scope.base;
-    const pipeline = summary.pipeline;
-    const displayed = report.groups.length;
-    let fragmentsAcross = 0;
-    for (const g of report.groups) fragmentsAcross += g.size;
-    const sizeLine =
-      summary.mode === "pr" && summary.scope.changed !== undefined
-        ? `base=${String(base.files)} files/${String(base.fragments)} fragments, ` +
-          `changed=${String(summary.scope.changed.files)} files/${String(summary.scope.changed.fragments)} fragments`
-        : `repo=${String(base.files)} files/${String(base.fragments)} fragments`;
-    const displayedNote =
-      displayed === fullCount
-        ? `displayed=${String(displayed)} groups (${String(fragmentsAcross)} fragments)`
-        : `displayed=${String(displayed)} of ${String(fullCount)} groups (${String(fragmentsAcross)} fragments)`;
+    io.stdout.write(
+      args.format === "json" ? renderJson(report) : renderMarkdownBody(report),
+    );
     io.stderr.write(
-      `ts-hotspots duplication: ${sizeLine}, ` +
-        `candidates=${String(pipeline.candidatePairs)}, reported=${String(pipeline.reportedPairs)}, ${displayedNote}\n`,
+      renderStatsLine("duplication", buildStatsPayload(report, fullCount)),
     );
     return 0;
   } catch (err) {
     const { code, message } = classifyError(err);
     const humanDetail =
       err instanceof Error ? (err.stack ?? err.message) : String(err);
-    writeFatalError(io, args.format, code, message, humanDetail);
+    writePostStreamError(io, args.format, code, message, humanDetail);
     return 1;
   }
 }
