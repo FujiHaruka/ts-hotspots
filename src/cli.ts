@@ -3,11 +3,13 @@ import { dirname, join, relative, resolve } from "node:path";
 import { Command, InvalidArgumentError } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { aggregate } from "./aggregator/aggregate.ts";
+import { splitFunctionLocation } from "./aggregator/function-location.ts";
 import {
   collectFunctionRefKeys,
   computeFunctionAxisMeta,
   computeFunctionCoOccurrence,
   computeFunctionHotspotCandidates,
+  emptyFunctionRankings,
   filterFunctionRankings,
   functionRefKey,
   isFunctionAxisId,
@@ -40,10 +42,23 @@ import type {
   DismissedSummary,
   ErrorReport,
   FunctionAxisId,
+  FunctionCoOccurrenceEntry,
+  FunctionEntry,
   FunctionReport,
   HotspotCandidate,
+  PrInfo,
+  RankedFunctionEntry,
   ReportProject,
 } from "./schema.ts";
+import { FUNCTION_AXIS_IDS } from "./schema.ts";
+import { findGitRoot } from "./util/git/findGitRoot.ts";
+import { listChangedFilePaths } from "./util/git/listChangedFilePaths.ts";
+import {
+  parseRevRange,
+  type RevRange,
+  RevRangeParseError,
+} from "./util/git/parseRevRange.ts";
+import { resolveDiffEndpoints } from "./util/git/runner.ts";
 
 export interface WritableLike {
   write: (chunk: string) => void;
@@ -74,6 +89,7 @@ interface FunctionCliOptions extends ChurnCliOptions {
   file?: string;
   full?: boolean;
   format?: ReportFormat;
+  pr?: RevRange;
 }
 
 interface DismissCliOptions {
@@ -113,6 +129,17 @@ function parseLimit(value: string): number {
 function parseFormat(value: string): ReportFormat {
   if (value === "markdown" || value === "json") return value;
   throw new InvalidArgumentError("--format must be 'markdown' or 'json'");
+}
+
+function parsePr(value: string): RevRange {
+  try {
+    return parseRevRange(value);
+  } catch (err) {
+    if (err instanceof RevRangeParseError) {
+      throw new InvalidArgumentError(err.message);
+    }
+    throw err;
+  }
 }
 
 function parseChurnWindow(value: string): number {
@@ -202,6 +229,11 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
       "--format <markdown|json>",
       "report format (default: markdown)",
       parseFormat,
+    )
+    .option(
+      "--pr <revrange>",
+      "scope hotspot output to functions in files changed by <revrange> (e.g. origin/main...). Rankings are still computed against the full head ref so the distribution is intact.",
+      parsePr,
     )
     .action((pathArg: string | undefined, opts: FunctionCliOptions) => {
       onInvoke({ kind: "complexity", positional: pathArg, options: opts });
@@ -467,18 +499,121 @@ function writeStatsLine(
       `functions=${String(project.functionCount)}, ` +
       `candidates=${String(report.functionHotspotCandidates.length)}`;
   }
+  if (report.pr !== undefined) {
+    payload += `, pr=${String(report.pr.changedFiles)} changed files`;
+  }
   if (report.dismissed !== undefined && report.dismissed.active > 0) {
     payload += `, dismissed=${String(report.dismissed.active)}`;
   }
   stderr.write(renderStatsLine("complexity", payload));
 }
 
-function runFunctions(
+interface PrScope {
+  info: PrInfo;
+  isInScope: (location: string) => boolean;
+}
+
+class NotAGitRepoError extends Error {
+  code = "NOT_A_GIT_REPO" as const;
+}
+
+class GitFailedError extends Error {
+  code = "GIT_FAILED" as const;
+}
+
+/**
+ * Resolve the PR scope: list of project-relative file paths whose
+ * head-side content differs between `rev.baseRef` and `rev.headRef`,
+ * intersected with files that contain functions in this project.
+ */
+async function resolvePrScope(
+  rev: RevRange,
+  rootDir: string,
+  functions: readonly FunctionEntry[],
+): Promise<PrScope> {
+  let gitRoot: string;
+  try {
+    gitRoot = findGitRoot(rootDir);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new NotAGitRepoError(msg);
+  }
+
+  let baseSha: string;
+  let headSha: string;
+  let repoRelChanged: string[];
+  try {
+    ({ baseSha, headSha } = await resolveDiffEndpoints(
+      gitRoot,
+      rev.baseRef,
+      rev.headRef,
+      rev.threeDot,
+    ));
+    repoRelChanged = await listChangedFilePaths(gitRoot, baseSha, headSha);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new GitFailedError(msg);
+  }
+
+  // Project-relative files that contain at least one collected function.
+  const projectFiles = new Set<string>();
+  for (const f of functions) {
+    projectFiles.add(splitFunctionLocation(f.location)[0]);
+  }
+
+  const scopeFiles = new Set<string>();
+  for (const repoRel of repoRelChanged) {
+    const abs = resolve(gitRoot, repoRel);
+    const rel = relative(rootDir, abs);
+    if (projectFiles.has(rel)) scopeFiles.add(rel);
+  }
+
+  return {
+    info: {
+      baseSha,
+      headSha,
+      threeDot: rev.threeDot,
+      changedFiles: scopeFiles.size,
+    },
+    isInScope: (location) => scopeFiles.has(splitFunctionLocation(location)[0]),
+  };
+}
+
+function filterRankingsByScope(
+  rankings: Record<FunctionAxisId, RankedFunctionEntry[]>,
+  isInScope: (location: string) => boolean,
+): Record<FunctionAxisId, RankedFunctionEntry[]> {
+  const result = emptyFunctionRankings();
+  for (const axis of FUNCTION_AXIS_IDS) {
+    result[axis] = rankings[axis].filter((e) => isInScope(e.ref.location));
+  }
+  return result;
+}
+
+function filterCoOccurrenceByScope(
+  entries: readonly FunctionCoOccurrenceEntry[],
+  isInScope: (location: string) => boolean,
+): FunctionCoOccurrenceEntry[] {
+  return entries.filter((e) => isInScope(e.ref.location));
+}
+
+function filterCandidatesByScope(
+  candidates: readonly HotspotCandidate[],
+  isInScope: (location: string) => boolean,
+): HotspotCandidate[] {
+  return candidates.filter((c) => isInScope(c.ref.location));
+}
+
+class InvalidArgsError extends Error {
+  code = "INVALID_ARGS" as const;
+}
+
+async function runFunctions(
   positional: string | undefined,
   options: FunctionCliOptions,
   stdout: WritableLike,
   stderr: WritableLike,
-): number {
+): Promise<number> {
   const format = options.format ?? DEFAULT_FORMAT;
   const streaming = format !== "json";
   const userLimit = options.limit;
@@ -504,6 +639,9 @@ function runFunctions(
     }
     if (options.metrics !== undefined) {
       functionAxes = parseFunctionAxes(options.metrics);
+    }
+    if (options.pr !== undefined && options.file !== undefined) {
+      throw new InvalidArgsError("--pr and --file are mutually exclusive");
     }
   } catch (err) {
     writeError(
@@ -574,20 +712,40 @@ function runFunctions(
         activeDismissalIds,
         stderr,
       );
+
+    // PR scope narrows the displayed surfaces (rankings, co-occurrence,
+    // candidates) to functions in changed files. axisMeta keeps the full
+    // distribution so spread / tie / non-zero stats stay representative.
+    const prScope =
+      options.pr !== undefined
+        ? await resolvePrScope(options.pr, rootDir, functions)
+        : undefined;
+    const displayedRankings =
+      prScope === undefined
+        ? functionRankings
+        : filterRankingsByScope(functionRankings, prScope.isInScope);
+    const displayedCoOccurrence =
+      prScope === undefined
+        ? functionCoOccurrence
+        : filterCoOccurrenceByScope(functionCoOccurrence, prScope.isInScope);
+    const scopedCandidates =
+      prScope === undefined
+        ? filteredCandidates
+        : filterCandidatesByScope(filteredCandidates, prScope.isInScope);
     const functionHotspotCandidates = Number.isFinite(limit)
-      ? filteredCandidates.slice(0, limit)
-      : filteredCandidates;
+      ? scopedCandidates.slice(0, limit)
+      : scopedCandidates;
 
     if (options.full === true) {
-      const usedFunctionKeys = collectFunctionRefKeys(functionRankings);
+      const usedFunctionKeys = collectFunctionRefKeys(displayedRankings);
       const report: FunctionReport = {
         status: "ok",
         tool: { name: "ts-hotspots", version: pkg.version },
         project: projectInfo,
-        functionRankings,
+        functionRankings: displayedRankings,
         functionAxisMeta,
         functionHotspotCandidates,
-        functionCoOccurrence,
+        functionCoOccurrence: displayedCoOccurrence,
         functions: functions.filter((f) =>
           usedFunctionKeys.has(
             functionRefKey({
@@ -599,6 +757,7 @@ function runFunctions(
         ),
       };
       if (dismissed !== undefined) report.dismissed = dismissed;
+      if (prScope !== undefined) report.pr = prScope.info;
       writeOk(stdout, report, streaming);
       writeStatsLine(stderr, report, undefined);
       return 0;
@@ -611,6 +770,7 @@ function runFunctions(
       functionHotspotCandidates,
     };
     if (dismissed !== undefined) report.dismissed = dismissed;
+    if (prScope !== undefined) report.pr = prScope.info;
     writeOk(stdout, report, streaming);
     writeStatsLine(stderr, report, undefined);
     return 0;
@@ -685,7 +845,7 @@ export async function run(
   if (invocation === undefined) return 0;
 
   if (invocation.kind === "complexity") {
-    return runFunctions(
+    return await runFunctions(
       invocation.positional,
       invocation.options,
       stdout,

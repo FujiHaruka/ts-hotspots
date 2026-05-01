@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
 import pkg from "../../../package.json" with { type: "json" };
 import {
   renderJson,
@@ -9,6 +7,7 @@ import {
   renderMarkdownPreError,
   renderStatsLine,
 } from "../../reporter/render.ts";
+import { findGitRoot } from "../../util/git/findGitRoot.ts";
 import { defaultConfig } from "../config/index.ts";
 import type {
   CloneCandidateReport,
@@ -115,23 +114,6 @@ function classifyError(err: unknown): { code: string; message: string } {
     return { code: "GIT_FAILED", message };
   }
   return { code: "UNKNOWN_ERROR", message };
-}
-
-/**
- * Walk up from `start` until a `.git` entry is found, returning that
- * directory. `.git` may be a directory (normal repo) or a file (worktree
- * / submodule), so we test for either via `existsSync`.
- */
-function findGitRoot(start: string): string {
-  let cur = resolve(start);
-  while (true) {
-    if (existsSync(join(cur, ".git"))) return cur;
-    const parent = dirname(cur);
-    if (parent === cur) {
-      throw new Error(`not in a git repository: ${start}`);
-    }
-    cur = parent;
-  }
 }
 
 export interface DuplicationWritable {

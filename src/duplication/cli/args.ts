@@ -1,5 +1,8 @@
 import { parseArgs } from "node:util";
-import { parseRevRange, RevRangeParseError } from "./parseRevRange.ts";
+import {
+  parseRevRange,
+  RevRangeParseError,
+} from "../../util/git/parseRevRange.ts";
 
 export type ReportFormat = "markdown" | "json";
 

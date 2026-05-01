@@ -100,6 +100,21 @@ export interface DismissedSummary {
   prunedThisRun: number;
 }
 
+/**
+ * PR scope metadata. Present when complexity was invoked with `--pr` so the
+ * report's hotspot surfaces are filtered to functions in the changed-files
+ * set. Rankings are still computed against the full head ref so the
+ * underlying distribution is intact — only the displayed lists are scoped.
+ */
+export interface PrInfo {
+  baseSha: string;
+  headSha: string;
+  /** `true` for `A...B` (merge-base semantics). `false` for `A..B`. */
+  threeDot: boolean;
+  /** Changed `.ts`/`.tsx` files (after exclude globs) intersected with the project. */
+  changedFiles: number;
+}
+
 export interface FunctionReport {
   status: "ok";
   tool: ReportTool;
@@ -110,6 +125,7 @@ export interface FunctionReport {
   functionCoOccurrence?: FunctionCoOccurrenceEntry[];
   functions?: FunctionEntry[];
   dismissed?: DismissedSummary;
+  pr?: PrInfo;
 }
 
 export interface ErrorReport {
