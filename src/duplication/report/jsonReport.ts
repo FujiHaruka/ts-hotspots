@@ -52,6 +52,14 @@ export interface ReportInput {
    * as not-thin and the pair survives.
    */
   getSourceFile?: (filePath: string) => ts.SourceFile | undefined;
+  /**
+   * Map from project-relative POSIX path to the file's recent commit
+   * count. Used to compute each group's churn-amplified ranking score
+   * and to surface `aggregateChurn` metadata. When omitted (e.g.
+   * `--no-churn`, non-git env, shallow clone), groups are sorted by
+   * raw `combined.max` and `aggregateChurn` is left off the report.
+   */
+  churnByFile?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -119,8 +127,15 @@ export function buildJsonReport(
         input.config,
         includeCode,
         isThinById,
+        input.churnByFile,
       )
-    : buildCloneGroups(capped, input.config, includeCode, isThinById);
+    : buildCloneGroups(
+        capped,
+        input.config,
+        includeCode,
+        isThinById,
+        input.churnByFile,
+      );
 
   if (perfLog !== undefined) {
     perfLog.emit("report.summary", {

@@ -21,6 +21,7 @@ describe("parseCliArgs", () => {
       phaseTimings: undefined,
       limit: 20,
       verbose: false,
+      churn: { enabled: true, window: 200, ref: undefined },
     });
   });
 
@@ -139,6 +140,7 @@ describe("parseCliArgs", () => {
       phaseTimings: undefined,
       limit: 20,
       verbose: false,
+      churn: { enabled: true, window: 200, ref: undefined },
     });
   });
 
@@ -290,5 +292,70 @@ describe("parseCliArgs", () => {
       throw new Error("expected whole-repo mode");
     }
     expect(wr.verbose).toBe(true);
+  });
+
+  it("defaults churn to enabled with window 200 and undefined ref", () => {
+    const pr = parseCliArgs(["main..feature"]);
+    if (pr.kind !== "run" || pr.mode !== "pr") {
+      throw new Error("expected pr mode");
+    }
+    expect(pr.churn).toEqual({
+      enabled: true,
+      window: 200,
+      ref: undefined,
+    });
+
+    const wr = parseCliArgs(["--whole-repo"]);
+    if (wr.kind !== "run" || wr.mode !== "whole-repo") {
+      throw new Error("expected whole-repo mode");
+    }
+    expect(wr.churn).toEqual({
+      enabled: true,
+      window: 200,
+      ref: undefined,
+    });
+  });
+
+  it("disables churn when --no-churn is passed", () => {
+    const r = parseCliArgs(["main..feature", "--no-churn"]);
+    if (r.kind !== "run" || r.mode !== "pr") {
+      throw new Error("expected pr mode");
+    }
+    expect(r.churn.enabled).toBe(false);
+  });
+
+  it("parses --churn-window as a positive integer", () => {
+    const r = parseCliArgs(["main..feature", "--churn-window", "50"]);
+    if (r.kind !== "run" || r.mode !== "pr") {
+      throw new Error("expected pr mode");
+    }
+    expect(r.churn.window).toBe(50);
+  });
+
+  it("rejects --churn-window 0 and non-numeric values", () => {
+    expect(() =>
+      parseCliArgs(["main..feature", "--churn-window", "0"]),
+    ).toThrow(ArgParseError);
+    expect(() =>
+      parseCliArgs(["main..feature", "--churn-window", "many"]),
+    ).toThrow(ArgParseError);
+  });
+
+  it("parses --churn-ref as a string", () => {
+    const r = parseCliArgs([
+      "main..feature",
+      "--churn-ref",
+      "origin/release",
+    ]);
+    if (r.kind !== "run" || r.mode !== "pr") {
+      throw new Error("expected pr mode");
+    }
+    expect(r.churn.ref).toBe("origin/release");
+  });
+
+  it("rejects empty --churn-ref", () => {
+    expect(() =>
+      parseCliArgs(["main..feature", "--churn-ref", "  "]),
+    ).toThrow(ArgParseError);
   });
 });

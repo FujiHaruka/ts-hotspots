@@ -35,11 +35,35 @@ export interface AggregateAxis {
   max: number;
 }
 
+export interface AggregateCombinedAxis extends AggregateAxis {
+  /**
+   * Group sort key: `max * churnAmplifier(aggregateChurn.max)`. Equals
+   * `max` when churn is unavailable or zero, so `--no-churn` runs (or
+   * shallow / non-git environments) preserve the prior ranking.
+   */
+  amplified: number;
+}
+
 export interface AggregateScores {
-  combined: AggregateAxis;
+  combined: AggregateCombinedAxis;
   tokenOverlap: AggregateAxis;
   statementKindSimilarity: AggregateAxis;
   callOverlap: AggregateAxis;
+}
+
+/**
+ * Per-group churn metadata. `max` is the maximum commit count over the
+ * file set (de-duped — same file with multiple members counts once);
+ * `min` is the minimum. `perFile` lists the commit count for each file
+ * involved (omitted in slim output to keep the schema small).
+ *
+ * Absent on a group when churn collection was disabled or the run was
+ * outside a git repo.
+ */
+export interface AggregateChurn {
+  max: number;
+  min: number;
+  perFile: Record<string, number>;
 }
 
 export interface CloneGroup {
@@ -69,6 +93,12 @@ export interface CloneGroup {
    */
   size: number;
   aggregateScores: AggregateScores;
+  /**
+   * Per-group churn metadata. Present when churn collection ran
+   * successfully; absent when `--no-churn` was passed, when running
+   * outside a git repo, or on a fully shallow clone.
+   */
+  aggregateChurn?: AggregateChurn;
   /** Evidence keys shared by every pair in the group. */
   sharedEvidence: Evidence;
   /** Group-level recommendation, computed against the weakest pair. */

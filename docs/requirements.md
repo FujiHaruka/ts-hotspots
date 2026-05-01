@@ -272,6 +272,18 @@ Each candidate pair is then re-scored on:
 
 A weighted combined score is produced. Final reporting is gated by an **OR** condition: a pair clears if the combined score crosses its threshold *or* any single axis crosses its axis-specific threshold. This keeps the false-negative rate low.
 
+### B.5.1 Churn-amplified group ranking
+
+After clone groups are formed, their order in the report is determined by `combined.max × churnAmplifier(groupChurnMax)` rather than `combined.max` alone. The amplifier mirrors `comp`'s leverage axis (`commitCount`):
+
+```
+churnAmplifier = 1 + alpha * min(groupChurnMax, cap) / cap
+```
+
+`groupChurnMax` is the maximum recent-commit count across the files the group spans (`git log --first-parent -m --name-status -M`, same window and rename handling as `comp`). With the defaults (`alpha = 0.5`, `cap = 20`) a fully saturated group earns a 1.5× boost, just enough to flip a moderately-similar hot group above a colder near-clone — without letting churn overwhelm similarity. Pair-level scores are not modified, so `--limit` still cuts on similarity strength; the amplifier only re-orders the surviving groups.
+
+When churn collection is unavailable (non-git, shallow clone, missing git binary, `--no-churn`) the amplifier is exactly `1.0` for every group and the ranking falls back to the legacy `combined.max` order. Flags (`--churn-window`, `--churn-ref`, `--no-churn`) carry the same meaning as in `comp` (§7.2).
+
 ## B.6 Output: Hotspots
 
 The reporting unit is a **hotspot**, one per clone group. When the same pattern appears in N places, the report contains one entry with N coordinates, not `N(N−1)/2` pairs.
@@ -293,7 +305,8 @@ Each `hotspots[]` entry carries:
 - `summary` — mode, per-side scope stats (files / fragments / lines / `fragmentsByKind` / `excludedFiles`), and pipeline counters (`candidatePairs` / `reportedPairs`).
 - `members[].scores` — per-pair `combined` plus the five sub-axes.
 - `members[].code` — fragment source (omitted from the slim default to keep the report under an LLM's attention budget).
-- `aggregateScores` — group-level `min` / `median` / `max` per axis.
+- `aggregateScores` — group-level `min` / `median` / `max` per axis. `combined` additionally carries `amplified` (the churn-amplified value used as the group's sort key — see B.5.1).
+- `aggregateChurn` — `{ max, min, perFile }` over the files this group spans. Absent when churn collection was disabled or skipped.
 - `evidenceFull` — `statementKinds` and `tokenNgramsSample` (the slim `evidence` block already covers `calls` / `properties`).
 - `recommendationHint` — `extract-function` / `parameterize` / `manual-review`, plus a confidence level computed from the weakest pair.
 

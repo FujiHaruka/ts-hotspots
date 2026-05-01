@@ -8,6 +8,22 @@ export type ReportFormat = "markdown" | "json";
 
 export type PhaseTimingsLevel = "summary" | "verbose";
 
+/**
+ * Resolved churn-collector settings for one duplication run.
+ *
+ * - `enabled = false` (set by `--no-churn`) skips the collector entirely
+ *   and yields the legacy ranking (groups sorted by raw `combined.max`,
+ *   no `aggregateChurn` metadata).
+ * - `ref = undefined` defers ref selection to the caller — PR mode
+ *   uses the head ref; whole-repo mode uses the scan ref. `--churn-ref`
+ *   overrides both.
+ */
+export interface ChurnCliConfig {
+  enabled: boolean;
+  window: number;
+  ref: string | undefined;
+}
+
 export interface PrModeArgs {
   kind: "run";
   mode: "pr";
@@ -40,6 +56,8 @@ export interface PrModeArgs {
    * just coordinates + top evidence.
    */
   verbose: boolean;
+  /** Churn-collector wiring; mirrors `comp`'s `--churn-*` flags. */
+  churn: ChurnCliConfig;
 }
 
 export interface WholeRepoModeArgs {
@@ -57,9 +75,12 @@ export interface WholeRepoModeArgs {
   limit: number;
   /** See `PrModeArgs.verbose`. */
   verbose: boolean;
+  /** See `PrModeArgs.churn`. */
+  churn: ChurnCliConfig;
 }
 
 export const DEFAULT_LIMIT = 20;
+export const DEFAULT_CHURN_WINDOW = 200;
 
 export type ParsedArgs = PrModeArgs | WholeRepoModeArgs;
 
@@ -114,6 +135,15 @@ Options:
                            aggregate score axes, and the analysis
                            summary. Default output keeps just the
                            coordinates and top shared evidence.
+  --churn-window <N>       Number of commits walked by 'git log' to
+                           compute per-file churn (default: 200). Used
+                           to amplify the score of clone groups whose
+                           files have been edited recently.
+  --churn-ref <ref>        Ref to walk for churn (default: PR head ref
+                           in PR mode, --ref in whole-repo mode).
+  --no-churn               Disable churn collection. Groups are sorted
+                           by raw similarity and 'aggregateChurn' is
+                           omitted from the report.
   -h, --help               Show this help and exit
 
 Examples:
@@ -168,6 +198,7 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
   const phaseTimings = parsePhaseTimingsLevel(values["phase-timings"]);
   const limit = parseLimit(values.limit);
   const verbose = values.verbose === true;
+  const churn = parseChurnConfig(values);
 
   if (wholeRepo) {
     if (positionals.length > 1) {
@@ -185,6 +216,7 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
       phaseTimings,
       limit,
       verbose,
+      churn,
     };
   }
 
@@ -229,7 +261,40 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
     phaseTimings,
     limit,
     verbose,
+    churn,
   };
+}
+
+/**
+ * Resolve `--churn-window` / `--churn-ref` / `--no-churn` into a
+ * `ChurnCliConfig`. `--no-churn` wins over the other flags (specifying
+ * a window with churn disabled is a no-op rather than an error).
+ */
+function parseChurnConfig(values: ParsedValues): ChurnCliConfig {
+  const enabled = values["no-churn"] !== true;
+  const window = parseChurnWindow(values["churn-window"]);
+  const ref = values["churn-ref"];
+  if (ref !== undefined && ref.trim().length === 0) {
+    throw new ArgParseError("--churn-ref requires a non-empty value");
+  }
+  return { enabled, window, ref };
+}
+
+function parseChurnWindow(value: string | undefined): number {
+  if (value === undefined) return DEFAULT_CHURN_WINDOW;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new ArgParseError(
+      `invalid --churn-window '${value}' (expected a positive integer)`,
+    );
+  }
+  const n = Number.parseInt(trimmed, 10);
+  if (n <= 0) {
+    throw new ArgParseError(
+      `invalid --churn-window '${value}' (expected a positive integer)`,
+    );
+  }
+  return n;
 }
 
 /**
@@ -323,6 +388,9 @@ const OPTIONS = {
   "phase-timings": { type: "string" },
   limit: { type: "string" },
   verbose: { type: "boolean" },
+  "churn-window": { type: "string" },
+  "churn-ref": { type: "string" },
+  "no-churn": { type: "boolean" },
   help: { type: "boolean", short: "h" },
 } as const;
 
@@ -334,5 +402,8 @@ interface ParsedValues {
   "phase-timings"?: string;
   limit?: string;
   verbose?: boolean;
+  "churn-window"?: string;
+  "churn-ref"?: string;
+  "no-churn"?: boolean;
   help?: boolean;
 }

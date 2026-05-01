@@ -1,4 +1,5 @@
 import type {
+  AggregateChurn,
   AggregateScores,
   CloneCandidateReport,
   CloneGroup,
@@ -69,6 +70,12 @@ export interface HotspotRef {
 export interface VerboseDupHotspot extends SlimDupHotspot {
   /** min/median/max for combined + the four sub-axes. */
   aggregateScores: AggregateScores;
+  /**
+   * Recent-commit churn for the files this group spans. Absent when
+   * churn collection was disabled or skipped (non-git, shallow clone,
+   * `--no-churn`).
+   */
+  aggregateChurn?: AggregateChurn;
   /** Pipeline's recommendation derived from the weakest pair. */
   recommendationHint: RecommendationHint;
   /** Statement-kind / token-ngram signals dropped from slim output. */
@@ -170,6 +177,9 @@ function toVerboseHotspot(group: CloneGroup): VerboseDupHotspot {
     },
     members: group.members.map(toVerboseMember),
   };
+  if (group.aggregateChurn !== undefined) {
+    result.aggregateChurn = group.aggregateChurn;
+  }
   if (group.anchor !== undefined) {
     const anchor: VerboseDupHotspot["anchor"] = { ref: toRef(group.anchor) };
     if (group.anchor.code !== undefined) anchor.code = group.anchor.code;

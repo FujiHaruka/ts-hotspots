@@ -142,6 +142,22 @@ export interface Config {
       minLines: number;
       alpha: number;
     };
+    /**
+     * Churn-based group amplifier. Multiplied into a clone group's
+     * `aggregateScores.combined.max` to derive the final sort key:
+     *
+     *   amplifier = 1 + alpha * min(groupChurnMax, cap) / cap
+     *
+     * `alpha = 0` or `cap <= 0` disables the amplifier (every group
+     * keeps its raw `combined.max`). With the defaults (`alpha = 0.5`,
+     * `cap = 20`) a fully saturated group earns a 1.5x boost — enough
+     * to flip a high-similarity-but-cold group beneath a moderate-but-
+     * hot group, without letting churn overwhelm similarity entirely.
+     */
+    churn: {
+      alpha: number;
+      cap: number;
+    };
   };
   report: {
     tokenNgramSampleSize: number;
