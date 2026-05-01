@@ -59,7 +59,7 @@ export function aggregate(ctx: AggregateContext): AggregateResult {
       name: d.name,
       kind: d.kind,
       metrics: omitZeros(metrics),
-      bodyHash: computeBodyHash(d.node),
+      bodyHash: computeBodyHash(d.tsNode, d.tsSourceFile),
     };
   });
 
