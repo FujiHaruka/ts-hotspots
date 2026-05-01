@@ -33,6 +33,7 @@
     "prepublishOnly": "pnpm clean && pnpm build",
     "start": "node src/index.ts",
     "test": "vitest run",
+    "test:related": "vitest run --changed",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
