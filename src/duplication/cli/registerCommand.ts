@@ -91,6 +91,7 @@ export function addDuplicationCommand(
     .command("duplication [path]")
     .alias("dup")
     .description(SHORT_DESCRIPTION)
+    .helpGroup("Analysis commands:")
     .addHelpText("before", `\n${LONG_DESCRIPTION}\n`)
     .addHelpText("after", HELP_AFTER)
     .option(
