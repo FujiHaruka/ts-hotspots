@@ -9,9 +9,11 @@
  *  - **slim** (default): top-level coordinate, `smells[]` (the smell
  *    types the node tripped, ordered by composite descending — the
  *    first entry is the highest-composite smell), contributing-metric
- *    breakdown for the top-listed smell, edge mix, dismissalId.
- *  - **verbose** (`--verbose`): adds the project-level summary
- *    (per-smell counts of top-listed hits, candidate count, ref).
+ *    breakdown for the top-listed smell, dismissalId.
+ *  - **verbose** (`--verbose`): adds `edgeMix` per hotspot (raw
+ *    fanIn/fanOut counts and runtime-edge share) and the project-level
+ *    summary (per-smell counts of top-listed hits, candidate count,
+ *    ref).
  *
  * Both profiles share the same envelope (`tool`, `project`,
  * `hotspots[]`, `dismissed?`, `notice?`, `diff?`, `summary?`) so an
@@ -88,7 +90,8 @@ export interface ArchHotspot {
    */
   smells: SmellType[];
   metrics: ArchContributingMetric[];
-  edgeMix: ArchEdgeMix;
+  /** Verbose only — raw fanIn/fanOut counts and runtime-edge share. */
+  edgeMix?: ArchEdgeMix;
   dismissalId: string;
 }
 
