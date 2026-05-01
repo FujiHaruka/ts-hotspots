@@ -1,10 +1,6 @@
 import ts from "typescript";
-import type {
-  Collector,
-  CollectorContext,
-  DeclarationId,
-  FunctionLikeNode,
-} from "../types.ts";
+import { makeCollector } from "../makeCollector.ts";
+import type { FunctionLikeNode } from "../types.ts";
 
 export interface CognitiveResult {
   cognitiveComplexity: number;
@@ -185,35 +181,20 @@ function getBody(node: FunctionLikeNode): ts.Node | undefined {
 }
 
 function getOwnName(node: FunctionLikeNode): string | undefined {
-  if (node.kind === ts.SyntaxKind.FunctionDeclaration) {
-    const name = (node as ts.FunctionDeclaration).name?.text;
-    return name === undefined || name === "" ? undefined : name;
-  }
-  if (node.kind === ts.SyntaxKind.FunctionExpression) {
-    const name = (node as ts.FunctionExpression).name?.text;
+  if (
+    node.kind === ts.SyntaxKind.FunctionDeclaration ||
+    node.kind === ts.SyntaxKind.FunctionExpression
+  ) {
+    const name = node.name?.text;
     return name === undefined || name === "" ? undefined : name;
   }
   // Methods/accessors/constructors/anonymous: recursion via `this.m()` not detected (out of scope).
   return undefined;
 }
 
-export const cognitiveCollector: Collector<CognitiveResult> = {
+export const cognitiveCollector = makeCollector<CognitiveResult>({
   name: "cognitive",
-  collect(ctx: CollectorContext): Map<DeclarationId, CognitiveResult> {
-    const result = new Map<DeclarationId, CognitiveResult>();
-    for (const decl of ctx.declarations) {
-      try {
-        result.set(decl.id, {
-          cognitiveComplexity: computeCognitive(decl.node, decl.sourceFile),
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(
-          `cognitiveCollector failed at ${decl.file}:${String(decl.line)} (${decl.id}): ${msg}`,
-          { cause: err },
-        );
-      }
-    }
-    return result;
-  },
-};
+  compute: (decl) => ({
+    cognitiveComplexity: computeCognitive(decl.node, decl.sourceFile),
+  }),
+});
