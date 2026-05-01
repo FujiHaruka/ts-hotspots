@@ -111,7 +111,7 @@ describe("serializeReport — slim", () => {
     expect(h?.dismissalId.startsWith("arch:")).toBe(true);
   });
 
-  it("slim output drops summary and componentCount", () => {
+  it("slim output drops edgeMix, summary, and componentCount", () => {
     const g = graph([comp("src/a.ts", "A")], []);
     const report = serializeReport([SAMPLE_CANDIDATE], {
       tool: TOOL,
@@ -122,27 +122,7 @@ describe("serializeReport — slim", () => {
     });
     expect(report.summary).toBeUndefined();
     expect(report.project.componentCount).toBeUndefined();
-  });
-
-  it("computes runtime share over fanIn + fanOut", () => {
-    const g = graph(
-      [comp("src/a.ts", "A"), comp("src/b.ts", "B"), comp("src/c.ts", "C")],
-      [
-        edge("src/b.ts", "B", "src/a.ts", "A"), // runtime
-        edge("src/c.ts", "C", "src/a.ts", "A", "type"), // type-only
-      ],
-    );
-    const report = serializeReport([SAMPLE_CANDIDATE], {
-      tool: TOOL,
-      verbose: false,
-      ref: "HEAD",
-      graph: g,
-      sourceFileCount: 3,
-    });
-    const mix = report.hotspots[0]?.edgeMix;
-    expect(mix?.fanIn).toBe(2);
-    expect(mix?.fanOut).toBe(0);
-    expect(mix?.runtimeShare).toBeCloseTo(0.5, 6);
+    expect(report.hotspots[0]?.edgeMix).toBeUndefined();
   });
 });
 
@@ -161,5 +141,26 @@ describe("serializeReport — verbose", () => {
     expect(report.summary?.smellCounts.architectural_hub).toBe(1);
     expect(report.summary?.smellCounts.bridge_component).toBe(0);
     expect(report.project.componentCount).toBe(1);
+  });
+
+  it("computes edgeMix runtimeShare over fanIn + fanOut", () => {
+    const g = graph(
+      [comp("src/a.ts", "A"), comp("src/b.ts", "B"), comp("src/c.ts", "C")],
+      [
+        edge("src/b.ts", "B", "src/a.ts", "A"), // runtime
+        edge("src/c.ts", "C", "src/a.ts", "A", "type"), // type-only
+      ],
+    );
+    const report = serializeReport([SAMPLE_CANDIDATE], {
+      tool: TOOL,
+      verbose: true,
+      ref: "HEAD",
+      graph: g,
+      sourceFileCount: 3,
+    });
+    const mix = report.hotspots[0]?.edgeMix;
+    expect(mix?.fanIn).toBe(2);
+    expect(mix?.fanOut).toBe(0);
+    expect(mix?.runtimeShare).toBeCloseTo(0.5, 6);
   });
 });

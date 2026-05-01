@@ -10,12 +10,13 @@
  * 1. Pick the `file:line` coordinate, assemble the export name + kind
  *    string from the component id, and compute `dismissalId` so each
  *    hotspot is a self-contained agent-facing card.
- * 2. Compute the at-a-glance edge mix (`runtimeShare`) per node so the
- *    report shows whether type-only or runtime edges dominate without
- *    forcing the agent to re-walk the graph.
+ * 2. Compute the at-a-glance edge mix (`fanIn`/`fanOut`/`runtimeShare`)
+ *    per node — verbose only — so the report shows raw connectivity
+ *    without forcing the agent to re-walk the graph.
  * 3. Flatten the scoring layer's primary + secondary smells into a
  *    single `smells[]` list ordered by composite descending, and
- *    filter slim vs verbose (slim drops `summary` and `componentCount`).
+ *    filter slim vs verbose (slim drops `edgeMix`, `summary`, and
+ *    `componentCount`).
  */
 
 import { componentIdToArchDismissalId } from "../../dismissal/hash.ts";
@@ -45,7 +46,9 @@ export function serializeReport(
 ): ArchReport {
   const componentById = new Map<string, Component>();
   for (const node of opts.graph.nodes) componentById.set(node.id, node);
-  const edgeMixByNode = computeEdgeMix(opts.graph);
+  const edgeMixByNode = opts.verbose
+    ? computeEdgeMix(opts.graph)
+    : undefined;
 
   const hotspots = candidates.map((c) =>
     toHotspot(c, componentById, edgeMixByNode),
@@ -72,7 +75,7 @@ export function serializeReport(
 function toHotspot(
   candidate: ArchCandidate,
   componentById: ReadonlyMap<string, Component>,
-  edgeMixByNode: ReadonlyMap<string, ArchEdgeMix>,
+  edgeMixByNode: ReadonlyMap<string, ArchEdgeMix> | undefined,
 ): ArchHotspot {
   const node = componentById.get(candidate.nodeId);
   const ref = node === undefined
@@ -82,24 +85,26 @@ function toHotspot(
         kind: node.exportKind,
         name: node.exportName,
       };
-  const edgeMix = edgeMixByNode.get(candidate.nodeId) ?? {
-    fanOut: 0,
-    fanIn: 0,
-    runtimeShare: 0,
-  };
   const smells: SmellType[] = [
     candidate.primary.smellType,
     ...candidate.secondary.map((s) => s.smellType),
   ];
-  return {
+  const hotspot: ArchHotspot = {
     kind: "architecture",
     ref,
     score: { axis: "composite", value: candidate.primary.composite },
     smells,
     metrics: candidate.primary.contributing.map(toContributingMetric),
-    edgeMix,
     dismissalId: componentIdToArchDismissalId(candidate.nodeId),
   };
+  if (edgeMixByNode !== undefined) {
+    hotspot.edgeMix = edgeMixByNode.get(candidate.nodeId) ?? {
+      fanOut: 0,
+      fanIn: 0,
+      runtimeShare: 0,
+    };
+  }
+  return hotspot;
 }
 
 function toContributingMetric(c: {
