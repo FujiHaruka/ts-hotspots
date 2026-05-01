@@ -6,8 +6,8 @@ import { slocCollector } from "../collectors/complexity/sloc.ts";
 import { awaitCountCollector } from "../collectors/effects/await-count.ts";
 import { mutationCountCollector } from "../collectors/effects/mutation-count.ts";
 import { tryCatchCountCollector } from "../collectors/effects/try-catch-count.ts";
-import type { SourceFileInfo } from "../collectors/enumerate-source-files.ts";
 import type { CollectorContext } from "../collectors/types.ts";
+import type { SourceFileInfo } from "../loader/types.ts";
 import { computeBodyHash } from "../dismissal/hash.ts";
 import type { FunctionEntry, FunctionMetrics } from "../schema.ts";
 import {
@@ -59,7 +59,7 @@ export function aggregate(ctx: AggregateContext): AggregateResult {
       name: d.name,
       kind: d.kind,
       metrics: omitZeros(metrics),
-      bodyHash: computeBodyHash(d.tsNode, d.tsSourceFile),
+      bodyHash: computeBodyHash(d.node, d.sourceFile),
     };
   });
 

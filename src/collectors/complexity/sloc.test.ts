@@ -1,6 +1,6 @@
-import { Project } from "ts-morph";
 import { describe, expect, test } from "vitest";
 import { enumerateDeclarations } from "../enumerate-declarations.ts";
+import { mkSourceFiles } from "../internal/mkSourceFiles.test-helper.ts";
 import { parseFirstFunctionLike } from "../internal/parseFirstFunctionLike.test-helper.ts";
 import { computeSloc, slocCollector } from "./sloc.ts";
 
@@ -89,20 +89,17 @@ describe("computeSloc", () => {
 
 describe("slocCollector", () => {
   test("returns a map of results keyed by declaration id", () => {
-    const project = new Project({ useInMemoryFileSystem: true });
-    project.createSourceFile(
-      "/proj/src/a.ts",
-      [
+    const files = mkSourceFiles({
+      "src/a.ts": [
         "export function simple(){ return 1; }",
         "export function multi(x: number){",
         "  const y = x;",
         "  return y;",
         "}",
       ].join("\n"),
-    );
-    const declarations = enumerateDeclarations(project, "/proj");
+    });
+    const declarations = enumerateDeclarations(files);
     const result = slocCollector.collect({
-      project,
       rootDir: "/proj",
       declarations,
     });

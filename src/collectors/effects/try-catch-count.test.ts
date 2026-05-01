@@ -1,7 +1,7 @@
-import { Project } from "ts-morph";
 import ts from "typescript";
 import { describe, expect, test } from "vitest";
 import { enumerateDeclarations } from "../enumerate-declarations.ts";
+import { mkSourceFiles } from "../internal/mkSourceFiles.test-helper.ts";
 import {
   parseAllFunctionLikes,
   parseFirstFunctionLike,
@@ -72,17 +72,14 @@ describe("computeTryCatchCount", () => {
 
 describe("tryCatchCountCollector", () => {
   test("returns a map keyed by declaration id", () => {
-    const project = new Project({ useInMemoryFileSystem: true });
-    project.createSourceFile(
-      "/proj/src/a.ts",
-      [
+    const files = mkSourceFiles({
+      "src/a.ts": [
         "export function clean(){ return 1; }",
         "export function guarded(){ try { return 1; } catch { return 0; } }",
       ].join("\n"),
-    );
-    const declarations = enumerateDeclarations(project, "/proj");
+    });
+    const declarations = enumerateDeclarations(files);
     const result = tryCatchCountCollector.collect({
-      project,
       rootDir: "/proj",
       declarations,
     });

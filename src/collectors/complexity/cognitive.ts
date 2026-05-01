@@ -3,7 +3,7 @@ import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeTsNode,
+  FunctionLikeNode,
 } from "../types.ts";
 
 export interface CognitiveResult {
@@ -27,7 +27,7 @@ const LOGICAL_OPERATOR_KINDS = new Set<ts.SyntaxKind>([
 ]);
 
 export function computeCognitive(
-  node: FunctionLikeTsNode,
+  node: FunctionLikeNode,
   sourceFile: ts.SourceFile,
 ): number {
   const body = getBody(node);
@@ -177,14 +177,14 @@ export function computeCognitive(
   return score;
 }
 
-function getBody(node: FunctionLikeTsNode): ts.Node | undefined {
+function getBody(node: FunctionLikeNode): ts.Node | undefined {
   if (node.kind === ts.SyntaxKind.ArrowFunction) {
     return (node as ts.ArrowFunction).body;
   }
-  return (node as Exclude<FunctionLikeTsNode, ts.ArrowFunction>).body;
+  return (node as Exclude<FunctionLikeNode, ts.ArrowFunction>).body;
 }
 
-function getOwnName(node: FunctionLikeTsNode): string | undefined {
+function getOwnName(node: FunctionLikeNode): string | undefined {
   if (node.kind === ts.SyntaxKind.FunctionDeclaration) {
     const name = (node as ts.FunctionDeclaration).name?.text;
     return name === undefined || name === "" ? undefined : name;
@@ -204,7 +204,7 @@ export const cognitiveCollector: Collector<CognitiveResult> = {
     for (const decl of ctx.declarations) {
       try {
         result.set(decl.id, {
-          cognitiveComplexity: computeCognitive(decl.tsNode, decl.tsSourceFile),
+          cognitiveComplexity: computeCognitive(decl.node, decl.sourceFile),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

@@ -1,7 +1,7 @@
-import { Project } from "ts-morph";
 import ts from "typescript";
 import { describe, expect, test } from "vitest";
 import { enumerateDeclarations } from "../enumerate-declarations.ts";
+import { mkSourceFiles } from "../internal/mkSourceFiles.test-helper.ts";
 import {
   parseAllFunctionLikes,
   parseFirstFunctionLike,
@@ -83,17 +83,14 @@ describe("computeCalleeCount", () => {
 
 describe("calleeCountCollector", () => {
   test("returns a map keyed by declaration id", () => {
-    const project = new Project({ useInMemoryFileSystem: true });
-    project.createSourceFile(
-      "/proj/src/a.ts",
-      [
+    const files = mkSourceFiles({
+      "src/a.ts": [
         "export function quiet(){ return 1; }",
         "export function noisy(){ a(); b(); return 0; }",
       ].join("\n"),
-    );
-    const declarations = enumerateDeclarations(project, "/proj");
+    });
+    const declarations = enumerateDeclarations(files);
     const result = calleeCountCollector.collect({
-      project,
       rootDir: "/proj",
       declarations,
     });

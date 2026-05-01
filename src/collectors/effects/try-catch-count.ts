@@ -3,15 +3,15 @@ import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeTsNode,
+  FunctionLikeNode,
 } from "../types.ts";
-import { walkBodyExcludingNestedFunctions } from "../walk-ts.ts";
+import { walkBodyExcludingNestedFunctions } from "../walk.ts";
 
 export interface TryCatchCountResult {
   tryCatchCount: number;
 }
 
-export function computeTryCatchCount(node: FunctionLikeTsNode): number {
+export function computeTryCatchCount(node: FunctionLikeNode): number {
   const body = getBody(node);
   if (!body) return 0;
 
@@ -24,11 +24,11 @@ export function computeTryCatchCount(node: FunctionLikeTsNode): number {
   return count;
 }
 
-function getBody(node: FunctionLikeTsNode): ts.Node | undefined {
+function getBody(node: FunctionLikeNode): ts.Node | undefined {
   if (node.kind === ts.SyntaxKind.ArrowFunction) {
     return (node as ts.ArrowFunction).body;
   }
-  return (node as Exclude<FunctionLikeTsNode, ts.ArrowFunction>).body;
+  return (node as Exclude<FunctionLikeNode, ts.ArrowFunction>).body;
 }
 
 export const tryCatchCountCollector: Collector<TryCatchCountResult> = {
@@ -38,7 +38,7 @@ export const tryCatchCountCollector: Collector<TryCatchCountResult> = {
     for (const decl of ctx.declarations) {
       try {
         result.set(decl.id, {
-          tryCatchCount: computeTryCatchCount(decl.tsNode),
+          tryCatchCount: computeTryCatchCount(decl.node),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

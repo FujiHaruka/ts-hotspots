@@ -1,26 +1,19 @@
-import { Project } from "ts-morph";
 import { describe, expect, test } from "vitest";
 import { enumerateDeclarations } from "../collectors/enumerate-declarations.ts";
-import { enumerateSourceFiles } from "../collectors/enumerate-source-files.ts";
+import { mkSourceFiles } from "../collectors/internal/mkSourceFiles.test-helper.ts";
 import { aggregate } from "./aggregate.ts";
 
 function buildCtx(files: Record<string, string>, rootDir: string) {
-  const project = new Project({ useInMemoryFileSystem: true });
-  for (const [path, content] of Object.entries(files)) {
-    project.createSourceFile(path, content);
-  }
-  const sourceFiles = enumerateSourceFiles(project, rootDir);
-  const declarations = enumerateDeclarations(project, rootDir, {
-    files: sourceFiles,
-  });
-  return { project, rootDir, declarations, files: sourceFiles };
+  const sourceFiles = mkSourceFiles(files);
+  const declarations = enumerateDeclarations(sourceFiles);
+  return { rootDir, declarations, files: sourceFiles };
 }
 
 describe("aggregate", () => {
   test("builds function entries with complete shape", () => {
     const ctx = buildCtx(
       {
-        "/proj/src/a.ts":
+        "src/a.ts":
           "export function f(x: number){ if (x) return 1; return 0; }",
       },
       "/proj",
@@ -40,9 +33,8 @@ describe("aggregate", () => {
   test("sorts functions by (file, line, name)", () => {
     const ctx = buildCtx(
       {
-        "/proj/src/b.ts":
-          "export function second(){}\nexport function third(){}",
-        "/proj/src/a.ts": "export function first(){}",
+        "src/b.ts": "export function second(){}\nexport function third(){}",
+        "src/a.ts": "export function first(){}",
       },
       "/proj",
     );

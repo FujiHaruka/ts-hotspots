@@ -7,7 +7,7 @@ import { RecordingPerfLogger } from "../cli/perfLog.ts";
 import { defaultConfig } from "../config/index.ts";
 import type { CandidateScore, ScoreBreakdown } from "../domain/candidate.ts";
 import type { Fragment } from "../domain/fragment.ts";
-import { parseSource } from "../indexer/parseSource.ts";
+import { parseSource } from "../../parser/parseSource.ts";
 import { nonNull } from "../util/nonNull.ts";
 import { buildEvidence } from "./evidence.ts";
 import {

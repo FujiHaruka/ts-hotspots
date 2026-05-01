@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import ts from "typescript";
 import { parseSource } from "../parser/parseSource.ts";
-import { walkBodyExcludingNestedFunctions } from "./walk-ts.ts";
+import { walkBodyExcludingNestedFunctions } from "./walk.ts";
 
 function findFirstFunction(sourceFile: ts.SourceFile): ts.FunctionDeclaration {
   const fn = sourceFile.statements.find(

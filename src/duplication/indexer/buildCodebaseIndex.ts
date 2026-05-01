@@ -1,7 +1,7 @@
 import type { Config } from "../config/config.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import { extractFragments } from "./extractFragments.ts";
-import { parseSource } from "./parseSource.ts";
+import { parseSource } from "../../parser/parseSource.ts";
 
 export interface SourceInput {
   /** Relative path; used as-is for `Fragment.filePath`. */

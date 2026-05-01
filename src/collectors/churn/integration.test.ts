@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import type { SourceFileInfo } from "../enumerate-source-files.ts";
+import type { SourceFileInfo } from "../../loader/types.ts";
 import { collectChurn } from "./commit-count.ts";
 
 function git(cwd: string, args: readonly string[]): void {

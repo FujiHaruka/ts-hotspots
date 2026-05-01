@@ -18,7 +18,6 @@ import {
 import { runDismiss, runListDismissed, runUndismiss } from "./cli/dismiss.ts";
 import { collectChurn } from "./collectors/churn/commit-count.ts";
 import { enumerateDeclarations } from "./collectors/enumerate-declarations.ts";
-import type { SourceFileInfo } from "./collectors/enumerate-source-files.ts";
 import { DEFAULT_EXCLUDE_GLOBS } from "./defaults.ts";
 import { bodyHashToCompDismissalId } from "./dismissal/hash.ts";
 import {
@@ -381,16 +380,8 @@ async function prepare(
 ): Promise<PreparedContext> {
   const rootDir = resolveRootDir(positional);
   const sources = await listRepoSources(rootDir, { exclude });
-  const { project } = loadProject({
-    sourcePaths: sources.map((s) => s.absolute),
-  });
-  const files: SourceFileInfo[] = [];
-  for (const s of sources) {
-    const sourceFile = project.getSourceFile(s.absolute);
-    if (sourceFile === undefined) continue;
-    files.push({ path: s.relative, sourceFile });
-  }
-  const declarations = enumerateDeclarations(project, rootDir, { files });
+  const { files } = loadProject({ sources });
+  const declarations = enumerateDeclarations(files);
   const churn = churnOptions.enabled
     ? collectChurn({
         rootDir,
@@ -403,7 +394,6 @@ async function prepare(
       })
     : undefined;
   const { functions } = aggregate({
-    project,
     rootDir,
     declarations,
     files,

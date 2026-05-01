@@ -3,7 +3,7 @@ import type { Config } from "../config/config.ts";
 import { defaultConfig } from "../config/index.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import { extractFragments } from "../indexer/extractFragments.ts";
-import { parseSource } from "../indexer/parseSource.ts";
+import { parseSource } from "../../parser/parseSource.ts";
 import { buildTokenNgrams } from "./normalizedTokenNgram.ts";
 
 function firstFunction(

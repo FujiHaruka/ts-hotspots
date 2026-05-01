@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import type { SourceFileInfo } from "../enumerate-source-files.ts";
+import type { SourceFileInfo } from "../../loader/types.ts";
 
 export interface ChurnCollectorOptions {
   rootDir: string;

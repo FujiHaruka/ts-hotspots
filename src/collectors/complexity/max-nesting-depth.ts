@@ -3,7 +3,7 @@ import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeTsNode,
+  FunctionLikeNode,
 } from "../types.ts";
 
 export interface MaxNestingDepthResult {
@@ -20,7 +20,7 @@ const NESTED_FUNCTION_KINDS = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.Constructor,
 ]);
 
-export function computeMaxNestingDepth(node: FunctionLikeTsNode): number {
+export function computeMaxNestingDepth(node: FunctionLikeNode): number {
   const body = getBody(node);
   if (!body) return 0;
 
@@ -79,11 +79,11 @@ export function computeMaxNestingDepth(node: FunctionLikeTsNode): number {
   return max;
 }
 
-function getBody(node: FunctionLikeTsNode): ts.Node | undefined {
+function getBody(node: FunctionLikeNode): ts.Node | undefined {
   if (node.kind === ts.SyntaxKind.ArrowFunction) {
     return (node as ts.ArrowFunction).body;
   }
-  return (node as Exclude<FunctionLikeTsNode, ts.ArrowFunction>).body;
+  return (node as Exclude<FunctionLikeNode, ts.ArrowFunction>).body;
 }
 
 export const maxNestingDepthCollector: Collector<MaxNestingDepthResult> = {
@@ -93,7 +93,7 @@ export const maxNestingDepthCollector: Collector<MaxNestingDepthResult> = {
     for (const decl of ctx.declarations) {
       try {
         result.set(decl.id, {
-          maxNestingDepth: computeMaxNestingDepth(decl.tsNode),
+          maxNestingDepth: computeMaxNestingDepth(decl.node),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

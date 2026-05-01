@@ -1,7 +1,7 @@
-import { Project } from "ts-morph";
 import ts from "typescript";
 import { describe, expect, test } from "vitest";
 import { enumerateDeclarations } from "../enumerate-declarations.ts";
+import { mkSourceFiles } from "../internal/mkSourceFiles.test-helper.ts";
 import {
   parseAllFunctionLikes,
   parseFirstFunctionLike,
@@ -96,17 +96,14 @@ describe("computeMaxNestingDepth", () => {
 
 describe("maxNestingDepthCollector", () => {
   test("returns a map of results keyed by declaration id", () => {
-    const project = new Project({ useInMemoryFileSystem: true });
-    project.createSourceFile(
-      "/proj/src/a.ts",
-      [
+    const files = mkSourceFiles({
+      "src/a.ts": [
         "export function flat(){ return 1; }",
         "export function deep(x: boolean, y: boolean){ if (x) { if (y) { return 1; } } return 0; }",
       ].join("\n"),
-    );
-    const declarations = enumerateDeclarations(project, "/proj");
+    });
+    const declarations = enumerateDeclarations(files);
     const result = maxNestingDepthCollector.collect({
-      project,
       rootDir: "/proj",
       declarations,
     });

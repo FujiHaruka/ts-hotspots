@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { parseSource } from "../../parser/parseSource.ts";
-import type { FunctionLikeTsNode } from "../types.ts";
+import type { FunctionLikeNode } from "../types.ts";
 
 const FUNCTION_LIKE_KINDS = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.FunctionDeclaration,
@@ -14,13 +14,12 @@ const FUNCTION_LIKE_KINDS = new Set<ts.SyntaxKind>([
 
 export interface ParsedFunctionLike {
   sourceFile: ts.SourceFile;
-  fn: FunctionLikeTsNode;
+  fn: FunctionLikeNode;
 }
 
 /**
  * Parse `text` and return the first function-like declaration encountered in
- * source-order (depth-first). Used by collector tests to replace the prior
- * ts-morph `Project + sf.getFunctions()[0]` pattern.
+ * source-order (depth-first).
  */
 export function parseFirstFunctionLike(
   text: string,
@@ -39,12 +38,12 @@ export function parseFirstFunctionLike(
 export function parseAllFunctionLikes(
   text: string,
   ext: ".ts" | ".tsx" = ".ts",
-): { sourceFile: ts.SourceFile; fns: FunctionLikeTsNode[] } {
+): { sourceFile: ts.SourceFile; fns: FunctionLikeNode[] } {
   const { sourceFile } = parseSource(`/proj/t${ext}`, text);
-  const fns: FunctionLikeTsNode[] = [];
+  const fns: FunctionLikeNode[] = [];
   const visit = (node: ts.Node): void => {
     if (FUNCTION_LIKE_KINDS.has(node.kind)) {
-      fns.push(node as FunctionLikeTsNode);
+      fns.push(node as FunctionLikeNode);
     }
     ts.forEachChild(node, visit);
   };
@@ -52,11 +51,11 @@ export function parseAllFunctionLikes(
   return { sourceFile, fns };
 }
 
-function findFirst(node: ts.Node): FunctionLikeTsNode | undefined {
+function findFirst(node: ts.Node): FunctionLikeNode | undefined {
   if (FUNCTION_LIKE_KINDS.has(node.kind)) {
-    return node as FunctionLikeTsNode;
+    return node as FunctionLikeNode;
   }
-  let found: FunctionLikeTsNode | undefined;
+  let found: FunctionLikeNode | undefined;
   ts.forEachChild(node, (child) => {
     if (found) return;
     found = findFirst(child);
