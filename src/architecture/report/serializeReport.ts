@@ -104,20 +104,14 @@ function toHotspot(
 
 function toContributingMetric(c: {
   axis: string;
-  weight: number;
   value: number;
   percentile: number;
-  rank: number;
-  thresholdDelta: number;
   zScore: number;
 }): ArchContributingMetric {
   return {
     axis: c.axis,
-    weight: c.weight,
     value: c.value,
     percentile: c.percentile,
-    rank: c.rank,
-    thresholdDelta: c.thresholdDelta,
     zScore: c.zScore,
   };
 }

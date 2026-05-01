@@ -50,14 +50,16 @@ export interface ArchScore {
 
 export interface ArchContributingMetric {
   axis: string;
-  weight: number;
+  /** Raw axis value (e.g. fan-in count, betweenness centrality). */
   value: number;
+  /** Position in the per-axis distribution, in `0..1`. `0` for flag axes. */
   percentile: number;
-  /** 1-based rank from the top (`1` = highest). `0` for flag axes. */
-  rank: number;
-  /** `percentile - threshold`. `0` for flag axes. */
-  thresholdDelta: number;
-  /** Population z-score. `0` for flag axes or uniform distributions. */
+  /**
+   * Population z-score. `0` for flag axes or uniform distributions.
+   * Lets the agent distinguish "barely above threshold" from "extreme
+   * outlier" when the percentile alone (e.g. `0.99`) hides the shape
+   * of the distribution.
+   */
   zScore: number;
 }
 
