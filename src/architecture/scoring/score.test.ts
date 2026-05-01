@@ -168,6 +168,95 @@ describe("score — unstable_edge_ratio_pct axis", () => {
   });
 });
 
+describe("score — instability_delta_pct noise floor (0.05)", () => {
+  it("delta below 0.05 contributes 0 even with high unstable_edge_ratio_pct", () => {
+    // A's ratio = 1.0 (top of population), delta = 0.03 (below floor).
+    // Composite = 0.6 * 1.0 + 0.4 * 0 = 0.6 → below 0.85 threshold.
+    // Without the floor, the small positive delta would percentile-rank
+    // at 1.0 against a population of zeros and force the smell to fire.
+    const m = metrics([
+      [
+        "src/a.ts::A::function",
+        {
+          unstableEdgeCount: 3,
+          unstableEdgeRatio: 1,
+          fanOutUnweighted: 3,
+          instabilityDelta: 0.03,
+        },
+      ],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ]);
+    expect(
+      score(m).find(
+        (c) => c.primary.smellType === "unstable_dependency_candidate",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("delta exactly at the floor (0.05) is treated as no signal", () => {
+    const m = metrics([
+      [
+        "src/a.ts::A::function",
+        {
+          unstableEdgeCount: 3,
+          unstableEdgeRatio: 1,
+          fanOutUnweighted: 3,
+          instabilityDelta: 0.05,
+        },
+      ],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ]);
+    const result = score(m);
+    const a = result.find((c) => c.nodeId === "src/a.ts::A::function");
+    const deltaContribution = a?.primary.contributing.find(
+      (mm) => mm.axis === "instability_delta_pct",
+    );
+    // The smell may or may not fire (it depends on whether composite
+    // clears the threshold from `unstable_edge_ratio_pct` alone), but
+    // when it does, the delta axis must show 0 percentile.
+    if (deltaContribution !== undefined) {
+      expect(deltaContribution.percentile).toBe(0);
+    }
+    expect(
+      result.find(
+        (c) => c.primary.smellType === "unstable_dependency_candidate",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("delta above the floor still contributes its percentile", () => {
+    // A: ratio = 1.0, delta = 0.20 (well above floor) — top of both
+    // populations. Composite = 0.6 + 0.4 = 1.0 → fires.
+    const m = metrics([
+      [
+        "src/a.ts::A::function",
+        {
+          unstableEdgeCount: 3,
+          unstableEdgeRatio: 1,
+          fanOutUnweighted: 3,
+          instabilityDelta: 0.2,
+        },
+      ],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ]);
+    const a = score(m).find((c) => c.nodeId === "src/a.ts::A::function");
+    expect(a?.primary.smellType).toBe("unstable_dependency_candidate");
+    const deltaContribution = a?.primary.contributing.find(
+      (mm) => mm.axis === "instability_delta_pct",
+    );
+    expect(deltaContribution?.percentile).toBeCloseTo(1, 6);
+  });
+});
+
 describe("score — zero-guard on percentile axes", () => {
   it("a node whose every percentile-axis raw value is 0 cannot fire any smell", () => {
     // 10 nodes; one has all signals positive, the other nine are all

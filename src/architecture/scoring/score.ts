@@ -32,6 +32,7 @@ import type { MetricsRecord, NodeMetrics } from "../metrics/types.ts";
 import { buildPercentileLookup } from "../ranking/percentiles.ts";
 import {
   AXIS_KIND,
+  AXIS_NOISE_FLOOR,
   type AxisId,
   SMELL_TYPES,
   type SmellType,
@@ -204,17 +205,21 @@ export function score(
         if (lookup === undefined) continue;
         const raw =
           axis === "size_pct" ? sizeOf(id) : readAxisValue(node, axis);
-        // A raw 0 means "no signal on this axis" — a node with no
-        // outgoing edges has no fan-out, no unstable edges, etc. Without
-        // this guard, the percentile lookup's last-occurrence-rank
-        // convention would assign 0 the percentile of the tied-zero
-        // block's top, which in sparse populations (most nodes at 0) is
-        // close to 1.0 and trivially clears thresholds.
-        if (raw === 0) {
+        // Per-axis noise floor (defaults to 0, see AXIS_NOISE_FLOOR).
+        // A raw value at or below the floor contributes 0 to the
+        // composite — the value is below the resolution at which the
+        // axis carries any signal, regardless of where it sits in the
+        // percentile distribution. The default-0 floor still catches
+        // raw-zero cases (a node with no outgoing edges has no
+        // fan-out, no unstable edges, etc.); axes that carry
+        // quantization noise on small positives (e.g.
+        // `instability_delta_pct`) raise the floor to suppress
+        // single-tail-positive percentile inflation.
+        if (raw <= AXIS_NOISE_FLOOR[axis]) {
           contributing.push({
             axis,
             weight,
-            value: 0,
+            value: raw,
             percentile: 0,
             rank: 0,
             thresholdDelta: -threshold,
