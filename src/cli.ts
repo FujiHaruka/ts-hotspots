@@ -201,7 +201,8 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
   program
     .name("ts-hotspots")
     .description("TypeScript metrics reporter")
-    .version(pkg.version);
+    .version(pkg.version)
+    .addHelpCommand(false);
 
   program
     .command("complexity [path]")
