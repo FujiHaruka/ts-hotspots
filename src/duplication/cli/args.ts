@@ -14,7 +14,7 @@ export type PhaseTimingsLevel = "summary" | "verbose";
  * - `enabled = false` (set by `--no-churn`) skips the collector entirely
  *   and yields the legacy ranking (groups sorted by raw `combined.max`,
  *   no `aggregateChurn` metadata).
- * - `ref = undefined` defers ref selection to the caller — PR mode
+ * - `ref = undefined` defers ref selection to the caller — diff mode
  *   uses the head ref; whole-repo mode uses the scan ref. `--churn-ref`
  *   overrides both.
  */
@@ -24,9 +24,9 @@ export interface ChurnCliConfig {
   ref: string | undefined;
 }
 
-export interface PrModeArgs {
+export interface DiffModeArgs {
   kind: "run";
-  mode: "pr";
+  mode: "diff";
   baseRef: string;
   headRef: string;
   /** `true` for `A...B` (merge-base semantics). `false` for `A..B`. */
@@ -65,24 +65,24 @@ export interface WholeRepoModeArgs {
   mode: "whole-repo";
   /** Commit / branch / tag to scan. */
   ref: string;
-  /** See `PrModeArgs.path`. */
+  /** See `DiffModeArgs.path`. */
   path: string | undefined;
   format: ReportFormat;
   excludeGlobs: string[];
-  /** See `PrModeArgs.phaseTimings`. */
+  /** See `DiffModeArgs.phaseTimings`. */
   phaseTimings: PhaseTimingsLevel | undefined;
-  /** See `PrModeArgs.limit`. */
+  /** See `DiffModeArgs.limit`. */
   limit: number;
-  /** See `PrModeArgs.verbose`. */
+  /** See `DiffModeArgs.verbose`. */
   verbose: boolean;
-  /** See `PrModeArgs.churn`. */
+  /** See `DiffModeArgs.churn`. */
   churn: ChurnCliConfig;
 }
 
 export const DEFAULT_LIMIT = 20;
 export const DEFAULT_CHURN_WINDOW = 200;
 
-export type ParsedArgs = PrModeArgs | WholeRepoModeArgs;
+export type ParsedArgs = DiffModeArgs | WholeRepoModeArgs;
 
 export interface HelpArgs {
   kind: "help";
@@ -95,29 +95,27 @@ export class ArgParseError extends Error {
 }
 
 export const USAGE = `Usage:
-  ts-hotspots duplication <revrange> [path] [options]                 (PR mode)
-  ts-hotspots duplication --whole-repo [--ref <ref>] [path] [options] (whole-repo mode)
+  ts-hotspots duplication [path] [options]
 
-PR mode compares the head side of <revrange> against the rest of the
-codebase on the base side. Whole-repo mode scans every fragment at one
-ref and reports duplicate pairs across the whole tree. The report is
-written to stdout; redirect it to a file if you want to keep it.
+By default the entire repository is scanned at HEAD. Pass --diff <revrange>
+to compare the head side of a diff against the rest of the codebase on the
+base side. The report is written to stdout; redirect it to a file if you
+want to keep it.
 
 [path] points at a directory inside a git repository. The repo root is
 discovered by walking up from [path] until a .git entry is found
 (default: cwd).
 
-<revrange> is a git-style revision range:
-  A...B   diff from merge-base(A, B) to B (PR semantics; recommended)
-  A..B    diff base against head directly
-  A...    head side defaults to HEAD (same as A...HEAD)
-  ...B    base side defaults to HEAD
-
 Options:
-  --whole-repo             Scan the entire repo (mutually exclusive with
-                           <revrange>).
-  --ref <ref>              Commit/branch/tag to scan in --whole-repo mode
-                           (default: HEAD).
+  --diff <revrange>        Scope to a git revision range. Mutually exclusive
+                           with --ref. <revrange> forms:
+                             A...B   diff from merge-base(A, B) to B
+                                     (PR semantics; recommended)
+                             A..B    diff base against head directly
+                             A...    head side defaults to HEAD
+                             ...B    base side defaults to HEAD
+  --ref <ref>              Commit/branch/tag to scan in whole-repo mode
+                           (default: HEAD). Mutually exclusive with --diff.
   --format markdown|json   Report format (default: markdown)
   --exclude <glob>         Extra path glob to exclude (repeatable). Added on
                            top of the built-in defaults (node_modules,
@@ -139,22 +137,23 @@ Options:
                            compute per-file churn (default: 200). Used
                            to amplify the score of clone groups whose
                            files have been edited recently.
-  --churn-ref <ref>        Ref to walk for churn (default: PR head ref
-                           in PR mode, --ref in whole-repo mode).
+  --churn-ref <ref>        Ref to walk for churn (default: diff head ref
+                           in diff mode, --ref in whole-repo mode).
   --no-churn               Disable churn collection. Groups are sorted
                            by raw similarity and 'aggregateChurn' is
                            omitted from the report.
   -h, --help               Show this help and exit
 
 Examples:
-  ts-hotspots duplication origin/main... > report.md
-  ts-hotspots duplication origin/main...HEAD --format json > report.json
-  ts-hotspots duplication main..feature ./my-repo
-  ts-hotspots duplication origin/main... --exclude 'src/legacy/**' --exclude '**/*.gen.ts'
-  ts-hotspots duplication --whole-repo --format json > report.json
-  ts-hotspots duplication --whole-repo --ref release/v2 --exclude 'src/legacy/**'
-  ts-hotspots duplication --whole-repo --phase-timings 2> perf.log
-  ts-hotspots duplication --whole-repo --phase-timings=verbose 2> perf.log
+  ts-hotspots duplication > report.md
+  ts-hotspots duplication --format json > report.json
+  ts-hotspots duplication --diff origin/main... > report.md
+  ts-hotspots duplication --diff origin/main...HEAD --format json > report.json
+  ts-hotspots duplication --diff main..feature ./my-repo
+  ts-hotspots duplication --diff origin/main... --exclude 'src/legacy/**' --exclude '**/*.gen.ts'
+  ts-hotspots duplication --ref release/v2 --exclude 'src/legacy/**'
+  ts-hotspots duplication --phase-timings 2> perf.log
+  ts-hotspots duplication --phase-timings=verbose 2> perf.log
 
 Each reported group carries a 'dismissalId' (dup:<hex>) you can pass to
 'ts-hotspots dismiss <id> --reason <text>' to filter it from future runs.
@@ -191,7 +190,7 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
     return { kind: "help" };
   }
 
-  const wholeRepo = values["whole-repo"] === true;
+  const diffInput = values.diff;
   const ref = values.ref;
   const format = parseFormat(values.format);
   const excludeGlobs = parseExcludeGlobs(values.exclude);
@@ -200,17 +199,33 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
   const verbose = values.verbose === true;
   const churn = parseChurnConfig(values);
 
-  if (wholeRepo) {
-    if (positionals.length > 1) {
-      throw new ArgParseError(
-        `expected at most one positional [path], got: ${positionals.join(" ")}`,
-      );
+  if (positionals.length > 1) {
+    throw new ArgParseError(
+      `expected at most one positional [path], got: ${positionals.join(" ")}`,
+    );
+  }
+  const path = positionals[0];
+
+  if (diffInput !== undefined) {
+    if (ref !== undefined) {
+      throw new ArgParseError("--ref and --diff are mutually exclusive");
+    }
+    let revRange: ReturnType<typeof parseRevRange>;
+    try {
+      revRange = parseRevRange(diffInput);
+    } catch (err) {
+      if (err instanceof RevRangeParseError) {
+        throw new ArgParseError(err.message);
+      }
+      throw err;
     }
     return {
       kind: "run",
-      mode: "whole-repo",
-      ref: ref ?? "HEAD",
-      path: positionals[0],
+      mode: "diff",
+      baseRef: revRange.baseRef,
+      headRef: revRange.headRef,
+      threeDot: revRange.threeDot,
+      path,
       format,
       excludeGlobs,
       phaseTimings,
@@ -220,42 +235,11 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
     };
   }
 
-  if (ref !== undefined) {
-    throw new ArgParseError("--ref is only valid with --whole-repo");
-  }
-
-  if (positionals.length === 0) {
-    throw new ArgParseError(
-      "missing revrange argument (e.g. origin/main...) or pass --whole-repo",
-    );
-  }
-  if (positionals.length > 2) {
-    throw new ArgParseError(
-      `expected at most <revrange> and [path], got: ${positionals.join(" ")}`,
-    );
-  }
-
-  const revRangeInput = positionals[0];
-  if (revRangeInput === undefined) {
-    throw new ArgParseError("missing revrange argument (e.g. origin/main...)");
-  }
-  let revRange: ReturnType<typeof parseRevRange>;
-  try {
-    revRange = parseRevRange(revRangeInput);
-  } catch (err) {
-    if (err instanceof RevRangeParseError) {
-      throw new ArgParseError(err.message);
-    }
-    throw err;
-  }
-
   return {
     kind: "run",
-    mode: "pr",
-    baseRef: revRange.baseRef,
-    headRef: revRange.headRef,
-    threeDot: revRange.threeDot,
-    path: positionals[1],
+    mode: "whole-repo",
+    ref: ref ?? "HEAD",
+    path,
     format,
     excludeGlobs,
     phaseTimings,
@@ -383,7 +367,7 @@ function parseExcludeGlobs(values: string[] | undefined): string[] {
 const OPTIONS = {
   format: { type: "string" },
   exclude: { type: "string", multiple: true },
-  "whole-repo": { type: "boolean" },
+  diff: { type: "string" },
   ref: { type: "string" },
   "phase-timings": { type: "string" },
   limit: { type: "string" },
@@ -397,7 +381,7 @@ const OPTIONS = {
 interface ParsedValues {
   format?: string;
   exclude?: string[];
-  "whole-repo"?: boolean;
+  diff?: string;
   ref?: string;
   "phase-timings"?: string;
   limit?: string;

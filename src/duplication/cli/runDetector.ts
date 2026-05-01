@@ -347,7 +347,7 @@ export async function runDetector(
   const report = buildJsonReport(
     {
       tool,
-      pr: {
+      diff: {
         baseSha: diff.baseSha,
         headSha: diff.headSha,
         threeDot,
@@ -356,7 +356,7 @@ export async function runDetector(
       pairs: scoredPairs,
       config,
       summary: {
-        mode: "pr",
+        mode: "diff",
         scope: { base: baseScope, changed: changedScope },
         pipeline: {
           candidatePairs,

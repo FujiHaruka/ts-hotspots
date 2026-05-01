@@ -205,7 +205,7 @@ export function emitSearchSummary(
  * Emit `phase.subPhase` (scoring) + `scoring.summary`.
  *
  * `pairs` is the raw count handed to scoring; `uniquePairs` is the count
- * after canonical-key dedup (whole-repo) or equal to `pairs` (PR mode).
+ * after canonical-key dedup (whole-repo) or equal to `pairs` (diff mode).
  */
 export function emitScoringSummary(
   perfLog: PerfLogger | undefined,

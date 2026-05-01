@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  STUB_PR_SUMMARY,
+  STUB_DIFF_SUMMARY,
   STUB_WHOLE_REPO_SUMMARY,
 } from "../../../test/dedup/helpers/stubSummary.ts";
 import { defaultConfig } from "../config/index.ts";
@@ -83,10 +83,10 @@ const SEMANTIC = {
 describe("serializeReport (slim default)", () => {
   it("renames `groups` to `hotspots`, omits `status`, drops the analysis summary", () => {
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [mkPair("c", "b", 0.7, { intersections: SEMANTIC })],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const out = serializeReport(report, { verbose: false });
     expect(out).toMatchObject({ hotspots: expect.any(Array) });
@@ -99,14 +99,14 @@ describe("serializeReport (slim default)", () => {
 
   it("trims `project` to `sourceFileCount` only", () => {
     const summary = {
-      ...STUB_PR_SUMMARY,
+      ...STUB_DIFF_SUMMARY,
       scope: {
-        ...STUB_PR_SUMMARY.scope,
-        base: { ...STUB_PR_SUMMARY.scope.base, files: 42 },
+        ...STUB_DIFF_SUMMARY.scope,
+        base: { ...STUB_DIFF_SUMMARY.scope.base, files: 42 },
       },
     };
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [],
       config: defaultConfig,
       summary,
@@ -115,9 +115,9 @@ describe("serializeReport (slim default)", () => {
     expect(out.project).toEqual({ sourceFileCount: 42 });
   });
 
-  it("keeps `pr` block in PR mode and drops it in whole-repo mode", () => {
-    const pr = buildJsonReport({
-      pr: {
+  it("keeps `diff` block in diff mode and drops it in whole-repo mode", () => {
+    const diff = buildJsonReport({
+      diff: {
         baseSha: "deadbeef",
         headSha: "cafef00d",
         threeDot: true,
@@ -125,29 +125,29 @@ describe("serializeReport (slim default)", () => {
       },
       pairs: [],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const wr = buildJsonReport({
-      pr: { baseSha: "x", headSha: "x", threeDot: false, changedFiles: 0 },
+      diff: { baseSha: "x", headSha: "x", threeDot: false, changedFiles: 0 },
       pairs: [],
       config: defaultConfig,
       summary: STUB_WHOLE_REPO_SUMMARY,
     });
-    expect(serializeReport(pr, { verbose: false }).pr).toEqual({
+    expect(serializeReport(diff, { verbose: false }).diff).toEqual({
       baseSha: "deadbeef",
       headSha: "cafef00d",
       threeDot: true,
       changedFiles: 3,
     });
-    expect(serializeReport(wr, { verbose: false }).pr).toBeUndefined();
+    expect(serializeReport(wr, { verbose: false }).diff).toBeUndefined();
   });
 
   it("emits a slim hotspot per group with anchor, members, score, evidence, dismissalId", () => {
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [mkPair("c", "b", 0.7, { intersections: SEMANTIC })],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const out = serializeReport(report, { verbose: false });
     const h = out.hotspots[0];
@@ -168,10 +168,10 @@ describe("serializeReport (slim default)", () => {
 
   it("strips evidence prefixes and humanises NEW/AWAIT_CALL into `new X` / `await X`", () => {
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [mkPair("c", "b", 0.7, { intersections: SEMANTIC })],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const evidence = serializeReport(report, { verbose: false }).hotspots[0]
       ?.evidence;
@@ -194,10 +194,10 @@ describe("serializeReport (slim default)", () => {
 
   it("does not embed fragment source in slim output", () => {
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [mkPair("c", "b", 0.7, { intersections: SEMANTIC })],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
       includeCode: true,
     });
     const json = JSON.stringify(serializeReport(report, { verbose: false }));
@@ -211,7 +211,7 @@ describe("serializeReport (slim default)", () => {
       mkPair("b", "c", 0.75, { intersections: SEMANTIC }),
     ];
     const report = buildJsonReport({
-      pr: { baseSha: "x", headSha: "x", threeDot: false, changedFiles: 0 },
+      diff: { baseSha: "x", headSha: "x", threeDot: false, changedFiles: 0 },
       pairs,
       config: defaultConfig,
       summary: STUB_WHOLE_REPO_SUMMARY,
@@ -233,10 +233,10 @@ describe("serializeReport (slim default)", () => {
       mkPair("c", "b3", 0.8, { intersections }),
     ];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const score = serializeReport(report, { verbose: false }).hotspots[0]
       ?.score;
@@ -250,10 +250,10 @@ describe("serializeReport (slim default)", () => {
       mkPair("c1", "b1", 0.8, { intersections: SEMANTIC }),
     ];
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs,
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
     });
     const a = JSON.stringify(serializeReport(report, { verbose: false }));
     const b = JSON.stringify(serializeReport(report, { verbose: false }));
@@ -264,10 +264,10 @@ describe("serializeReport (slim default)", () => {
 describe("serializeReport (verbose)", () => {
   it("re-includes `summary`, per-member scores, full evidence, and recommendation hint", () => {
     const report = buildJsonReport({
-      pr: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
       pairs: [mkPair("c", "b", 0.7, { intersections: SEMANTIC })],
       config: defaultConfig,
-      summary: STUB_PR_SUMMARY,
+      summary: STUB_DIFF_SUMMARY,
       includeCode: true,
     });
     const out = serializeReport(report, { verbose: true });

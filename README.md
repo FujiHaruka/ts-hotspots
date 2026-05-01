@@ -50,18 +50,19 @@ Options:
 - `--metrics <list>` comma-separated axis ids to include
 - `--exclude <glob...>` extra path globs to drop (repeatable; built-in defaults already cover `node_modules`, `dist`, generated files, and tests)
 - `--file <path>` single-file drill-down (returns raw metrics for every function in the file)
+- `--diff <revrange>` scope hotspots to functions in files changed by a git revrange (e.g. `origin/main...`). Rankings are still computed against the full head ref.
 - `--verbose` include `functionRankings`, `functionAxisMeta`, `functionCoOccurrence`, and `functions[]` alongside the candidates
 
 ## Duplication candidates: `ts-hotspots duplication`
 
 `duplication` finds Type-3 duplicates: copy-pasted regions that have been lightly edited (renamed identifiers, reordered statements, slightly different argument shape). It is tuned for **recall** — the goal is to surface every spot worth a second look, not to declare a strict clone verdict.
 
-It runs in two modes:
+By default it scans the entire repository at HEAD. Pass `--diff <revrange>` to compare a diff's changed code against the rest of the tree.
 
 ```
-ts-hotspots duplication <revrange> [path]            # PR mode: changed code vs. the rest of the tree
-ts-hotspots duplication --whole-repo [path]          # whole-repo mode: every duplicate cluster at one ref
-ts-hotspots dup --whole-repo                         # short alias
+ts-hotspots duplication [path]                       # whole-repo: every duplicate cluster at HEAD
+ts-hotspots duplication [path] --diff <revrange>     # diff mode: changed code vs. the rest of the tree
+ts-hotspots dup                                      # short alias
 ```
 
 `[path]` points at a directory inside a git repository; the repo root is discovered by walking up until a `.git` entry is found (defaults to the current directory).
@@ -71,10 +72,11 @@ ts-hotspots dup --whole-repo                         # short alias
 Examples:
 
 ```
-ts-hotspots duplication origin/main... > report.md
-ts-hotspots duplication origin/main...HEAD --format json > report.json
-ts-hotspots duplication --whole-repo --format json > report.json
-ts-hotspots duplication --whole-repo --exclude 'src/legacy/**'
+ts-hotspots duplication > report.md
+ts-hotspots duplication --format json > report.json
+ts-hotspots duplication --diff origin/main... > report.md
+ts-hotspots duplication --diff origin/main...HEAD --format json > report.json
+ts-hotspots duplication --exclude 'src/legacy/**'
 ```
 
 By default the tool emits a Markdown document containing a short instruction block followed by the report data inside a fenced JSON code block — pipeable straight into an agent in plan mode. Each entry in `hotspots[]` has `kind: "duplication"`, the coordinates of every fragment in the group (`anchor` in PR mode, `members[]` always), a `score` (`{ axis: "combined", value }` — the median similarity across pairs, in 0..1), and an `evidence` block listing the top shared `calls` and `properties` — just enough to point at why the group surfaced and where to read first. Pass `--format json` for the machine-readable form.
@@ -89,7 +91,8 @@ Common options:
 - `--exclude <glob>` extra path glob to drop (repeatable; built-in defaults already cover `node_modules`, `dist`, generated files, and tests)
 - `--limit <N|all>` cap `hotspots[]` at the top N by combined score (default: 20)
 - `--verbose` emit the rich schema (per-member scores, fragment source, full evidence, recommendation hint, analysis summary)
-- `--ref <ref>` ref to scan in `--whole-repo` mode (default: `HEAD`)
+- `--diff <revrange>` scope to a git diff (mutually exclusive with `--ref`)
+- `--ref <ref>` ref to scan in whole-repo mode (default: `HEAD`; mutually exclusive with `--diff`)
 - `--churn-window <N>` how many recent commits the churn-aware ranker walks (default: 200; pass `--no-churn` to disable)
 - `--phase-timings[=summary|verbose]` emit a JSON Lines perf log to stderr
 

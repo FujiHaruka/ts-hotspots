@@ -6,7 +6,7 @@ import type { Fragment } from "../domain/fragment.ts";
 import type {
   AnalysisSummary,
   CloneCandidateReport,
-  DuplicationPrInfo,
+  DuplicationDiffInfo,
   ReportTool,
 } from "../domain/report.ts";
 import { isThinWrapperFragment } from "../features/internal/isThinWrapper.ts";
@@ -34,7 +34,7 @@ export interface ReportInput {
    * that ignore the field).
    */
   tool?: ReportTool;
-  pr: DuplicationPrInfo;
+  diff: DuplicationDiffInfo;
   pairs: readonly ScoredPair[];
   config: Config;
   summary: AnalysisSummary;
@@ -81,7 +81,7 @@ export interface ReportInput {
  * 5. Cap each fragment's reported associates via `capPerFragmentPairs` so
  *    hot file-header windows and tiny structural blocks can't drag in a
  *    long tail of weak partners.
- * 6. Build `CloneGroup`s. PR mode pivots on `changedFragment.id` via
+ * 6. Build `CloneGroup`s. Diff mode pivots on `changedFragment.id` via
  *    `buildCloneGroups`. Whole-repo mode hands the symmetric pair set to
  *    `clusterPairs` (graph clustering with edge prune → connected
  *    components → quasi-clique extraction → intra-cluster collapse) and
@@ -154,7 +154,7 @@ export function buildJsonReport(
   return {
     status: "ok",
     tool: input.tool ?? { name: "ts-hotspots", version: "0.0.0" },
-    pr: input.pr,
+    diff: input.diff,
     summary: input.summary,
     groups,
   };

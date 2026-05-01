@@ -1002,15 +1002,7 @@ describe("duplication subcommand routing", () => {
     expect(code).toBe(0);
     expect(stdout.text).toBe("");
     expect(stderr.text).toContain("Usage:");
-    expect(stderr.text).toContain("ts-hotspots duplication <revrange>");
-  });
-
-  test("`duplication` with no args returns 1 with a missing-revrange hint", async () => {
-    const stdout = new StringSink();
-    const stderr = new StringSink();
-    const code = await run([...ARGV_PREFIX, "duplication"], stdout, stderr);
-    expect(code).toBe(1);
-    expect(stderr.text).toContain("missing revrange");
+    expect(stderr.text).toContain("--diff <revrange>");
   });
 
   test("`duplication` forwards unknown flags to its parser (commander does not reject them)", async () => {
@@ -1034,7 +1026,7 @@ describe("duplication subcommand routing", () => {
     const stderr = new StringSink();
     const code = await run([...ARGV_PREFIX, "dup", "--help"], stdout, stderr);
     expect(code).toBe(0);
-    expect(stderr.text).toContain("ts-hotspots duplication <revrange>");
+    expect(stderr.text).toContain("--diff <revrange>");
   });
 });
 

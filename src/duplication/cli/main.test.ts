@@ -69,15 +69,9 @@ describe("main", () => {
     const code = await main(["--help"], cap.io);
     expect(code).toBe(0);
     expect(cap.stderr()).toContain("Usage:");
-    expect(cap.stderr()).toContain("ts-hotspots duplication <revrange>");
+    expect(cap.stderr()).toContain("ts-hotspots duplication");
+    expect(cap.stderr()).toContain("--diff <revrange>");
     expect(cap.stdout()).toBe("");
-  });
-
-  it("returns 1 with a usage hint when the revrange is missing", async () => {
-    const cap = captureIO();
-    const code = await main([], cap.io);
-    expect(code).toBe(1);
-    expect(cap.stderr()).toContain("missing revrange");
   });
 
   it("writes Markdown to stdout by default and exits 0 on empty diff", async () => {
@@ -86,7 +80,7 @@ describe("main", () => {
     const sha = r.commit("only");
 
     const cap = captureIO();
-    const code = await main([`${sha}..${sha}`, r.path], cap.io);
+    const code = await main(["--diff", `${sha}..${sha}`, r.path], cap.io);
     expect(code).toBe(0);
     const out = cap.stdout();
     expect(out).toContain("# ts-hotspots duplication report");
@@ -123,7 +117,7 @@ describe("main", () => {
       } as NodeJS.WritableStream,
       cwd: () => process.cwd(),
     };
-    const code = await main([`${sha}..${sha}`, r.path], io);
+    const code = await main(["--diff", `${sha}..${sha}`, r.path], io);
     expect(code).toBe(0);
     expect(stdoutChunks.length).toBeGreaterThanOrEqual(2);
     const head = stdoutChunks[0] ?? "";
@@ -141,14 +135,14 @@ describe("main", () => {
 
     const cap = captureIO();
     const code = await main(
-      [`${sha}..${sha}`, r.path, "--format", "json"],
+      ["--diff", `${sha}..${sha}`, r.path, "--format", "json"],
       cap.io,
     );
     expect(code).toBe(0);
-    // PR mode keeps the `pr` block; the `summary` block is `--verbose`-only
-    // and stays out of the slim default.
+    // Diff mode keeps the `diff` block; the `summary` block is
+    // `--verbose`-only and stays out of the slim default.
     const parsed = JSON.parse(cap.stdout()) as {
-      pr: {
+      diff: {
         baseSha: string;
         headSha: string;
         threeDot: boolean;
@@ -157,7 +151,7 @@ describe("main", () => {
       summary?: unknown;
       hotspots: unknown[];
     };
-    expect(parsed.pr).toEqual({
+    expect(parsed.diff).toEqual({
       baseSha: sha,
       headSha: sha,
       threeDot: false,
@@ -197,7 +191,7 @@ describe("main", () => {
 
     const baseline = captureIO();
     const baselineCode = await main(
-      [`${baseSha}..${headSha}`, r.path, "--format", "json"],
+      ["--diff", `${baseSha}..${headSha}`, r.path, "--format", "json"],
       baseline.io,
     );
     expect(baselineCode).toBe(0);
@@ -209,6 +203,7 @@ describe("main", () => {
     const filtered = captureIO();
     const filteredCode = await main(
       [
+        "--diff",
         `${baseSha}..${headSha}`,
         r.path,
         "--format",
@@ -227,7 +222,10 @@ describe("main", () => {
 
   it("returns 1 and writes an error to stderr when the path is not in a git repo", async () => {
     const cap = captureIO();
-    const code = await main(["main..feature", "/path/does/not/exist"], cap.io);
+    const code = await main(
+      ["--diff", "main..feature", "/path/does/not/exist"],
+      cap.io,
+    );
     expect(code).toBe(1);
     expect(cap.stderr()).toMatch(/ts-hotspots duplication:/);
     expect(cap.stderr()).toContain("not in a git repository");
@@ -240,7 +238,7 @@ describe("main", () => {
 
     const cap = captureIO();
     const code = await main(
-      [`${sha}..${sha}`, r.path, "--phase-timings"],
+      ["--diff", `${sha}..${sha}`, r.path, "--phase-timings"],
       cap.io,
     );
     expect(code).toBe(0);
@@ -278,7 +276,7 @@ describe("main", () => {
     const sha = r.commit("only");
 
     const cap = captureIO();
-    await main([`${sha}..${sha}`, r.path], cap.io);
+    await main(["--diff", `${sha}..${sha}`, r.path], cap.io);
     const stderr = cap.stderr();
     for (const line of stderr.split("\n")) {
       expect(line.startsWith("{")).toBe(false);
@@ -322,7 +320,7 @@ describe("main", () => {
 
     const unlimited = captureIO();
     const codeAll = await main(
-      ["--whole-repo", r.path, "--format", "json", "--limit", "all"],
+      [r.path, "--format", "json", "--limit", "all"],
       unlimited.io,
     );
     expect(codeAll).toBe(0);
@@ -334,7 +332,7 @@ describe("main", () => {
 
     const capped = captureIO();
     const codeCap = await main(
-      ["--whole-repo", r.path, "--format", "json", "--limit", "1"],
+      [r.path, "--format", "json", "--limit", "1"],
       capped.io,
     );
     expect(codeCap).toBe(0);
@@ -355,7 +353,7 @@ describe("main", () => {
     const sha = r.commit("only");
 
     const cap = captureIO();
-    await main([`${sha}..${sha}`, r.path], cap.io);
+    await main(["--diff", `${sha}..${sha}`, r.path], cap.io);
     expect(cap.stderr()).toMatch(/displayed=\d+(?! of)/);
   });
 
@@ -414,10 +412,7 @@ describe("main", () => {
 
     async function runDup(repoPath: string): Promise<ParsedReport> {
       const cap = captureIO();
-      const code = await main(
-        ["--whole-repo", repoPath, "--format", "json"],
-        cap.io,
-      );
+      const code = await main([repoPath, "--format", "json"], cap.io);
       expect(code).toBe(0);
       return JSON.parse(cap.stdout()) as ParsedReport;
     }
@@ -559,10 +554,7 @@ describe("main", () => {
       r.commit("mutate");
 
       const cap = captureIO();
-      const code = await main(
-        ["--whole-repo", r.path, "--format", "json"],
-        cap.io,
-      );
+      const code = await main([r.path, "--format", "json"], cap.io);
       expect(code).toBe(0);
       const second = JSON.parse(cap.stdout()) as ParsedReport;
       expect(second.dismissed).toEqual({
@@ -607,10 +599,7 @@ describe("main", () => {
     r.commit("only");
 
     const cap = captureIO();
-    const code = await main(
-      ["--whole-repo", r.path, "--format", "json"],
-      cap.io,
-    );
+    const code = await main([r.path, "--format", "json"], cap.io);
     expect(code).toBe(0);
 
     const parsed = JSON.parse(cap.stdout()) as {

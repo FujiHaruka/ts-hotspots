@@ -114,12 +114,12 @@ export interface DismissedSummary {
 }
 
 /**
- * PR scope metadata. Present when complexity was invoked with `--pr` so the
- * report's hotspot surfaces are filtered to functions in the changed-files
+ * Diff scope metadata. Present when complexity was invoked with `--diff` so
+ * the report's hotspot surfaces are filtered to functions in the changed-files
  * set. Rankings are still computed against the full head ref so the
  * underlying distribution is intact — only the displayed lists are scoped.
  */
-export interface PrInfo {
+export interface DiffInfo {
   baseSha: string;
   headSha: string;
   /** `true` for `A...B` (merge-base semantics). `false` for `A..B`. */
@@ -143,7 +143,7 @@ export interface FunctionReport {
   functionCoOccurrence?: FunctionCoOccurrenceEntry[];
   functions?: FunctionEntry[];
   dismissed?: DismissedSummary;
-  pr?: PrInfo;
+  diff?: DiffInfo;
   notice?: { code: string; message: string };
 }
 

@@ -2,8 +2,24 @@ import { describe, expect, it } from "vitest";
 import { ArgParseError, parseCliArgs } from "./args.ts";
 
 describe("parseCliArgs", () => {
-  it("parses a three-dot revrange with options and positional [path]", () => {
+  it("defaults to whole-repo mode at HEAD when no flags or positionals are given", () => {
+    expect(parseCliArgs([])).toEqual({
+      kind: "run",
+      mode: "whole-repo",
+      ref: "HEAD",
+      path: undefined,
+      format: "markdown",
+      excludeGlobs: [],
+      phaseTimings: undefined,
+      limit: 20,
+      verbose: false,
+      churn: { enabled: true, window: 200, ref: undefined },
+    });
+  });
+
+  it("parses --diff with a three-dot revrange and a positional [path]", () => {
     const r = parseCliArgs([
+      "--diff",
       "origin/main...feature",
       "/tmp/x",
       "--format",
@@ -11,7 +27,7 @@ describe("parseCliArgs", () => {
     ]);
     expect(r).toEqual({
       kind: "run",
-      mode: "pr",
+      mode: "diff",
       baseRef: "origin/main",
       headRef: "feature",
       threeDot: true,
@@ -26,17 +42,17 @@ describe("parseCliArgs", () => {
   });
 
   it("defaults format to markdown when --format is omitted", () => {
-    const r = parseCliArgs(["main..feature"]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const r = parseCliArgs(["--diff", "main..feature"]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(r.format).toBe("markdown");
   });
 
-  it("parses a two-dot revrange", () => {
-    const r = parseCliArgs(["main..feature"]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
+  it("parses a two-dot revrange via --diff", () => {
+    const r = parseCliArgs(["--diff", "main..feature"]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(r.baseRef).toBe("main");
     expect(r.headRef).toBe("feature");
@@ -44,9 +60,9 @@ describe("parseCliArgs", () => {
   });
 
   it("defaults the head side of A... to HEAD", () => {
-    const r = parseCliArgs(["origin/main..."]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const r = parseCliArgs(["--diff", "origin/main..."]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(r.baseRef).toBe("origin/main");
     expect(r.headRef).toBe("HEAD");
@@ -54,9 +70,9 @@ describe("parseCliArgs", () => {
   });
 
   it("leaves path undefined when no positional [path] is given", () => {
-    const r = parseCliArgs(["main..feature"]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const r = parseCliArgs(["--diff", "main..feature"]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(r.path).toBeUndefined();
   });
@@ -66,100 +82,76 @@ describe("parseCliArgs", () => {
     expect(parseCliArgs(["-h"])).toEqual({ kind: "help" });
   });
 
-  it("throws ArgParseError when the revrange is missing", () => {
-    expect(() => parseCliArgs([])).toThrow(ArgParseError);
-  });
-
   it("throws ArgParseError on a bare ref with no separator", () => {
-    expect(() => parseCliArgs(["main"])).toThrow(ArgParseError);
-  });
-
-  it("accepts a second positional as [path]", () => {
-    const r = parseCliArgs(["main..feature", "/tmp/repo"]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
-    }
-    expect(r.path).toBe("/tmp/repo");
-  });
-
-  it("throws ArgParseError when more than two positionals are given", () => {
-    expect(() => parseCliArgs(["main..feature", "/tmp/repo", "extra"])).toThrow(
-      ArgParseError,
-    );
-  });
-
-  it("throws ArgParseError on unknown flags", () => {
-    expect(() => parseCliArgs(["main..feature", "--nope"])).toThrow(
-      ArgParseError,
-    );
-  });
-
-  it("throws ArgParseError on an unknown --format value", () => {
-    expect(() => parseCliArgs(["main..feature", "--format", "yaml"])).toThrow(
-      ArgParseError,
-    );
-  });
-
-  it("collects repeated --exclude flags into excludeGlobs", () => {
-    const r = parseCliArgs([
-      "main..feature",
-      "--exclude",
-      "src/legacy/**",
-      "--exclude",
-      "**/*.gen.ts",
-    ]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
-    }
-    expect(r.excludeGlobs).toEqual(["src/legacy/**", "**/*.gen.ts"]);
-  });
-
-  it("returns an empty excludeGlobs when --exclude is not passed", () => {
-    const r = parseCliArgs(["main..feature"]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
-    }
-    expect(r.excludeGlobs).toEqual([]);
-  });
-
-  it("rejects an empty --exclude value", () => {
-    expect(() => parseCliArgs(["main..feature", "--exclude", "  "])).toThrow(
-      ArgParseError,
-    );
-  });
-
-  it("returns whole-repo mode when --whole-repo is passed", () => {
-    const r = parseCliArgs(["--whole-repo"]);
-    expect(r).toEqual({
-      kind: "run",
-      mode: "whole-repo",
-      ref: "HEAD",
-      path: undefined,
-      format: "markdown",
-      excludeGlobs: [],
-      phaseTimings: undefined,
-      limit: 20,
-      verbose: false,
-      churn: { enabled: true, window: 200, ref: undefined },
-    });
+    expect(() => parseCliArgs(["--diff", "main"])).toThrow(ArgParseError);
   });
 
   it("accepts a positional [path] in whole-repo mode", () => {
-    const r = parseCliArgs(["--whole-repo", "/tmp/repo"]);
+    const r = parseCliArgs(["/tmp/repo"]);
     if (r.kind !== "run" || r.mode !== "whole-repo") {
       throw new Error("expected whole-repo mode");
     }
     expect(r.path).toBe("/tmp/repo");
   });
 
-  it("treats bare --phase-timings as level 'summary'", () => {
-    const pr = parseCliArgs(["main..feature", "--phase-timings"]);
-    if (pr.kind !== "run" || pr.mode !== "pr") {
-      throw new Error("expected pr mode");
+  it("accepts a positional [path] alongside --diff", () => {
+    const r = parseCliArgs(["--diff", "main..feature", "/tmp/repo"]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
-    expect(pr.phaseTimings).toBe("summary");
+    expect(r.path).toBe("/tmp/repo");
+  });
 
-    const wr = parseCliArgs(["--whole-repo", "--phase-timings"]);
+  it("throws ArgParseError when more than one positional is given", () => {
+    expect(() => parseCliArgs(["/tmp/a", "/tmp/b"])).toThrow(ArgParseError);
+    expect(() =>
+      parseCliArgs(["--diff", "main..feature", "/tmp/a", "/tmp/b"]),
+    ).toThrow(ArgParseError);
+  });
+
+  it("throws ArgParseError on unknown flags", () => {
+    expect(() => parseCliArgs(["--nope"])).toThrow(ArgParseError);
+  });
+
+  it("throws ArgParseError on an unknown --format value", () => {
+    expect(() => parseCliArgs(["--format", "yaml"])).toThrow(ArgParseError);
+  });
+
+  it("collects repeated --exclude flags into excludeGlobs", () => {
+    const r = parseCliArgs([
+      "--diff",
+      "main..feature",
+      "--exclude",
+      "src/legacy/**",
+      "--exclude",
+      "**/*.gen.ts",
+    ]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
+    }
+    expect(r.excludeGlobs).toEqual(["src/legacy/**", "**/*.gen.ts"]);
+  });
+
+  it("returns an empty excludeGlobs when --exclude is not passed", () => {
+    const r = parseCliArgs([]);
+    if (r.kind !== "run" || r.mode !== "whole-repo") {
+      throw new Error("expected whole-repo mode");
+    }
+    expect(r.excludeGlobs).toEqual([]);
+  });
+
+  it("rejects an empty --exclude value", () => {
+    expect(() => parseCliArgs(["--exclude", "  "])).toThrow(ArgParseError);
+  });
+
+  it("treats bare --phase-timings as level 'summary'", () => {
+    const diff = parseCliArgs(["--diff", "main..feature", "--phase-timings"]);
+    if (diff.kind !== "run" || diff.mode !== "diff") {
+      throw new Error("expected diff mode");
+    }
+    expect(diff.phaseTimings).toBe("summary");
+
+    const wr = parseCliArgs(["--phase-timings"]);
     if (wr.kind !== "run" || wr.mode !== "whole-repo") {
       throw new Error("expected whole-repo mode");
     }
@@ -167,99 +159,92 @@ describe("parseCliArgs", () => {
   });
 
   it("accepts --phase-timings=verbose and --phase-timings verbose", () => {
-    const eq = parseCliArgs(["main..feature", "--phase-timings=verbose"]);
-    if (eq.kind !== "run" || eq.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const eq = parseCliArgs([
+      "--diff",
+      "main..feature",
+      "--phase-timings=verbose",
+    ]);
+    if (eq.kind !== "run" || eq.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(eq.phaseTimings).toBe("verbose");
 
-    const space = parseCliArgs(["main..feature", "--phase-timings", "verbose"]);
-    if (space.kind !== "run" || space.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const space = parseCliArgs([
+      "--diff",
+      "main..feature",
+      "--phase-timings",
+      "verbose",
+    ]);
+    if (space.kind !== "run" || space.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(space.phaseTimings).toBe("verbose");
   });
 
   it("rejects invalid --phase-timings level", () => {
     expect(() =>
-      parseCliArgs(["main..feature", "--phase-timings=loud"]),
+      parseCliArgs(["--diff", "main..feature", "--phase-timings=loud"]),
     ).toThrow(ArgParseError);
   });
 
   it("defaults phaseTimings to undefined", () => {
-    const pr = parseCliArgs(["main..feature"]);
-    if (pr.kind !== "run" || pr.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const r = parseCliArgs(["--diff", "main..feature"]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
-    expect(pr.phaseTimings).toBeUndefined();
+    expect(r.phaseTimings).toBeUndefined();
   });
 
-  it("uses --ref when given alongside --whole-repo", () => {
-    const r = parseCliArgs(["--whole-repo", "--ref", "release/v2"]);
+  it("uses --ref to pin the whole-repo scan to a non-HEAD ref", () => {
+    const r = parseCliArgs(["--ref", "release/v2"]);
     if (r.kind !== "run" || r.mode !== "whole-repo") {
       throw new Error("expected whole-repo mode");
     }
     expect(r.ref).toBe("release/v2");
   });
 
-  it("rejects more than one positional alongside --whole-repo", () => {
-    expect(() => parseCliArgs(["--whole-repo", "/tmp/a", "/tmp/b"])).toThrow(
-      ArgParseError,
-    );
-  });
-
-  it("rejects --ref without --whole-repo", () => {
-    expect(() => parseCliArgs(["main..feature", "--ref", "abc"])).toThrow(
-      ArgParseError,
-    );
-  });
-
-  it("hints --whole-repo in the missing-revrange error message", () => {
-    try {
-      parseCliArgs([]);
-      throw new Error("expected ArgParseError");
-    } catch (err) {
-      expect(err).toBeInstanceOf(ArgParseError);
-      expect((err as Error).message).toContain("--whole-repo");
-    }
+  it("rejects --ref combined with --diff", () => {
+    expect(() =>
+      parseCliArgs(["--diff", "main..feature", "--ref", "abc"]),
+    ).toThrow(ArgParseError);
   });
 
   it("parses --limit as a positive integer", () => {
-    const r = parseCliArgs(["main..feature", "--limit", "10"]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const r = parseCliArgs(["--diff", "main..feature", "--limit", "10"]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(r.limit).toBe(10);
   });
 
   it("treats --limit all as no cap (POSITIVE_INFINITY)", () => {
-    const r = parseCliArgs(["main..feature", "--limit", "all"]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const r = parseCliArgs(["--diff", "main..feature", "--limit", "all"]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(r.limit).toBe(Number.POSITIVE_INFINITY);
   });
 
   it("rejects --limit 0 (use 'all' instead for no cap)", () => {
-    expect(() => parseCliArgs(["main..feature", "--limit", "0"])).toThrow(
-      ArgParseError,
-    );
+    expect(() =>
+      parseCliArgs(["--diff", "main..feature", "--limit", "0"]),
+    ).toThrow(ArgParseError);
   });
 
   it("rejects negative --limit", () => {
-    expect(() => parseCliArgs(["main..feature", "--limit", "-5"])).toThrow(
-      ArgParseError,
-    );
+    expect(() =>
+      parseCliArgs(["--diff", "main..feature", "--limit", "-5"]),
+    ).toThrow(ArgParseError);
   });
 
   it("rejects non-numeric --limit (other than 'all')", () => {
-    expect(() => parseCliArgs(["main..feature", "--limit", "many"])).toThrow(
-      ArgParseError,
-    );
+    expect(() =>
+      parseCliArgs(["--diff", "main..feature", "--limit", "many"]),
+    ).toThrow(ArgParseError);
   });
 
   it("--limit is also valid in whole-repo mode", () => {
-    const r = parseCliArgs(["--whole-repo", "--limit", "200"]);
+    const r = parseCliArgs(["--limit", "200"]);
     if (r.kind !== "run" || r.mode !== "whole-repo") {
       throw new Error("expected whole-repo mode");
     }
@@ -267,13 +252,13 @@ describe("parseCliArgs", () => {
   });
 
   it("defaults verbose to false", () => {
-    const pr = parseCliArgs(["main..feature"]);
-    if (pr.kind !== "run" || pr.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const diff = parseCliArgs(["--diff", "main..feature"]);
+    if (diff.kind !== "run" || diff.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
-    expect(pr.verbose).toBe(false);
+    expect(diff.verbose).toBe(false);
 
-    const wr = parseCliArgs(["--whole-repo"]);
+    const wr = parseCliArgs([]);
     if (wr.kind !== "run" || wr.mode !== "whole-repo") {
       throw new Error("expected whole-repo mode");
     }
@@ -281,13 +266,13 @@ describe("parseCliArgs", () => {
   });
 
   it("sets verbose to true when --verbose is passed", () => {
-    const pr = parseCliArgs(["main..feature", "--verbose"]);
-    if (pr.kind !== "run" || pr.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const diff = parseCliArgs(["--diff", "main..feature", "--verbose"]);
+    if (diff.kind !== "run" || diff.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
-    expect(pr.verbose).toBe(true);
+    expect(diff.verbose).toBe(true);
 
-    const wr = parseCliArgs(["--whole-repo", "--verbose"]);
+    const wr = parseCliArgs(["--verbose"]);
     if (wr.kind !== "run" || wr.mode !== "whole-repo") {
       throw new Error("expected whole-repo mode");
     }
@@ -295,17 +280,17 @@ describe("parseCliArgs", () => {
   });
 
   it("defaults churn to enabled with window 200 and undefined ref", () => {
-    const pr = parseCliArgs(["main..feature"]);
-    if (pr.kind !== "run" || pr.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const diff = parseCliArgs(["--diff", "main..feature"]);
+    if (diff.kind !== "run" || diff.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
-    expect(pr.churn).toEqual({
+    expect(diff.churn).toEqual({
       enabled: true,
       window: 200,
       ref: undefined,
     });
 
-    const wr = parseCliArgs(["--whole-repo"]);
+    const wr = parseCliArgs([]);
     if (wr.kind !== "run" || wr.mode !== "whole-repo") {
       throw new Error("expected whole-repo mode");
     }
@@ -317,45 +302,51 @@ describe("parseCliArgs", () => {
   });
 
   it("disables churn when --no-churn is passed", () => {
-    const r = parseCliArgs(["main..feature", "--no-churn"]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const r = parseCliArgs(["--diff", "main..feature", "--no-churn"]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(r.churn.enabled).toBe(false);
   });
 
   it("parses --churn-window as a positive integer", () => {
-    const r = parseCliArgs(["main..feature", "--churn-window", "50"]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
+    const r = parseCliArgs([
+      "--diff",
+      "main..feature",
+      "--churn-window",
+      "50",
+    ]);
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(r.churn.window).toBe(50);
   });
 
   it("rejects --churn-window 0 and non-numeric values", () => {
     expect(() =>
-      parseCliArgs(["main..feature", "--churn-window", "0"]),
+      parseCliArgs(["--diff", "main..feature", "--churn-window", "0"]),
     ).toThrow(ArgParseError);
     expect(() =>
-      parseCliArgs(["main..feature", "--churn-window", "many"]),
+      parseCliArgs(["--diff", "main..feature", "--churn-window", "many"]),
     ).toThrow(ArgParseError);
   });
 
   it("parses --churn-ref as a string", () => {
     const r = parseCliArgs([
+      "--diff",
       "main..feature",
       "--churn-ref",
       "origin/release",
     ]);
-    if (r.kind !== "run" || r.mode !== "pr") {
-      throw new Error("expected pr mode");
+    if (r.kind !== "run" || r.mode !== "diff") {
+      throw new Error("expected diff mode");
     }
     expect(r.churn.ref).toBe("origin/release");
   });
 
   it("rejects empty --churn-ref", () => {
     expect(() =>
-      parseCliArgs(["main..feature", "--churn-ref", "  "]),
+      parseCliArgs(["--diff", "main..feature", "--churn-ref", "  "]),
     ).toThrow(ArgParseError);
   });
 });

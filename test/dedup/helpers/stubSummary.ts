@@ -15,8 +15,8 @@ export const STUB_SCOPE_STATS: ScopeStats = {
   excludedFiles: 0,
 };
 
-export const STUB_PR_SUMMARY: AnalysisSummary = {
-  mode: "pr",
+export const STUB_DIFF_SUMMARY: AnalysisSummary = {
+  mode: "diff",
   scope: { base: STUB_SCOPE_STATS, changed: STUB_SCOPE_STATS },
   pipeline: { candidatePairs: 0, reportedPairs: 0 },
 };

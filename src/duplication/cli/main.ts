@@ -150,7 +150,7 @@ function buildStatsPayload(
   let fragmentsAcross = 0;
   for (const g of report.groups) fragmentsAcross += g.size;
   const sizeLine =
-    summary.mode === "pr" && summary.scope.changed !== undefined
+    summary.mode === "diff" && summary.scope.changed !== undefined
       ? `base=${String(base.files)} files/${String(base.fragments)} fragments, ` +
         `changed=${String(summary.scope.changed.files)} files/${String(summary.scope.changed.fragments)} fragments`
       : `repo=${String(base.files)} files/${String(base.fragments)} fragments`;
@@ -309,7 +309,7 @@ export async function main(
     ? {
         window: args.churn.window,
         ref:
-          args.churn.ref ?? (args.mode === "pr" ? args.headRef : args.ref),
+          args.churn.ref ?? (args.mode === "diff" ? args.headRef : args.ref),
         onWarning: (msg: string) => {
           io.stderr.write(`${msg}\n`);
         },
@@ -318,7 +318,7 @@ export async function main(
 
   try {
     const report: CloneCandidateReport =
-      args.mode === "pr"
+      args.mode === "diff"
         ? await runDetector({
             repoPath,
             baseRef: args.baseRef,
