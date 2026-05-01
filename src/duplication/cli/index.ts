@@ -1,5 +1,5 @@
 export type { ArgsResult, HelpArgs, ParsedArgs } from "./args.ts";
-export { ArgParseError, parseCliArgs, USAGE } from "./args.ts";
+export { ArgParseError, parseCliArgs } from "./args.ts";
 export type { BaseSource } from "./listBaseSources.ts";
 export { listBaseSources } from "./listBaseSources.ts";
 export type { MainIO } from "./main.ts";

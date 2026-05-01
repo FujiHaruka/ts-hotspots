@@ -27,7 +27,15 @@ import {
   saveRegistry,
   withProjectPath,
 } from "./dismissal/store.ts";
-import { main as runDuplicationMain } from "./duplication/cli/main.ts";
+import type { ParsedArgs as DuplicationParsedArgs } from "./duplication/cli/args.ts";
+import {
+  runPipeline as runDuplicationPipeline,
+  writeDuplicationParseError,
+} from "./duplication/cli/main.ts";
+import {
+  addDuplicationCommand,
+  normalizePhaseTimingsArgv,
+} from "./duplication/cli/registerCommand.ts";
 import {
   listRepoSources,
   NotAGitRepositoryError,
@@ -168,6 +176,42 @@ function collectExcludeGlob(
   return [...previous, trimmed];
 }
 
+/**
+ * Detect whether a parseAsync failure happened while processing the dup
+ * subcommand. We scan the post-binary argv for the first non-flag token
+ * — if it is `duplication` or `dup`, the failing context was dup, and
+ * the catch block routes the error through dup's format-aware envelope.
+ */
+function isDuplicationContext(argv: readonly string[]): boolean {
+  return findDuplicationCommandIndex(argv) !== -1;
+}
+
+function findDuplicationCommandIndex(argv: readonly string[]): number {
+  for (let i = 2; i < argv.length; i++) {
+    const tok = argv[i];
+    if (tok === undefined) continue;
+    if (tok.startsWith("-")) continue;
+    if (tok === "duplication" || tok === "dup") return i;
+    return -1;
+  }
+  return -1;
+}
+
+/**
+ * If `argv` invokes the dup subcommand, rewrite the trailing portion so
+ * commander's optional-value `[level]` for `--phase-timings` does not
+ * greedily consume a following positional. Other subcommands are left
+ * untouched. Mirrors the same preprocessing done by `parseCliArgs` and
+ * `main(argv, io)` in `src/duplication/cli/`.
+ */
+function preprocessArgv(argv: readonly string[]): string[] {
+  const dupIdx = findDuplicationCommandIndex(argv);
+  if (dupIdx === -1) return [...argv];
+  const head = argv.slice(0, dupIdx + 1);
+  const tail = normalizePhaseTimingsArgv(argv.slice(dupIdx + 1));
+  return [...head, ...tail];
+}
+
 type PendingInvocation =
   | {
       kind: "complexity";
@@ -192,7 +236,7 @@ type PendingInvocation =
     }
   | {
       kind: "duplication";
-      argv: string[];
+      parsedArgs: DuplicationParsedArgs;
     };
 
 export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
@@ -301,18 +345,9 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
       });
     });
 
-  program
-    .command("duplication")
-    .alias("dup")
-    .description(
-      "detect Type-3 duplication candidates (run `ts-hotspots duplication --help` for details)",
-    )
-    .helpOption(false)
-    .allowUnknownOption(true)
-    .argument("[args...]", "forwarded to the duplication subcommand")
-    .action((args: string[]) => {
-      onInvoke({ kind: "duplication", argv: args });
-    });
+  addDuplicationCommand(program, (parsedArgs) => {
+    onInvoke({ kind: "duplication", parsedArgs });
+  });
 
   return program;
 }
@@ -897,7 +932,7 @@ export async function run(
   }
 
   try {
-    await program.parseAsync(argv);
+    await program.parseAsync(preprocessArgv(argv));
   } catch (err) {
     const code =
       err !== null && typeof err === "object" && "code" in err
@@ -910,6 +945,19 @@ export async function run(
       // Auto-help was emitted because no subcommand was given. The help
       // text is already on stderr via configureOutput; the throw carries a
       // sentinel message ("(outputHelp)") that should not surface.
+      return 1;
+    }
+    if (isDuplicationContext(argv)) {
+      // dup arg-parse failures (mutual-exclusivity throws from the action,
+      // commander's own unknown-flag / invalid-argument errors) need the
+      // dup-flavoured error envelope (markdown pre-error block or JSON to
+      // stdout, prefixed line to stderr) so the agent surface stays
+      // identical whether dup ran via the root CLI or via main(argv, io).
+      writeDuplicationParseError(
+        { stdout, stderr, cwd: () => process.cwd() },
+        argv,
+        err,
+      );
       return 1;
     }
     const message = err instanceof Error ? err.message : String(err);
@@ -929,7 +977,7 @@ export async function run(
   }
 
   if (invocation.kind === "duplication") {
-    return await runDuplicationMain(invocation.argv, {
+    return await runDuplicationPipeline(invocation.parsedArgs, {
       stdout,
       stderr,
       cwd: () => process.cwd(),

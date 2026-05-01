@@ -1,8 +1,8 @@
-import { parseArgs } from "node:util";
+import { Command, CommanderError } from "commander";
 import {
-  parseRevRange,
-  RevRangeParseError,
-} from "../../util/git/parseRevRange.ts";
+  addDuplicationCommand,
+  normalizePhaseTimingsArgv,
+} from "./registerCommand.ts";
 
 export type ReportFormat = "markdown" | "json";
 
@@ -94,305 +94,52 @@ export class ArgParseError extends Error {
   override readonly name = "ArgParseError";
 }
 
-export const USAGE = `Usage:
-  ts-hotspots duplication [path] [options]
-
-By default the entire repository is scanned at HEAD. Pass --diff <revrange>
-to compare the head side of a diff against the rest of the codebase on the
-base side. The report is written to stdout; redirect it to a file if you
-want to keep it.
-
-[path] points at a directory inside a git repository. The repo root is
-discovered by walking up from [path] until a .git entry is found
-(default: cwd).
-
-Options:
-  --diff <revrange>        Scope to a git revision range. Mutually exclusive
-                           with --ref. Defines the comparison's base/head
-                           sides (changed fragments on the head side are
-                           compared against the rest of the codebase on the
-                           base side). Note: 'comp --diff' instead acts as
-                           a display filter on top of full-repo ranking.
-                           <revrange> forms:
-                             A...B   diff from merge-base(A, B) to B
-                                     (PR semantics; recommended)
-                             A..B    diff base against head directly
-                             A...    head side defaults to HEAD
-                             ...B    base side defaults to HEAD
-  --ref <ref>              Commit/branch/tag to scan in whole-repo mode
-                           (default: HEAD). Mutually exclusive with --diff.
-  --format markdown|json   Report format (default: markdown)
-  -e, --exclude <glob>     Extra path glob to exclude (repeatable). Added on
-                           top of the built-in defaults (node_modules,
-                           dist, generated files, test files, ...).
-  --phase-timings[=LEVEL]  Emit a JSON Lines perf-debug log to stderr.
-                           LEVEL is 'summary' (default) or 'verbose' (adds a
-                           per-query record per changed fragment). Pipe with
-                           '2> perf.log' to capture.
-  --limit <N|all>          Cap the hotspots list at the top N by combined
-                           score (default: 20). Pass 'all' to keep every
-                           group.
-  --verbose                Emit the rich schema: per-member scores,
-                           fragment source, full evidence (statement
-                           kinds, token n-grams), recommendation hint,
-                           aggregate score axes, and the analysis
-                           summary. Default output keeps just the
-                           coordinates and top shared evidence.
-  --churn-window <N>       Number of commits walked by 'git log' to
-                           compute per-file churn (default: 200). Used
-                           to amplify the score of clone groups whose
-                           files have been edited recently.
-  --churn-ref <ref>        Ref to walk for churn (default: diff head ref
-                           in diff mode, --ref in whole-repo mode).
-  --no-churn               Disable churn collection. Groups are sorted
-                           by raw similarity and 'aggregateChurn' is
-                           omitted from the report.
-  -h, --help               Show this help and exit
-
-Examples:
-  ts-hotspots duplication > report.md
-  ts-hotspots duplication --format json > report.json
-  ts-hotspots duplication --diff origin/main... > report.md
-  ts-hotspots duplication --diff origin/main...HEAD --format json > report.json
-  ts-hotspots duplication --diff main..feature ./my-repo
-  ts-hotspots duplication --diff origin/main... --exclude 'src/legacy/**' --exclude '**/*.gen.ts'
-  ts-hotspots duplication --ref release/v2 --exclude 'src/legacy/**'
-  ts-hotspots duplication --phase-timings 2> perf.log
-  ts-hotspots duplication --phase-timings=verbose 2> perf.log
-
-Each reported group carries a 'dismissalId' (dup:<hex>) you can pass to
-'ts-hotspots dismiss <id> --reason <text>' to filter it from future runs.
-The id auto-expires when the group's membership changes.
-`;
-
 /**
- * Parse ts-hotspots duplication argv. Throws `ArgParseError` with a user-facing message on
- * missing or malformed positional, unknown flags, etc. Returns a `"help"`
- * variant for `--help` / `-h` so the caller can render usage and exit 0.
+ * Parse ts-hotspots duplication argv. Throws `ArgParseError` with a
+ * user-facing message on missing or malformed positional, unknown flags,
+ * etc. Returns a `"help"` variant for `--help` / `-h` so the caller can
+ * render usage and exit 0.
+ *
+ * Backed by a private commander program built with `addDuplicationCommand`
+ * — the same registrar wires the option surface for the root CLI in
+ * `src/cli.ts` and the `main(argv, io)` entry point in `./main.ts`. This
+ * function is the test seam for `args.test.ts`, which exercises the
+ * commander-side parsing and the post-parse validation in isolation.
  */
 export function parseCliArgs(argv: readonly string[]): ArgsResult {
-  // Pre-normalise `--phase-timings` so a bare flag is treated as `=summary`.
-  // `parseArgs` cannot natively express a string option whose value is
-  // optional, so we rewrite the argv slice ourselves before delegating.
-  const normalized = normalizePhaseTimings(argv);
+  let captured: ParsedArgs | undefined;
+  const program = new Command();
+  program.exitOverride();
+  // Swallow commander's writes — the caller of parseCliArgs only wants
+  // the parsed result or a thrown error, not free-form output.
+  program.configureOutput({
+    writeOut: () => {},
+    writeErr: () => {},
+  });
 
-  let values: ParsedValues;
-  let positionals: string[];
+  addDuplicationCommand(program, (args) => {
+    captured = args;
+  });
+
   try {
-    const parsed = parseArgs({
-      args: normalized,
-      options: OPTIONS,
-      allowPositionals: true,
-      strict: true,
-    });
-    values = parsed.values;
-    positionals = parsed.positionals;
+    program.parse([
+      "node",
+      "ts-hotspots",
+      "duplication",
+      ...normalizePhaseTimingsArgv(argv),
+    ]);
   } catch (err) {
-    throw new ArgParseError(err instanceof Error ? err.message : String(err));
-  }
-
-  if (values.help === true) {
-    return { kind: "help" };
-  }
-
-  const diffInput = values.diff;
-  const ref = values.ref;
-  const format = parseFormat(values.format);
-  const excludeGlobs = parseExcludeGlobs(values.exclude);
-  const phaseTimings = parsePhaseTimingsLevel(values["phase-timings"]);
-  const limit = parseLimit(values.limit);
-  const verbose = values.verbose === true;
-  const churn = parseChurnConfig(values);
-
-  if (positionals.length > 1) {
-    throw new ArgParseError(
-      `expected at most one positional [path], got: ${positionals.join(" ")}`,
-    );
-  }
-  const path = positionals[0];
-
-  if (diffInput !== undefined) {
-    if (ref !== undefined) {
-      throw new ArgParseError("--ref and --diff are mutually exclusive");
-    }
-    let revRange: ReturnType<typeof parseRevRange>;
-    try {
-      revRange = parseRevRange(diffInput);
-    } catch (err) {
-      if (err instanceof RevRangeParseError) {
-        throw new ArgParseError(err.message);
+    if (err instanceof CommanderError) {
+      if (err.code === "commander.helpDisplayed") {
+        return { kind: "help" };
       }
-      throw err;
+      throw new ArgParseError(err.message);
     }
-    return {
-      kind: "run",
-      mode: "diff",
-      baseRef: revRange.baseRef,
-      headRef: revRange.headRef,
-      threeDot: revRange.threeDot,
-      path,
-      format,
-      excludeGlobs,
-      phaseTimings,
-      limit,
-      verbose,
-      churn,
-    };
+    throw err;
   }
 
-  return {
-    kind: "run",
-    mode: "whole-repo",
-    ref: ref ?? "HEAD",
-    path,
-    format,
-    excludeGlobs,
-    phaseTimings,
-    limit,
-    verbose,
-    churn,
-  };
-}
-
-/**
- * Resolve `--churn-window` / `--churn-ref` / `--no-churn` into a
- * `ChurnCliConfig`. `--no-churn` wins over the other flags (specifying
- * a window with churn disabled is a no-op rather than an error).
- */
-function parseChurnConfig(values: ParsedValues): ChurnCliConfig {
-  const enabled = values["no-churn"] !== true;
-  const window = parseChurnWindow(values["churn-window"]);
-  const ref = values["churn-ref"];
-  if (ref !== undefined && ref.trim().length === 0) {
-    throw new ArgParseError("--churn-ref requires a non-empty value");
+  if (captured === undefined) {
+    throw new ArgParseError("duplication command did not run");
   }
-  return { enabled, window, ref };
-}
-
-function parseChurnWindow(value: string | undefined): number {
-  if (value === undefined) return DEFAULT_CHURN_WINDOW;
-  const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    throw new ArgParseError(
-      `invalid --churn-window '${value}' (expected a positive integer)`,
-    );
-  }
-  const n = Number.parseInt(trimmed, 10);
-  if (n <= 0) {
-    throw new ArgParseError(
-      `invalid --churn-window '${value}' (expected a positive integer)`,
-    );
-  }
-  return n;
-}
-
-/**
- * Rewrite `--phase-timings` (bare) → `--phase-timings=summary` so it can be
- * parsed by `parseArgs` as a string option. Also handles the space-separated
- * `--phase-timings summary` / `--phase-timings verbose` forms.
- */
-function normalizePhaseTimings(argv: readonly string[]): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === undefined) continue;
-    if (a === "--phase-timings") {
-      const next = argv[i + 1];
-      if (next === "summary" || next === "verbose") {
-        out.push(`--phase-timings=${next}`);
-        i++;
-      } else {
-        out.push("--phase-timings=summary");
-      }
-      continue;
-    }
-    out.push(a);
-  }
-  return out;
-}
-
-/** Validate a string option value as a `PhaseTimingsLevel` or `undefined`. */
-function parsePhaseTimingsLevel(
-  value: string | undefined,
-): PhaseTimingsLevel | undefined {
-  if (value === undefined) return undefined;
-  if (value === "summary" || value === "verbose") return value;
-  throw new ArgParseError(
-    `invalid --phase-timings level '${value}' (expected 'summary' or 'verbose')`,
-  );
-}
-
-/**
- * Parse the `--limit` value.
- *
- * - omitted          → DEFAULT_LIMIT (20)
- * - `"all"`          → POSITIVE_INFINITY (no cap)
- * - positive integer → that integer
- * - anything else    → ArgParseError
- */
-function parseLimit(value: string | undefined): number {
-  if (value === undefined) return DEFAULT_LIMIT;
-  const trimmed = value.trim();
-  if (trimmed.toLowerCase() === "all") return Number.POSITIVE_INFINITY;
-  if (!/^\d+$/.test(trimmed)) {
-    throw new ArgParseError(
-      `invalid --limit '${value}' (expected a positive integer or 'all')`,
-    );
-  }
-  const n = Number.parseInt(trimmed, 10);
-  if (n <= 0) {
-    throw new ArgParseError(
-      `invalid --limit '${value}' (expected a positive integer or 'all')`,
-    );
-  }
-  return n;
-}
-
-function parseFormat(value: string | undefined): ReportFormat {
-  if (value === undefined) return "markdown";
-  if (value === "markdown" || value === "json") return value;
-  throw new ArgParseError(
-    `invalid --format '${value}' (expected 'markdown' or 'json')`,
-  );
-}
-
-function parseExcludeGlobs(values: string[] | undefined): string[] {
-  if (values === undefined) return [];
-  const out: string[] = [];
-  for (const v of values) {
-    const trimmed = v.trim();
-    if (trimmed.length === 0) {
-      throw new ArgParseError("--exclude requires a non-empty glob");
-    }
-    out.push(trimmed);
-  }
-  return out;
-}
-
-const OPTIONS = {
-  format: { type: "string" },
-  exclude: { type: "string", short: "e", multiple: true },
-  diff: { type: "string" },
-  ref: { type: "string" },
-  "phase-timings": { type: "string" },
-  limit: { type: "string" },
-  verbose: { type: "boolean" },
-  "churn-window": { type: "string" },
-  "churn-ref": { type: "string" },
-  "no-churn": { type: "boolean" },
-  help: { type: "boolean", short: "h" },
-} as const;
-
-interface ParsedValues {
-  format?: string;
-  exclude?: string[];
-  diff?: string;
-  ref?: string;
-  "phase-timings"?: string;
-  limit?: string;
-  verbose?: boolean;
-  "churn-window"?: string;
-  "churn-ref"?: string;
-  "no-churn"?: boolean;
-  help?: boolean;
+  return captured;
 }
