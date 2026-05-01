@@ -15,6 +15,9 @@ describe("score — small-N gate", () => {
   it("requires composite >= threshold AND a z-score >= floor when N < cutoff", () => {
     // 5 nodes; only one has high fan-out. With smallNCutoff = 100 (default),
     // we're in small-N mode. The hub node should clear both gates.
+    // Size axis is also populated so the rebalanced
+    // `high_fanout_component` weights (0.8 fan-out + 0.2 size) clear the
+    // 0.85 threshold.
     const m = metrics([
       ["hub.ts::H::function", { fanOutWeighted: 10 }],
       ["a.ts::A::function", { fanOutWeighted: 0 }],
@@ -22,7 +25,15 @@ describe("score — small-N gate", () => {
       ["c.ts::C::function", { fanOutWeighted: 0 }],
       ["d.ts::D::function", { fanOutWeighted: 0 }],
     ]);
-    const candidates = score(m);
+    const candidates = score(m, {
+      lineCounts: new Map([
+        ["hub.ts::H::function", 100],
+        ["a.ts::A::function", 1],
+        ["b.ts::B::function", 1],
+        ["c.ts::C::function", 1],
+        ["d.ts::D::function", 1],
+      ]),
+    });
     expect(candidates.length).toBe(1);
     expect(candidates[0]?.nodeId).toBe("hub.ts::H::function");
     expect(candidates[0]?.primary.smellType).toBe("high_fanout_component");
@@ -50,7 +61,9 @@ describe("score — small-N gate", () => {
 
 describe("score — composite", () => {
   it("composite is the weighted sum of input percentiles", () => {
-    // Hub-like: A is the only node with high fan-in, fan-out, and reverse closure.
+    // Hub-like: H is the only node with high fan-in, fan-out, reverse
+    // closure, and size. With every percentile == 1.0, the composite
+    // equals the sum of weights == 1.0.
     const m = metrics([
       [
         "hub.ts::H::function",
@@ -65,10 +78,18 @@ describe("score — composite", () => {
       ["c.ts::C::function", {}],
       ["d.ts::D::function", {}],
     ]);
-    const candidates = score(m);
+    const candidates = score(m, {
+      lineCounts: new Map([
+        ["hub.ts::H::function", 100],
+        ["a.ts::A::function", 1],
+        ["b.ts::B::function", 1],
+        ["c.ts::C::function", 1],
+        ["d.ts::D::function", 1],
+      ]),
+    });
     const hub = candidates.find((c) => c.nodeId === "hub.ts::H::function");
-    // architectural_hub uses fan_in (0.4) + fan_out (0.3) + reverse_closure (0.3).
-    // All three percentiles == 1.0, so composite == 1.0.
+    // architectural_hub uses fan_in (0.35) + fan_out (0.25) +
+    // reverse_closure (0.25) + size (0.15) — all percentiles 1.0.
     expect(hub?.primary.smellType).toBe("architectural_hub");
     expect(hub?.primary.composite).toBeCloseTo(1, 6);
   });
@@ -109,13 +130,18 @@ describe("score — flag axes", () => {
     ]);
     const withFlag = score(m, {
       suppressFlag: new Map([["src/a.ts::A::function", true]]),
+      lineCounts: new Map([
+        ["src/a.ts::A::function", 100],
+        ["src/b.ts::B::function", 1],
+        ["src/c.ts::C::function", 1],
+        ["src/d.ts::D::function", 1],
+        ["src/e.ts::E::function", 1],
+      ]),
     });
     const a = withFlag.find((c) => c.nodeId === "src/a.ts::A::function");
-    // over_shared_component: fan_in 0.4 + fan_out 0.3 + suppress 0.3 = 1.0
-    // architectural_hub: fan_in 0.4 + fan_out 0.3 + reverse_closure 0.3 = 0.7
-    // (reverse_closure is 0 here, so its percentile is 0.6 not 1.0;
-    // composite for hub is 0.4*1 + 0.3*1 + 0.3*0.x. Either way, the
-    // suppress hit pushes over_shared_component to a higher composite.)
+    // over_shared_component: fan_in 0.35 + fan_out 0.25 + suppress 0.25
+    // + size 0.15 = 1.0 with all axes maxed. The suppress hit + the
+    // size axis push it over the 0.85 threshold.
     const oversharedHit = a?.primary.smellType === "over_shared_component"
       ? a.primary
       : a?.secondary.find((s) => s.smellType === "over_shared_component");
@@ -151,10 +177,10 @@ describe("score — secondary smells", () => {
 
 describe("score — excludedNodeIds", () => {
   it("drops excluded ids from the output without shifting survivors' percentiles", () => {
-    // Two nodes both top out fan-out; without exclusion both qualify
-    // (composite=1.0, lex-sorted output). Excluding A must drop A from
-    // the result while leaving B's contributing percentile at 1.0 — i.e.
-    // A still participates in the percentile distribution.
+    // Two nodes both top out fan-out and size; without exclusion both
+    // qualify (composite=1.0, lex-sorted output). Excluding A must
+    // drop A from the result while leaving B's contributing percentile
+    // at 1.0 — i.e. A still participates in the percentile distribution.
     const m = metrics([
       ["src/a.ts::A::function", { fanOutWeighted: 100 }],
       ["src/b.ts::B::function", { fanOutWeighted: 100 }],
@@ -167,8 +193,20 @@ describe("score — excludedNodeIds", () => {
       ["src/i.ts::I::function", {}],
       ["src/j.ts::J::function", {}],
     ]);
+    const lineCounts = new Map([
+      ["src/a.ts::A::function", 100],
+      ["src/b.ts::B::function", 100],
+      ["src/c.ts::C::function", 1],
+      ["src/d.ts::D::function", 1],
+      ["src/e.ts::E::function", 1],
+      ["src/f.ts::F::function", 1],
+      ["src/g.ts::G::function", 1],
+      ["src/h.ts::H::function", 1],
+      ["src/i.ts::I::function", 1],
+      ["src/j.ts::J::function", 1],
+    ]);
 
-    const baseline = score(m);
+    const baseline = score(m, { lineCounts });
     const baselineB = baseline.find(
       (c) => c.nodeId === "src/b.ts::B::function",
     );
@@ -176,6 +214,7 @@ describe("score — excludedNodeIds", () => {
 
     const filtered = score(m, {
       excludedNodeIds: new Set(["src/a.ts::A::function"]),
+      lineCounts,
     });
     expect(filtered.map((c) => c.nodeId)).toEqual(["src/b.ts::B::function"]);
 
@@ -193,9 +232,10 @@ describe("score — excludedNodeIds", () => {
 
 describe("score — determinism", () => {
   it("ties sorted by node id (lex)", () => {
-    // 10 nodes; 2 outliers at 100, 8 at 0. zScore for outliers ≈ 2.0
-    // (above the default 1.5 floor); zScore for zeros ≈ -0.5 (below).
-    // Both outliers tie on composite = 1.0 → must sort lex.
+    // 10 nodes; 2 outliers at 100, 8 at 0 on fan_out and size. zScore
+    // for outliers ≈ 2.0 (above the default 1.5 floor); zScore for
+    // zeros ≈ -0.5 (below). Both outliers tie on composite = 1.0 →
+    // must sort lex.
     const entries: ReadonlyArray<[string, Partial<NodeMetrics>]> = [
       ["src/a.ts::A::function", { fanOutWeighted: 100 }],
       ["src/b.ts::B::function", { fanOutWeighted: 100 }],
@@ -208,10 +248,96 @@ describe("score — determinism", () => {
       ["src/i.ts::I::function", {}],
       ["src/j.ts::J::function", {}],
     ];
-    const result = score(metrics(entries));
+    const lineCounts = new Map(
+      entries.map(([id]) => [
+        id,
+        id.startsWith("src/a") || id.startsWith("src/b") ? 100 : 1,
+      ]),
+    );
+    const result = score(metrics(entries), { lineCounts });
     expect(result.map((c) => c.nodeId)).toEqual([
       "src/a.ts::A::function",
       "src/b.ts::B::function",
     ]);
+  });
+});
+
+describe("score — size_pct axis", () => {
+  it("breaks ties between equal-coupling nodes in favor of the larger one", () => {
+    // Two nodes have identical fan-out and would tie on the original
+    // axes alone. Giving one a larger declaration span lifts its
+    // size_pct contribution and orders it first.
+    const entries: readonly [string, Partial<NodeMetrics>][] = [
+      ["src/big.ts::Big::function", { fanOutWeighted: 100 }],
+      ["src/small.ts::Small::function", { fanOutWeighted: 100 }],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+      ["src/f.ts::F::function", {}],
+      ["src/g.ts::G::function", {}],
+      ["src/h.ts::H::function", {}],
+      ["src/i.ts::I::function", {}],
+      ["src/j.ts::J::function", {}],
+    ];
+    const lineCounts = new Map([
+      ["src/big.ts::Big::function", 200],
+      ["src/small.ts::Small::function", 50],
+      ["src/c.ts::C::function", 30],
+      ["src/d.ts::D::function", 30],
+      ["src/e.ts::E::function", 30],
+      ["src/f.ts::F::function", 30],
+      ["src/g.ts::G::function", 30],
+      ["src/h.ts::H::function", 30],
+      ["src/i.ts::I::function", 30],
+      ["src/j.ts::J::function", 30],
+    ]);
+    const result = score(metrics(entries), { lineCounts });
+    expect(result.map((c) => c.nodeId)).toEqual([
+      "src/big.ts::Big::function",
+      "src/small.ts::Small::function",
+    ]);
+    const big = result[0]?.primary;
+    const small = result[1]?.primary;
+    expect(big?.composite).toBeGreaterThan(small?.composite ?? 0);
+  });
+
+  it("contributes a size_pct entry to the primary smell's metric breakdown", () => {
+    const entries: readonly [string, Partial<NodeMetrics>][] = [
+      ["src/a.ts::A::function", { fanInWeighted: 10, fanOutWeighted: 10, reverseClosure: 10 }],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ];
+    const lineCounts = new Map([
+      ["src/a.ts::A::function", 100],
+      ["src/b.ts::B::function", 1],
+      ["src/c.ts::C::function", 1],
+      ["src/d.ts::D::function", 1],
+      ["src/e.ts::E::function", 1],
+    ]);
+    const result = score(metrics(entries), { lineCounts });
+    const hub = result.find((c) => c.nodeId === "src/a.ts::A::function");
+    const sizeContribution = hub?.primary.contributing.find(
+      (m) => m.axis === "size_pct",
+    );
+    expect(sizeContribution).toBeDefined();
+    expect(sizeContribution?.percentile).toBeCloseTo(1, 6);
+    expect(sizeContribution?.weight).toBeCloseTo(0.15, 6);
+  });
+
+  it("treats missing lineCounts entries as 0 and falls through gracefully", () => {
+    // No lineCounts passed at all — size_pct population is uniformly 0,
+    // so percentile collapses to 0 (uniform distribution rule). A node
+    // that previously cleared the gate solely on coupling now misses
+    // because the rebalanced weights need size_pct to contribute.
+    const m = metrics([
+      ["src/a.ts::A::function", { fanOutWeighted: 100 }],
+      ["src/b.ts::B::function", {}],
+      ["src/c.ts::C::function", {}],
+      ["src/d.ts::D::function", {}],
+      ["src/e.ts::E::function", {}],
+    ]);
+    expect(score(m)).toEqual([]);
   });
 });

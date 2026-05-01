@@ -13,6 +13,7 @@ function comp(
     exportName,
     exportKind,
     line: 1,
+    endLine: 1,
   };
 }
 

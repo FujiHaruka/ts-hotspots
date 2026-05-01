@@ -16,17 +16,20 @@ export type WeightsTable = Readonly<Record<SmellType, SmellWeights>>;
 
 export const DEFAULT_WEIGHTS: WeightsTable = {
   architectural_hub: {
-    fan_in_pct: 0.4,
-    fan_out_pct: 0.3,
-    reverse_closure_pct: 0.3,
+    fan_in_pct: 0.35,
+    fan_out_pct: 0.25,
+    reverse_closure_pct: 0.25,
+    size_pct: 0.15,
   },
   high_fanout_component: {
-    fan_out_pct: 1.0,
+    fan_out_pct: 0.8,
+    size_pct: 0.2,
   },
   high_impact_component: {
-    fan_in_pct: 0.5,
-    reverse_closure_pct: 0.4,
+    fan_in_pct: 0.4,
+    reverse_closure_pct: 0.35,
     pagerank_pct: 0.1,
+    size_pct: 0.15,
   },
   bridge_component: {
     betweenness_pct: 1.0,
@@ -36,8 +39,9 @@ export const DEFAULT_WEIGHTS: WeightsTable = {
     instability_delta_pct: 0.4,
   },
   over_shared_component: {
-    fan_in_pct: 0.4,
-    fan_out_pct: 0.3,
-    suppress_flag: 0.3,
+    fan_in_pct: 0.35,
+    fan_out_pct: 0.25,
+    suppress_flag: 0.25,
+    size_pct: 0.15,
   },
 };

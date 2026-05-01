@@ -72,6 +72,7 @@ export function buildGraph(opts: BuildGraphOptions): Graph {
         exportName: local.exportName,
         exportKind: local.exportKind,
         line: local.line,
+        endLine: local.endLine,
       });
     }
   }

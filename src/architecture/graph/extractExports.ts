@@ -38,6 +38,8 @@ export interface LocalExport {
   readonly exportKind: ExportKind;
   /** 1-based line of the defining declaration. */
   readonly line: number;
+  /** 1-based, inclusive end line of the declaration node. */
+  readonly endLine: number;
   /**
    * The declaration node whose body is later scanned for references.
    * For `export const x = expr`, this is the VariableDeclaration; for
@@ -67,6 +69,7 @@ export interface FileExports {
 interface DeclIndexEntry {
   readonly exportKind: ExportKind;
   readonly line: number;
+  readonly endLine: number;
   readonly declarationNode: ts.Node;
 }
 
@@ -111,6 +114,7 @@ export function extractExports(parsed: ParsedSource): FileExports {
         exportName,
         exportKind: indexed.exportKind,
         line: indexed.line,
+        endLine: indexed.endLine,
         declarationNode: indexed.declarationNode,
       });
     }
@@ -134,12 +138,14 @@ function indexTopLevelDeclarations(
     index.set(stmt.name.text, {
       exportKind: "function",
       line: lineOf(sourceFile, stmt),
+      endLine: endLineOf(sourceFile, stmt),
       declarationNode: stmt,
     });
   } else if (ts.isClassDeclaration(stmt) && stmt.name !== undefined) {
     index.set(stmt.name.text, {
       exportKind: "class",
       line: lineOf(sourceFile, stmt),
+      endLine: endLineOf(sourceFile, stmt),
       declarationNode: stmt,
     });
   } else if (ts.isVariableStatement(stmt)) {
@@ -148,6 +154,7 @@ function indexTopLevelDeclarations(
       index.set(decl.name.text, {
         exportKind: "const",
         line: lineOf(sourceFile, decl),
+        endLine: endLineOf(sourceFile, decl),
         declarationNode: decl,
       });
     }
@@ -155,18 +162,21 @@ function indexTopLevelDeclarations(
     index.set(stmt.name.text, {
       exportKind: "type",
       line: lineOf(sourceFile, stmt),
+      endLine: endLineOf(sourceFile, stmt),
       declarationNode: stmt,
     });
   } else if (ts.isInterfaceDeclaration(stmt)) {
     index.set(stmt.name.text, {
       exportKind: "interface",
       line: lineOf(sourceFile, stmt),
+      endLine: endLineOf(sourceFile, stmt),
       declarationNode: stmt,
     });
   } else if (ts.isEnumDeclaration(stmt)) {
     index.set(stmt.name.text, {
       exportKind: "enum",
       line: lineOf(sourceFile, stmt),
+      endLine: endLineOf(sourceFile, stmt),
       declarationNode: stmt,
     });
   }
@@ -217,6 +227,7 @@ function visitExportingStatement(
       exportName: DEFAULT_EXPORT_NAME,
       exportKind: "default",
       line: lineOf(sourceFile, stmt),
+      endLine: endLineOf(sourceFile, stmt),
       declarationNode: stmt,
     });
     return;
@@ -232,6 +243,7 @@ function visitExportingStatement(
         exportName: DEFAULT_EXPORT_NAME,
         exportKind: "default",
         line: lineOf(sourceFile, stmt),
+        endLine: endLineOf(sourceFile, stmt),
         declarationNode: stmt,
       });
     }
@@ -242,6 +254,7 @@ function visitExportingStatement(
         exportName: DEFAULT_EXPORT_NAME,
         exportKind: "default",
         line: lineOf(sourceFile, stmt),
+        endLine: endLineOf(sourceFile, stmt),
         declarationNode: stmt,
       });
     }
@@ -270,6 +283,7 @@ function addLocal(
     exportName,
     exportKind,
     line: lineOf(sourceFile, declarationNode),
+    endLine: endLineOf(sourceFile, declarationNode),
     declarationNode,
   });
 }
@@ -296,5 +310,11 @@ function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
   return (
     ts.getLineAndCharacterOfPosition(sourceFile, node.getStart(sourceFile))
       .line + 1
+  );
+}
+
+function endLineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
+  return (
+    ts.getLineAndCharacterOfPosition(sourceFile, node.getEnd()).line + 1
   );
 }

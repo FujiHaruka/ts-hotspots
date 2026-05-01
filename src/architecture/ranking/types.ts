@@ -38,6 +38,7 @@ export type AxisId =
   | "pagerank_pct"
   | "betweenness_pct"
   | "instability_delta_pct"
+  | "size_pct"
   | "unstable_edge_flag"
   | "suppress_flag";
 
@@ -50,6 +51,7 @@ export const AXIS_KIND: Readonly<Record<AxisId, AxisKind>> = {
   pagerank_pct: "percentile",
   betweenness_pct: "percentile",
   instability_delta_pct: "percentile",
+  size_pct: "percentile",
   unstable_edge_flag: "flag",
   suppress_flag: "flag",
 };

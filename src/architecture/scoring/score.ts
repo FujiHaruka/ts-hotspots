@@ -76,6 +76,13 @@ export interface ScoreOptions {
    * high-value node does not inflate the percentiles of the survivors.
    */
   readonly excludedNodeIds?: ReadonlySet<string>;
+  /**
+   * Per-node line counts (raw declaration line span) for the `size_pct`
+   * axis. Missing entries are treated as `0`. Provided as a separate
+   * input rather than reaching into `Graph` so `score()` stays pure
+   * over its declared inputs — same posture as `excludedNodeIds`.
+   */
+  readonly lineCounts?: ReadonlyMap<string, number>;
 }
 
 const DEFAULT_PERCENTILE_THRESHOLD = 0.85;
@@ -88,6 +95,9 @@ const SECONDARY_LIMIT = 2;
  * the percentile lookup operates on. Weighted variants of fan-in /
  * fan-out are used for the percentile axes — mirrors the requirements
  * doc's "weighted variant drove the candidate" framing.
+ *
+ * `size_pct` is sourced separately from a per-node `lineCounts` map
+ * passed via {@link ScoreOptions}, so it bypasses this function.
  */
 function readAxisValue(node: NodeMetrics, axis: AxisId): number {
   switch (axis) {
@@ -105,6 +115,7 @@ function readAxisValue(node: NodeMetrics, axis: AxisId): number {
       return node.instabilityDelta;
     case "unstable_edge_flag":
       return node.unstableEdgeCount > 0 ? 1 : 0;
+    case "size_pct":
     case "suppress_flag":
       return 0;
   }
@@ -117,6 +128,7 @@ const PERCENTILE_AXES: readonly AxisId[] = [
   "pagerank_pct",
   "betweenness_pct",
   "instability_delta_pct",
+  "size_pct",
 ];
 
 export function score(
@@ -129,14 +141,18 @@ export function score(
   const weights = mergeWeights(options.weights);
   const suppressFlag = options.suppressFlag ?? new Map<string, boolean>();
   const excludedNodeIds = options.excludedNodeIds;
+  const lineCounts = options.lineCounts;
 
   const nodeIds = [...metrics.keys()];
   const n = nodeIds.length;
   if (n === 0) return [];
 
+  const sizeOf = (id: string): number => lineCounts?.get(id) ?? 0;
+
   const lookups = new Map<AxisId, ReturnType<typeof buildPercentileLookup>>();
   for (const axis of PERCENTILE_AXES) {
     const population = nodeIds.map((id) => {
+      if (axis === "size_pct") return sizeOf(id);
       const m = metrics.get(id);
       return m === undefined ? 0 : readAxisValue(m, axis);
     });
@@ -185,7 +201,8 @@ export function score(
 
         const lookup = lookups.get(axis);
         if (lookup === undefined) continue;
-        const raw = readAxisValue(node, axis);
+        const raw =
+          axis === "size_pct" ? sizeOf(id) : readAxisValue(node, axis);
         const entry = lookup(raw);
         composite += weight * entry.percentile;
         contributing.push({
