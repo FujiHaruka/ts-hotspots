@@ -93,7 +93,6 @@ export function jaccardWithIntersection(
   const unionSize = a.size + b.size - intersection.length;
   const jaccard = unionSize === 0 ? 0 : intersection.length / unionSize;
   const minSize = Math.min(a.size, b.size);
-  const overlapCoefficient =
-    minSize === 0 ? 0 : intersection.length / minSize;
+  const overlapCoefficient = minSize === 0 ? 0 : intersection.length / minSize;
   return { jaccard, overlapCoefficient, intersection };
 }

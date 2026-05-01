@@ -158,10 +158,7 @@ export function buildIntersectionsFromSets(
       changedFeatureSets.statements,
       baseFeatureSets.statements,
     ),
-    calls: intersectionSorted(
-      changedFeatureSets.calls,
-      baseFeatureSets.calls,
-    ),
+    calls: intersectionSorted(changedFeatureSets.calls, baseFeatureSets.calls),
   };
 }
 

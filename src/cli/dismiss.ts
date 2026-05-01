@@ -1,6 +1,6 @@
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { enumerateDeclarations } from "../collectors/enumerate-declarations.ts";
-import { enumerateSourceFiles } from "../collectors/enumerate-source-files.ts";
+import type { SourceFileInfo } from "../collectors/enumerate-source-files.ts";
 import {
   bodyHashToCompDismissalId,
   computeBodyHash,
@@ -16,6 +16,7 @@ import {
   withProjectPath,
 } from "../dismissal/store.ts";
 import type { DismissalEntry, DismissalFeature } from "../dismissal/types.ts";
+import { listRepoSources } from "../loader/listRepoSources.ts";
 import { loadProject } from "../loader/load-project.ts";
 
 export interface WritableLike {
@@ -35,20 +36,20 @@ export interface DismissOptions {
    */
   feature: DismissalFeature;
   /**
-   * Optional ts-morph project entry point. When present (comp), the
-   * dismiss subcommand walks declarations to fill in the entry's
-   * `display` fields. Omit for `dup` ids — there is no equivalent
-   * cheap resolver, and dup display can be reconstructed by re-running
-   * the detector when needed.
+   * Optional analyze root for resolving `display` fields. When present
+   * (comp), the dismiss subcommand enumerates the repo's TypeScript
+   * sources and walks declarations to fill in `display`. Omit for `dup`
+   * ids — there is no equivalent cheap resolver, and dup display can be
+   * reconstructed by re-running the detector when needed.
    */
-  tsconfigPath?: string;
+  analyzeRoot?: string;
 }
 
-export function runDismiss(
+export async function runDismiss(
   options: DismissOptions,
   stdout: WritableLike,
   stderr: WritableLike,
-): number {
+): Promise<number> {
   const id = normalizeDismissalId(options.id);
   const rootDir = resolve(options.rootDir);
   const registry = loadRegistry(rootDir, {
@@ -66,8 +67,8 @@ export function runDismiss(
     reason: options.reason,
     dismissedAt: new Date().toISOString(),
   };
-  if (options.feature === "comp" && options.tsconfigPath !== undefined) {
-    const display = tryResolveDisplay(options.tsconfigPath, id, stderr);
+  if (options.feature === "comp" && options.analyzeRoot !== undefined) {
+    const display = await tryResolveDisplay(options.analyzeRoot, id, stderr);
     if (display !== undefined) entry.display = display;
   }
   const { registry: next } = addEntry(registry, entry);
@@ -141,15 +142,22 @@ function formatLine(line: number | undefined): string {
   return line === undefined ? "?" : String(line);
 }
 
-function tryResolveDisplay(
-  tsconfigPath: string,
+async function tryResolveDisplay(
+  rootDir: string,
   id: string,
   stderr: WritableLike,
-): DismissalEntry["display"] | undefined {
+): Promise<DismissalEntry["display"] | undefined> {
   try {
-    const { project } = loadProject({ tsconfigPath });
-    const rootDir = dirname(tsconfigPath);
-    const files = enumerateSourceFiles(project, rootDir);
+    const sources = await listRepoSources(rootDir);
+    const { project } = loadProject({
+      sourcePaths: sources.map((s) => s.absolute),
+    });
+    const files: SourceFileInfo[] = [];
+    for (const s of sources) {
+      const sourceFile = project.getSourceFile(s.absolute);
+      if (sourceFile === undefined) continue;
+      files.push({ path: s.relative, sourceFile });
+    }
     const declarations = enumerateDeclarations(project, rootDir, { files });
     for (const d of declarations) {
       if (bodyHashToCompDismissalId(computeBodyHash(d.node)) === id) {

@@ -82,9 +82,7 @@ function writePostStreamError(
 ): void {
   const report = buildErrorReport(code, message);
   io.stdout.write(
-    format === "json"
-      ? renderJson(report)
-      : renderMarkdownErrorBody(report),
+    format === "json" ? renderJson(report) : renderMarkdownErrorBody(report),
   );
   io.stderr.write(`ts-hotspots duplication: ${humanDetail}\n`);
 }

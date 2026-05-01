@@ -17,7 +17,6 @@ function makeFunctionReport(
   return {
     tool: { name: "ts-hotspots", version: "0.1.0" },
     project: {
-      tsconfigPath: "/abs/tsconfig.json",
       sourceFileCount: 3,
       functionCount: 5,
     },
@@ -68,7 +67,7 @@ describe("renderJson", () => {
     expect(JSON.parse(renderJson(err))).toEqual(err);
   });
 
-  test("success reports omit `status`; error reports keep `status: \"error\"`", () => {
+  test('success reports omit `status`; error reports keep `status: "error"`', () => {
     const ok = JSON.parse(renderJson(makeFunctionReport())) as {
       status?: string;
     };
@@ -122,7 +121,6 @@ describe("renderMarkdown (complexity)", () => {
     const a = makeFunctionReport();
     const b = makeFunctionReport({
       project: {
-        tsconfigPath: "/other/tsconfig.json",
         sourceFileCount: 999,
         functionCount: 123,
       },
@@ -192,9 +190,9 @@ describe("renderMarkdown (duplication)", () => {
 
 describe("renderStatsLine", () => {
   test("uses the `ts-hotspots <feature>: <payload>` format and ends with a newline", () => {
-    expect(renderStatsLine("complexity", "files=3, functions=5, candidates=2")).toBe(
-      "ts-hotspots complexity: files=3, functions=5, candidates=2\n",
-    );
+    expect(
+      renderStatsLine("complexity", "files=3, functions=5, candidates=2"),
+    ).toBe("ts-hotspots complexity: files=3, functions=5, candidates=2\n");
     expect(renderStatsLine("duplication", "repo=10 files/200 fragments")).toBe(
       "ts-hotspots duplication: repo=10 files/200 fragments\n",
     );

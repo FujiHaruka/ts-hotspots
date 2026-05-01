@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultConfig } from "../config/index.ts";
-import {
-  buildCodebaseIndex,
-  type SourceInput,
-} from "./buildCodebaseIndex.ts";
+import { buildCodebaseIndex, type SourceInput } from "./buildCodebaseIndex.ts";
 
 describe("buildCodebaseIndex", () => {
   it("returns an empty array for empty input", () => {
@@ -29,9 +26,9 @@ describe("buildCodebaseIndex", () => {
     expect(
       filePathsInOrder.slice(0, firstBIndex).every((p) => p === "a.ts"),
     ).toBe(true);
-    expect(
-      filePathsInOrder.slice(firstBIndex).every((p) => p === "b.ts"),
-    ).toBe(true);
+    expect(filePathsInOrder.slice(firstBIndex).every((p) => p === "b.ts")).toBe(
+      true,
+    );
   });
 
   it("is deterministic across repeated runs", () => {

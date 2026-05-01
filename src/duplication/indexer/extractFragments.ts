@@ -36,8 +36,7 @@ export function extractFragments(
     const end = node.getEnd();
     const startLine =
       ts.getLineAndCharacterOfPosition(sourceFile, start).line + 1;
-    const endLine =
-      ts.getLineAndCharacterOfPosition(sourceFile, end).line + 1;
+    const endLine = ts.getLineAndCharacterOfPosition(sourceFile, end).line + 1;
     const id = idAllocator.allocate(startLine, endLine, kind);
     fragments.push({
       id,
@@ -58,8 +57,7 @@ export function extractFragments(
     const end = lastStatement.getEnd();
     const startLine =
       ts.getLineAndCharacterOfPosition(sourceFile, start).line + 1;
-    const endLine =
-      ts.getLineAndCharacterOfPosition(sourceFile, end).line + 1;
+    const endLine = ts.getLineAndCharacterOfPosition(sourceFile, end).line + 1;
     const id = idAllocator.allocate(startLine, endLine, "window");
     fragments.push({
       id,

@@ -28,11 +28,7 @@ function mkScore(
   };
 }
 
-function mkFragment(
-  id: string,
-  filePath: string,
-  lines = 10,
-): Fragment {
+function mkFragment(id: string, filePath: string, lines = 10): Fragment {
   return {
     id,
     filePath,

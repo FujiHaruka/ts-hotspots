@@ -1,5 +1,4 @@
 import { calleeCountCollector } from "../collectors/call-graph/callee-count.ts";
-import { callerCountCollector } from "../collectors/call-graph/caller-count.ts";
 import { cognitiveCollector } from "../collectors/complexity/cognitive.ts";
 import { maxNestingDepthCollector } from "../collectors/complexity/max-nesting-depth.ts";
 import { parameterCountCollector } from "../collectors/complexity/parameter-count.ts";
@@ -33,7 +32,6 @@ const METRIC_COLLECTORS = [
   slocCollector,
   parameterCountCollector,
   maxNestingDepthCollector,
-  callerCountCollector,
   calleeCountCollector,
   tryCatchCountCollector,
   awaitCountCollector,

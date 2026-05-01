@@ -1,6 +1,9 @@
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createTempRepo, type TempRepo } from "../../../test/dedup/e2e/helpers/tempRepo.ts";
+import {
+  createTempRepo,
+  type TempRepo,
+} from "../../../test/dedup/e2e/helpers/tempRepo.ts";
 import { defaultConfig } from "../config/index.ts";
 import { listBaseSources } from "./listBaseSources.ts";
 

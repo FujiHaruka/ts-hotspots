@@ -19,11 +19,11 @@ You are working inside the ts-hotspots repo. ts-hotspots is a CLI that staticall
 
 1. **Run the tool against the target.** From the ts-hotspots repo:
    ```
-   node src/index.ts <<target path>> > /tmp/ts-hotspots-<<slug>>-functions.json
+   node src/index.ts comp <<target path>> --format json > /tmp/ts-hotspots-<<slug>>-functions.json
    ```
    The default output contains only `hotspots` — the union of "co-occurrence ≥ 3 axes" and "discriminative axis top-3 rescue", with each candidate carrying its hit axes and raw values inline. This is the primary signal and is what we are evaluating.
 
-   If the target has no `tsconfig.json` at the root (e.g. a monorepo), pass the tsconfig you want to analyze directly. Handle errors (e.g. exclude out-of-scope paths with `--exclude`).
+   `<<target path>>` is a directory inside a git working tree; sources are picked up via `git ls-files`. Untracked files are skipped — commit before analyzing. Handle noise by tightening `--exclude` globs.
 
 2. **Validate `hotspots` against real code.** Read the candidates top-down and open each coordinate. Judge whether each candidate's `axes[]` and `metrics` (raw values on hit axes) line up with an actual code smell. Classify into at least:
 

@@ -19,7 +19,7 @@ function fn(opts: {
   sloc?: number;
   paramCount?: number;
   mutationSiteCount?: number;
-  callerCount?: number;
+  commitCount?: number;
 }): FunctionEntry {
   const start = opts.line ?? 1;
   const end = opts.endLine ?? start;
@@ -36,11 +36,11 @@ function fn(opts: {
       sloc: opts.sloc ?? 0,
       parameterCount: opts.paramCount ?? 0,
       maxNestingDepth: 0,
-      callerCount: opts.callerCount ?? 0,
       calleeCount: 0,
       tryCatchCount: 0,
       awaitCount: 0,
       mutationSiteCount: opts.mutationSiteCount ?? 0,
+      commitCount: opts.commitCount ?? 0,
     },
     bodyHash: `sha256:${opts.file}:${String(start)}:${opts.name ?? "f"}`,
   };
@@ -598,11 +598,11 @@ describe("computeFunctionHotspotCandidates", () => {
     ).toEqual([]);
   });
 
-  test("leverage-only axis (callerCount) does not rescue candidates", () => {
+  test("leverage-only axis (commitCount) does not rescue candidates", () => {
     const entries: FunctionEntry[] = [
-      fn({ file: "a.ts", name: "a", callerCount: 10 }),
-      fn({ file: "b.ts", name: "b", callerCount: 5 }),
-      fn({ file: "c.ts", name: "c", callerCount: 1 }),
+      fn({ file: "a.ts", name: "a", commitCount: 10 }),
+      fn({ file: "b.ts", name: "b", commitCount: 5 }),
+      fn({ file: "c.ts", name: "c", commitCount: 1 }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
     const meta = computeFunctionAxisMeta(entries, rankings);
@@ -630,13 +630,13 @@ describe("computeFunctionHotspotCandidates", () => {
           location: "a.ts:1",
           name: "solo",
           kind: "function",
-          metrics: { callerCount: 10 },
+          metrics: { commitCount: 10 },
           bodyHash: "sha256:solo",
         },
       ],
       emptyFunctionRankings(),
       computeFunctionAxisMeta([], emptyFunctionRankings()),
-      [{ ref, axisHitCount: 3, axes: ["callerCount"] }],
+      [{ ref, axisHitCount: 3, axes: ["commitCount"] }],
     );
     expect(candidates).toEqual([]);
   });
@@ -655,7 +655,7 @@ describe("computeFunctionHotspotCandidates", () => {
         name: "quality-plus-leverage",
         cognitive: 5,
         sloc: 5,
-        callerCount: 10,
+        commitCount: 10,
       }),
       fn({
         file: "c.ts",
@@ -663,7 +663,7 @@ describe("computeFunctionHotspotCandidates", () => {
         cognitive: 1,
         sloc: 1,
         paramCount: 1,
-        callerCount: 1,
+        commitCount: 1,
       }),
     ];
     const rankings = rankFunctions(entries, { topN: 5 });
@@ -675,9 +675,9 @@ describe("computeFunctionHotspotCandidates", () => {
       meta,
       co,
     );
-    // all-four: totalHits=4 (cog+cyc+param+callerCount), qualityHits=3
+    // all-four: totalHits=4 (cog+cyc+param+commitCount), qualityHits=3
     // quality-only: totalHits=3 (cog+cyc+param), qualityHits=3
-    // quality-plus-leverage: totalHits=3 (cog+cyc+callerCount), qualityHits=2
+    // quality-plus-leverage: totalHits=3 (cog+cyc+commitCount), qualityHits=2
     // Sort: totalHits desc → all-four first. Then totalHits=3 tied, qualityHits
     // desc breaks in favor of quality-only over quality-plus-leverage.
     expect(candidates.map((c) => c.ref.name)).toEqual([
@@ -689,7 +689,7 @@ describe("computeFunctionHotspotCandidates", () => {
     const leverageCandidate = candidates.find(
       (c) => c.ref.name === "quality-plus-leverage",
     );
-    expect(Object.hasOwn(leverageCandidate?.metrics ?? {}, "callerCount")).toBe(
+    expect(Object.hasOwn(leverageCandidate?.metrics ?? {}, "commitCount")).toBe(
       true,
     );
   });

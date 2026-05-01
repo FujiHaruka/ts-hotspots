@@ -1,5 +1,5 @@
 import { existsSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { Command, InvalidArgumentError } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { aggregate } from "./aggregator/aggregate.ts";
@@ -18,7 +18,7 @@ import {
 import { runDismiss, runListDismissed, runUndismiss } from "./cli/dismiss.ts";
 import { collectChurn } from "./collectors/churn/commit-count.ts";
 import { enumerateDeclarations } from "./collectors/enumerate-declarations.ts";
-import { enumerateSourceFiles } from "./collectors/enumerate-source-files.ts";
+import type { SourceFileInfo } from "./collectors/enumerate-source-files.ts";
 import { DEFAULT_EXCLUDE_GLOBS } from "./defaults.ts";
 import { bodyHashToCompDismissalId } from "./dismissal/hash.ts";
 import {
@@ -29,7 +29,11 @@ import {
   withProjectPath,
 } from "./dismissal/store.ts";
 import { main as runDuplicationMain } from "./duplication/cli/main.ts";
-import { loadProject, TsconfigNotFoundError } from "./loader/load-project.ts";
+import {
+  listRepoSources,
+  NotAGitRepositoryError,
+} from "./loader/listRepoSources.ts";
+import { loadProject } from "./loader/load-project.ts";
 import {
   renderJson,
   renderMarkdownBody,
@@ -248,10 +252,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
       "--reason <text>",
       "why this candidate is not a real hotspot",
     )
-    .option(
-      "--path <path>",
-      "project directory or tsconfig.json (defaults to cwd)",
-    )
+    .option("--path <path>", "project directory (defaults to cwd)")
     .action((id: string, opts: DismissCliOptions) => {
       onInvoke({
         kind: "dismiss",
@@ -265,10 +266,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     .command("list-dismissed")
     .description("list entries in the dismissal registry")
     .option("--json", "emit raw JSON instead of a human-readable table")
-    .option(
-      "--path <path>",
-      "project directory or tsconfig.json (defaults to cwd)",
-    )
+    .option("--path <path>", "project directory (defaults to cwd)")
     .action((opts: ListDismissedCliOptions) => {
       onInvoke({
         kind: "list-dismissed",
@@ -280,10 +278,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
   program
     .command("undismiss <id>")
     .description("remove a dismissal entry by id")
-    .option(
-      "--path <path>",
-      "project directory or tsconfig.json (defaults to cwd)",
-    )
+    .option("--path <path>", "project directory (defaults to cwd)")
     .action((id: string, opts: UndismissCliOptions) => {
       onInvoke({
         kind: "undismiss",
@@ -308,15 +303,10 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
   return program;
 }
 
-function resolveTsconfigPath(positional: string | undefined): string {
-  if (positional !== undefined) {
-    const p = resolve(positional);
-    if (existsSync(p) && statSync(p).isDirectory()) {
-      return join(p, "tsconfig.json");
-    }
-    return p;
-  }
-  return resolve(process.cwd(), "tsconfig.json");
+function resolveRootDir(positional: string | undefined): string {
+  return positional !== undefined
+    ? resolve(positional)
+    : resolve(process.cwd());
 }
 
 function writeError(
@@ -372,7 +362,6 @@ function resolveChurnOptions(opts: ChurnCliOptions): ChurnPrepareOptions {
 }
 
 interface PreparedContext {
-  tsconfigPath: string;
   rootDir: string;
   projectInfo: ReportProject;
   functions: ReturnType<typeof aggregate>["functions"];
@@ -384,18 +373,23 @@ interface ChurnPrepareOptions {
   ref: string;
 }
 
-function prepare(
+async function prepare(
   positional: string | undefined,
   exclude: readonly string[],
   churnOptions: ChurnPrepareOptions,
   stderr: WritableLike,
-): PreparedContext {
-  const tsconfigPath = resolveTsconfigPath(positional);
-  const { project } = loadProject({ tsconfigPath });
-  const rootDir = dirname(tsconfigPath);
-  const files = enumerateSourceFiles(project, rootDir, {
-    exclude: [...exclude],
+): Promise<PreparedContext> {
+  const rootDir = resolveRootDir(positional);
+  const sources = await listRepoSources(rootDir, { exclude });
+  const { project } = loadProject({
+    sourcePaths: sources.map((s) => s.absolute),
   });
+  const files: SourceFileInfo[] = [];
+  for (const s of sources) {
+    const sourceFile = project.getSourceFile(s.absolute);
+    if (sourceFile === undefined) continue;
+    files.push({ path: s.relative, sourceFile });
+  }
   const declarations = enumerateDeclarations(project, rootDir, { files });
   const churn = churnOptions.enabled
     ? collectChurn({
@@ -416,18 +410,17 @@ function prepare(
     churn,
   });
   const projectInfo: ReportProject = {
-    tsconfigPath,
     sourceFileCount: files.length,
     functionCount: functions.length,
   };
-  return { tsconfigPath, rootDir, projectInfo, functions };
+  return { rootDir, projectInfo, functions };
 }
 
 /**
  * Strip `--verbose`-only fields from `projectInfo` so the slim default
  * envelope only carries the one project signal an agent needs to size up
- * the run (`sourceFileCount`). `tsconfigPath` and `functionCount` stay
- * available to `--verbose` callers and to the stderr stats line.
+ * the run (`sourceFileCount`). `functionCount` stays available to
+ * `--verbose` callers and to the stderr stats line.
  */
 function slimProject(projectInfo: ReportProject): ReportProject {
   return { sourceFileCount: projectInfo.sourceFileCount };
@@ -651,9 +644,12 @@ async function runFunctions(
   // longer switch to the old "# ts-hotspots error" preamble on failure.
   let functionAxes: FunctionAxisId[] | undefined;
   try {
-    const tsconfigPath = resolveTsconfigPath(positional);
-    if (!existsSync(tsconfigPath)) {
-      throw new TsconfigNotFoundError(tsconfigPath);
+    const rootDir = resolveRootDir(positional);
+    if (!existsSync(rootDir)) {
+      throw new InvalidArgsError(`path does not exist: ${rootDir}`);
+    }
+    if (!statSync(rootDir).isDirectory()) {
+      throw new InvalidArgsError(`path is not a directory: ${rootDir}`);
     }
     if (options.metrics !== undefined) {
       functionAxes = parseFunctionAxes(options.metrics);
@@ -675,7 +671,7 @@ async function runFunctions(
   if (streaming) stdout.write(renderMarkdownHead("complexity"));
 
   try {
-    const { rootDir, projectInfo, functions } = prepare(
+    const { rootDir, projectInfo, functions } = await prepare(
       positional,
       exclude,
       resolveChurnOptions(options),
@@ -898,16 +894,15 @@ export async function run(
     ) {
       return runDupDismissalCommand(invocation, stdout, stderr);
     }
-    const tsconfigPath = resolveTsconfigPath(invocation.path);
-    const rootDir = dirname(tsconfigPath);
+    const rootDir = resolveRootDir(invocation.path);
     if (invocation.kind === "dismiss") {
-      return runDismiss(
+      return await runDismiss(
         {
           id: invocation.id,
           reason: invocation.reason,
           rootDir,
           feature: "comp",
-          tsconfigPath,
+          analyzeRoot: rootDir,
         },
         stdout,
         stderr,
@@ -929,22 +924,21 @@ export async function run(
 }
 
 /**
- * Route `dup:<hex>` ids to the git-root registry instead of the
- * tsconfig-dirname one used by `comp`. `dup` resolves "the project" via
- * `findGitRoot`, so the registry key has to match — otherwise a dup run
- * would never see entries written by `dismiss`.
+ * Route `dup:<hex>` ids to the git-root registry. `dup` resolves "the
+ * project" via `findGitRoot`, so the registry key has to match —
+ * otherwise a dup run would never see entries written by `dismiss`.
  */
-function runDupDismissalCommand(
+async function runDupDismissalCommand(
   invocation:
     | { kind: "dismiss"; id: string; reason: string; path: string | undefined }
     | { kind: "undismiss"; id: string; path: string | undefined },
   stdout: WritableLike,
   stderr: WritableLike,
-): number {
+): Promise<number> {
   const start = invocation.path ?? process.cwd();
   const rootDir = findGitRoot(resolve(start));
   if (invocation.kind === "dismiss") {
-    return runDismiss(
+    return await runDismiss(
       {
         id: invocation.id,
         reason: invocation.reason,

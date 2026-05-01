@@ -40,6 +40,8 @@ export function extractFeatures(
     statements: enabled.statement
       ? buildStatementKindNgramsFromLocated(located, config)
       : [],
-    calls: enabled.call ? buildCallPropertyFingerprintsFromLocated(located) : [],
+    calls: enabled.call
+      ? buildCallPropertyFingerprintsFromLocated(located)
+      : [],
   };
 }

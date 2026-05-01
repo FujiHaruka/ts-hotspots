@@ -63,7 +63,9 @@ describe("runWholeRepoDetector", () => {
     // members of the same group.
     const matched = result.groups.some((g) => {
       const paths = new Set(
-        g.members.map((m) => parseLocation(m.fragment.location).filePath).sort(),
+        g.members
+          .map((m) => parseLocation(m.fragment.location).filePath)
+          .sort(),
       );
       return paths.has("src/math.ts") && paths.has("src/util.ts");
     });

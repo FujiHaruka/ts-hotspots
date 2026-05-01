@@ -63,10 +63,7 @@ describe("collectDiff", () => {
     const r = newRepo();
     r.write("src/a.ts", "export const x = 1;\n");
     const base = r.commit("base");
-    r.write(
-      "src/a.ts",
-      "export const x = 1;\nexport const y = 2;\n",
-    );
+    r.write("src/a.ts", "export const x = 1;\nexport const y = 2;\n");
     const head = r.commit("head");
 
     const { files } = await collectDiff({

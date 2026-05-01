@@ -12,7 +12,6 @@ export interface FunctionMetrics {
   sloc: number;
   parameterCount: number;
   maxNestingDepth: number;
-  callerCount: number;
   calleeCount: number;
   tryCatchCount: number;
   awaitCount: number;
@@ -25,7 +24,6 @@ export type FunctionAxisId =
   | "maxNestingDepth"
   | "sloc"
   | "parameterCount"
-  | "callerCount"
   | "calleeCount"
   | "tryCatchCount"
   | "awaitCount"
@@ -37,7 +35,6 @@ export const FUNCTION_AXIS_IDS: readonly FunctionAxisId[] = [
   "maxNestingDepth",
   "sloc",
   "parameterCount",
-  "callerCount",
   "calleeCount",
   "tryCatchCount",
   "awaitCount",
@@ -71,8 +68,6 @@ export interface ReportTool {
 
 export interface ReportProject {
   sourceFileCount: number;
-  /** `--verbose` only. Absolute path to the project's tsconfig. */
-  tsconfigPath?: string;
   /** `--verbose` only. Total functions collected (across all files). */
   functionCount?: number;
 }

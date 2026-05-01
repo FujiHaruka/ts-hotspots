@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CandidateScore, ScoreBreakdown } from "../domain/candidate.ts";
 import type { Fragment } from "../domain/fragment.ts";
-import { sortCandidates, type RankablePair } from "./ranking.ts";
+import { type RankablePair, sortCandidates } from "./ranking.ts";
 
 function mkFragment(id: string): Fragment {
   return {
@@ -86,11 +86,9 @@ describe("sortCandidates", () => {
       mkPair("c1", "b1", 0.5, { tokenOverlap: 0.5 }),
     ];
     const sorted = sortCandidates(pairs);
-    expect(sorted.map((p) => `${p.changedFragment.id}|${p.baseFragment.id}`)).toEqual([
-      "c1|b1",
-      "c1|b3",
-      "c2|b2",
-    ]);
+    expect(
+      sorted.map((p) => `${p.changedFragment.id}|${p.baseFragment.id}`),
+    ).toEqual(["c1|b1", "c1|b3", "c2|b2"]);
   });
 
   it("is deterministic: running twice produces the same order", () => {
@@ -110,10 +108,7 @@ describe("sortCandidates", () => {
   });
 
   it("does not mutate the input array", () => {
-    const pairs = [
-      mkPair("c1", "b1", 0.3),
-      mkPair("c2", "b2", 0.9),
-    ];
+    const pairs = [mkPair("c1", "b1", 0.3), mkPair("c2", "b2", 0.9)];
     const before = pairs.map((p) => p.score.combined);
     sortCandidates(pairs);
     expect(pairs.map((p) => p.score.combined)).toEqual(before);

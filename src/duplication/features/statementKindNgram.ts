@@ -1,7 +1,7 @@
 import type ts from "typescript";
 import type { Config } from "../config/config.ts";
-import type { Fragment } from "../domain/fragment.ts";
 import type { FeatureKey } from "../domain/feature.ts";
+import type { Fragment } from "../domain/fragment.ts";
 import {
   type LocatedFragment,
   locateFragmentNode,

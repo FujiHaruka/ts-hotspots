@@ -129,10 +129,7 @@ describe("loadRegistry", () => {
 
 describe("addEntry", () => {
   test("appends new entry", () => {
-    const { registry, added } = addEntry(
-      emptyRegistry(),
-      makeEntry("comp:a"),
-    );
+    const { registry, added } = addEntry(emptyRegistry(), makeEntry("comp:a"));
     expect(added).toBe(true);
     expect(registry.entries).toHaveLength(1);
   });

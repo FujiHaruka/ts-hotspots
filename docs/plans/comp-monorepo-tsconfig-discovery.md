@@ -1,6 +1,8 @@
 ## `comp` monorepo tsconfig 自動展開 計画
 
-> Status: Decisions pending, implementation pending
+> **Superseded by [comp-drop-callercount.md](./comp-drop-callercount.md) (2026-05-01)**: `comp` から tsconfig 依存自体を撤廃し、ソース列挙を `git ls-files` ベースに切り替えたため、本計画の monorepo discovery は不要になった。経緯と「なぜ YAGNI 判断が覆ったか」の記録として残す。
+>
+> Status: Superseded (no longer planned)
 > Goal: `ts-hotspots comp <path>` で `<path>` 直下に `tsconfig.json` が無い monorepo ルートを渡されたとき、配下のパッケージ tsconfig を自動的に発見してまとめて解析する。
 > 非 Goal: `dup` 側の挙動変更 (`dup` は tsconfig を読まないため本計画の対象外)。複数プロジェクトを **別レポートに分割** して並べる出力形 (集約は単一 ranking のまま)。
 
