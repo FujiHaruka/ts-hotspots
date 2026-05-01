@@ -13,8 +13,9 @@
  * 2. Compute the at-a-glance edge mix (`runtimeShare`) per node so the
  *    report shows whether type-only or runtime edges dominate without
  *    forcing the agent to re-walk the graph.
- * 3. Filter slim vs verbose: slim drops the per-secondary contributing
- *    breakdown, drops `summary`, and drops `componentCount`.
+ * 3. Flatten the scoring layer's primary + secondary smells into a
+ *    single `smells[]` list ordered by composite descending, and
+ *    filter slim vs verbose (slim drops `summary` and `componentCount`).
  */
 
 import { componentIdToArchDismissalId } from "../../dismissal/hash.ts";
@@ -26,7 +27,6 @@ import type {
   ArchEdgeMix,
   ArchHotspot,
   ArchReport,
-  ArchSecondarySmell,
   ArchSummary,
   ArchTool,
 } from "./types.ts";
@@ -48,7 +48,7 @@ export function serializeReport(
   const edgeMixByNode = computeEdgeMix(opts.graph);
 
   const hotspots = candidates.map((c) =>
-    toHotspot(c, componentById, edgeMixByNode, opts.verbose),
+    toHotspot(c, componentById, edgeMixByNode),
   );
 
   const project: ArchReport["project"] = {
@@ -73,7 +73,6 @@ function toHotspot(
   candidate: ArchCandidate,
   componentById: ReadonlyMap<string, Component>,
   edgeMixByNode: ReadonlyMap<string, ArchEdgeMix>,
-  verbose: boolean,
 ): ArchHotspot {
   const node = componentById.get(candidate.nodeId);
   const ref = node === undefined
@@ -88,20 +87,15 @@ function toHotspot(
     fanIn: 0,
     runtimeShare: 0,
   };
-  const secondarySmells: ArchSecondarySmell[] = candidate.secondary.map((s) => {
-    const out: ArchSecondarySmell = {
-      smellType: s.smellType,
-      composite: s.composite,
-    };
-    if (verbose) out.metrics = s.contributing.map(toContributingMetric);
-    return out;
-  });
+  const smells: SmellType[] = [
+    candidate.primary.smellType,
+    ...candidate.secondary.map((s) => s.smellType),
+  ];
   return {
     kind: "architecture",
     ref,
     score: { axis: "composite", value: candidate.primary.composite },
-    primarySmell: candidate.primary.smellType,
-    secondarySmells,
+    smells,
     metrics: candidate.primary.contributing.map(toContributingMetric),
     edgeMix,
     dismissalId: componentIdToArchDismissalId(candidate.nodeId),
@@ -154,7 +148,7 @@ function buildSummary(
   for (const s of SMELL_TYPES) ordered[s] = counts[s];
   return {
     candidateCount: candidates.length,
-    primarySmellCounts: ordered,
+    smellCounts: ordered,
     ref,
   };
 }

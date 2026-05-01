@@ -6,12 +6,12 @@
  * an AI agent can consume without drowning in metric detail.
  *
  * Two profiles:
- *  - **slim** (default): top-level coordinate, primary smell, up to two
- *    secondary smells, contributing-metric breakdown for the primary
- *    smell, dismissalId.
- *  - **verbose** (`--verbose`): adds contributing breakdown for every
- *    secondary smell and the project-level summary (counts, dominant
- *    edge mix).
+ *  - **slim** (default): top-level coordinate, `smells[]` (the smell
+ *    types the node tripped, ordered by composite descending — the
+ *    first entry is the highest-composite smell), contributing-metric
+ *    breakdown for the top-listed smell, edge mix, dismissalId.
+ *  - **verbose** (`--verbose`): adds the project-level summary
+ *    (per-smell counts of top-listed hits, candidate count, ref).
  *
  * Both profiles share the same envelope (`tool`, `project`,
  * `hotspots[]`, `dismissed?`, `notice?`, `diff?`, `summary?`) so an
@@ -61,13 +61,6 @@ export interface ArchContributingMetric {
   zScore: number;
 }
 
-export interface ArchSecondarySmell {
-  smellType: SmellType;
-  composite: number;
-  /** Verbose only — slim output drops this to keep secondary cards small. */
-  metrics?: ArchContributingMetric[];
-}
-
 export interface ArchEdgeMix {
   /** Total outgoing edge count (kind-agnostic). */
   fanOut: number;
@@ -86,8 +79,12 @@ export interface ArchHotspot {
   kind: "architecture";
   ref: ArchRef;
   score: ArchScore;
-  primarySmell: SmellType;
-  secondarySmells: ArchSecondarySmell[];
+  /**
+   * Smell types this node tripped, ordered by composite descending.
+   * The first entry is the highest-composite smell — `score.value` and
+   * `metrics` correspond to it.
+   */
+  smells: SmellType[];
   metrics: ArchContributingMetric[];
   edgeMix: ArchEdgeMix;
   dismissalId: string;
@@ -108,8 +105,11 @@ export interface ArchNotice {
 export interface ArchSummary {
   /** Total candidates emitted by the scoring layer (pre-`--limit`). */
   candidateCount: number;
-  /** Per-smell counts of primary hits (always present, even when 0). */
-  primarySmellCounts: Record<SmellType, number>;
+  /**
+   * Per-smell counts of top-listed hits — i.e. the first entry of
+   * each hotspot's `smells[]` array. Always present, even when 0.
+   */
+  smellCounts: Record<SmellType, number>;
   /** `--ref` value used to build the graph; `"working-tree"` when none. */
   ref: string;
 }

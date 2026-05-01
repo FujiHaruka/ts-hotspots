@@ -9,7 +9,6 @@ export {
   type ArchRef,
   type ArchReport,
   type ArchScore,
-  type ArchSecondarySmell,
   type ArchSummary,
   type ArchTool,
 } from "./types.ts";

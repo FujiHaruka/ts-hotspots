@@ -99,12 +99,11 @@ describe("serializeReport — slim", () => {
     });
     expect(h?.kind).toBe("architecture");
     expect(h?.score).toEqual({ axis: "composite", value: 0.92 });
-    expect(h?.primarySmell).toBe("architectural_hub");
-    expect(h?.secondarySmells.length).toBe(1);
+    expect(h?.smells).toEqual(["architectural_hub", "high_fanout_component"]);
     expect(h?.dismissalId.startsWith("arch:")).toBe(true);
   });
 
-  it("slim output drops per-secondary metrics and summary", () => {
+  it("slim output drops summary and componentCount", () => {
     const g = graph([comp("src/a.ts", "A")], []);
     const report = serializeReport([SAMPLE_CANDIDATE], {
       tool: TOOL,
@@ -115,7 +114,6 @@ describe("serializeReport — slim", () => {
     });
     expect(report.summary).toBeUndefined();
     expect(report.project.componentCount).toBeUndefined();
-    expect(report.hotspots[0]?.secondarySmells[0]?.metrics).toBeUndefined();
   });
 
   it("computes runtime share over fanIn + fanOut", () => {
@@ -141,7 +139,7 @@ describe("serializeReport — slim", () => {
 });
 
 describe("serializeReport — verbose", () => {
-  it("includes summary + per-secondary metrics", () => {
+  it("includes summary + componentCount", () => {
     const g = graph([comp("src/a.ts", "A")], []);
     const report = serializeReport([SAMPLE_CANDIDATE], {
       tool: TOOL,
@@ -152,9 +150,8 @@ describe("serializeReport — verbose", () => {
     });
     expect(report.summary?.ref).toBe("release/v2");
     expect(report.summary?.candidateCount).toBe(1);
-    expect(report.summary?.primarySmellCounts.architectural_hub).toBe(1);
-    expect(report.summary?.primarySmellCounts.bridge_component).toBe(0);
+    expect(report.summary?.smellCounts.architectural_hub).toBe(1);
+    expect(report.summary?.smellCounts.bridge_component).toBe(0);
     expect(report.project.componentCount).toBe(1);
-    expect(report.hotspots[0]?.secondarySmells[0]?.metrics?.length).toBe(1);
   });
 });
