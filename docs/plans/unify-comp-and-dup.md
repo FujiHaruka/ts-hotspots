@@ -1,6 +1,6 @@
 ## `comp` / `dup` 段階的統合 計画
 
-> Status: Decisions finalized, implementation pending
+> Status: Completed 2026-05-01 (M1–M5 shipped)
 > Goal: `complexity` (`comp`) と `duplication` (`dup`) は別コマンドのまま、ユーザー体験 (CLI シェイプ・出力スキーマ・エージェント向け表現) を一貫させる。
 > 非 Goal: `scan` のような単一コマンドへの再統合 (検討済み・採用しない。`docs/plans/scan-command.md` を削除した経緯はこの文書で吸収する)。
 
