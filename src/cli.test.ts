@@ -419,6 +419,33 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(locations.some((loc) => loc.startsWith("src/a.ts:"))).toBe(false);
   });
 
+  test("--exclude is repeatable: each invocation contributes one glob", async () => {
+    const stdout = new StringSink();
+    const stderr = new StringSink();
+    const code = await run(
+      [
+        ...COMPLEXITY_PREFIX,
+        FIXTURE_DIR,
+        "--exclude",
+        "**/a.ts",
+        "--exclude",
+        "**/b.ts",
+        "--verbose",
+        "--format",
+        "json",
+      ],
+      stdout,
+      stderr,
+    );
+    expect(code).toBe(0);
+    const report = JSON.parse(stdout.text) as ParsedFunctionReport;
+    const locations = (report.functions ?? []).map((f) => f.location);
+    expect(locations.some((loc) => loc.startsWith("src/a.ts:"))).toBe(false);
+    expect(locations.some((loc) => loc.startsWith("src/b.ts:"))).toBe(false);
+    // Sanity: other source files survive — the two flags excluded only a.ts and b.ts.
+    expect(locations.some((loc) => loc.startsWith("src/c.ts:"))).toBe(true);
+  });
+
   test("functionCoOccurrence is omitted from slim default output", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();

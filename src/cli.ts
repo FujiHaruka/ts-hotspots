@@ -157,6 +157,17 @@ function parseMetrics(value: string): string[] {
     .filter((s) => s.length > 0);
 }
 
+function collectExcludeGlob(
+  value: string,
+  previous: readonly string[],
+): string[] {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new InvalidArgumentError("--exclude requires a non-empty glob");
+  }
+  return [...previous, trimmed];
+}
+
 type PendingInvocation =
   | {
       kind: "complexity";
@@ -199,8 +210,10 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
       "rank functions and files by complexity / size / churn (per-function hotspot candidates)",
     )
     .option(
-      "-e, --exclude <glob...>",
-      "extra path glob(s) to exclude on top of the built-in defaults (node_modules, dist, generated files, test files, ...)",
+      "-e, --exclude <glob>",
+      "extra path glob to exclude (repeatable). Added on top of the built-in defaults (node_modules, dist, generated files, test files, ...)",
+      collectExcludeGlob,
+      [] as string[],
     )
     .option(
       "--limit <N|all>",
