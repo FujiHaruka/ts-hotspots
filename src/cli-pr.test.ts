@@ -43,7 +43,7 @@ function touch(root: string, relPath: string, body: string): void {
 }
 
 // A function body with enough cognitive load (nested ifs, try/catch, awaits)
-// to surface in `functionHotspotCandidates`. The bodies for `a.ts` and `b.ts`
+// to surface in `hotspots`. The bodies for `a.ts` and `b.ts`
 // are nearly identical, so both functions are equally complex — the filter,
 // not the score, is what scopes the output to one file.
 function complexFn(name: string): string {
@@ -103,7 +103,7 @@ function buildFixtureRepo(repoRoot: string): void {
 
 interface PrEnvelope {
   pr?: { baseSha: string; headSha: string; threeDot: boolean; changedFiles: number };
-  functionHotspotCandidates: { ref: { location: string } }[];
+  hotspots: { ref: { location: string } }[];
   functionRankings?: Record<string, { ref: { location: string } }[]>;
   functionCoOccurrence?: { ref: { location: string } }[];
   notice?: { code: string; message: string };
@@ -135,7 +135,7 @@ describe("complexity --pr (PR scope filter)", () => {
     const baseline = JSON.parse(baselineStdout.text) as PrEnvelope;
     expect(baseline.pr).toBeUndefined();
     const baselineFiles = new Set(
-      baseline.functionHotspotCandidates.map((c) =>
+      baseline.hotspots.map((c) =>
         c.ref.location.split(":")[0],
       ),
     );
@@ -157,15 +157,15 @@ describe("complexity --pr (PR scope filter)", () => {
     expect(report.pr?.threeDot).toBe(false);
     expect(report.pr?.baseSha).toMatch(/^[0-9a-f]{40}$/);
     expect(report.pr?.headSha).toMatch(/^[0-9a-f]{40}$/);
-    expect(report.functionHotspotCandidates.length).toBeGreaterThan(0);
-    for (const c of report.functionHotspotCandidates) {
+    expect(report.hotspots.length).toBeGreaterThan(0);
+    for (const c of report.hotspots) {
       expect(c.ref.location.startsWith("src/a.ts:")).toBe(true);
     }
     expect(report.notice).toBeUndefined();
     expect(stderr.text).toMatch(/pr=1 changed files/);
   });
 
-  test("--full filters rankings and co-occurrence to changed files", async () => {
+  test("--verbose filters rankings and co-occurrence to changed files", async () => {
     buildFixtureRepo(tmp);
 
     const stdout = new StringSink();
@@ -176,7 +176,7 @@ describe("complexity --pr (PR scope filter)", () => {
         tmp,
         "--pr",
         "HEAD~1..HEAD",
-        "--full",
+        "--verbose",
         "--format",
         "json",
       ],
@@ -211,13 +211,13 @@ describe("complexity --pr (PR scope filter)", () => {
     expect(code).toBe(0);
     const report = JSON.parse(stdout.text) as PrEnvelope;
     expect(report.pr?.changedFiles).toBe(0);
-    expect(report.functionHotspotCandidates).toEqual([]);
+    expect(report.hotspots).toEqual([]);
     expect(report.notice?.code).toBe("PR_SCOPE_EMPTY");
     expect(report.notice?.message).toMatch(/no functions/i);
     expect(stderr.text).toMatch(/pr=0 changed files/);
   });
 
-  test("PR_SCOPE_EMPTY notice also surfaces in --full mode", async () => {
+  test("PR_SCOPE_EMPTY notice also surfaces in --verbose mode", async () => {
     buildFixtureRepo(tmp);
 
     const stdout = new StringSink();
@@ -228,7 +228,7 @@ describe("complexity --pr (PR scope filter)", () => {
         tmp,
         "--pr",
         "HEAD..HEAD",
-        "--full",
+        "--verbose",
         "--format",
         "json",
       ],

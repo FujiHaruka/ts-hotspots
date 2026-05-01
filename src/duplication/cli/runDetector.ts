@@ -308,7 +308,12 @@ export async function runDetector(
   const report = buildJsonReport(
     {
       tool,
-      pr: { baseSha: diff.baseSha, headSha: diff.headSha },
+      pr: {
+        baseSha: diff.baseSha,
+        headSha: diff.headSha,
+        threeDot,
+        changedFiles: diff.files.length,
+      },
       pairs: scoredPairs,
       config,
       summary: {

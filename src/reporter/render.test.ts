@@ -15,14 +15,13 @@ function makeFunctionReport(
   overrides: Partial<FunctionReport> = {},
 ): FunctionReport {
   return {
-    status: "ok",
     tool: { name: "ts-hotspots", version: "0.1.0" },
     project: {
       tsconfigPath: "/abs/tsconfig.json",
       sourceFileCount: 3,
       functionCount: 5,
     },
-    functionHotspotCandidates: [],
+    hotspots: [],
     ...overrides,
   };
 }
@@ -40,7 +39,7 @@ describe("renderJson", () => {
   test("renders slim FunctionReport by default with only hotspot candidates", () => {
     const report = makeFunctionReport();
     const parsed = JSON.parse(renderJson(report)) as Record<string, unknown>;
-    expect(parsed.functionHotspotCandidates).toBeDefined();
+    expect(parsed.hotspots).toBeDefined();
     expect(parsed.functionRankings).toBeUndefined();
     expect(parsed.functionAxisMeta).toBeUndefined();
     expect(parsed.functions).toBeUndefined();
@@ -69,11 +68,11 @@ describe("renderJson", () => {
     expect(JSON.parse(renderJson(err))).toEqual(err);
   });
 
-  test("emits status for both ok and error reports (M2 envelope unification)", () => {
+  test("success reports omit `status`; error reports keep `status: \"error\"`", () => {
     const ok = JSON.parse(renderJson(makeFunctionReport())) as {
       status?: string;
     };
-    expect(ok.status).toBe("ok");
+    expect(ok.status).toBeUndefined();
     const err: ErrorReport = {
       status: "error",
       error: { code: "X", message: "y" },

@@ -70,9 +70,11 @@ export interface ReportTool {
 }
 
 export interface ReportProject {
-  tsconfigPath: string;
   sourceFileCount: number;
-  functionCount: number;
+  /** `--verbose` only. Absolute path to the project's tsconfig. */
+  tsconfigPath?: string;
+  /** `--verbose` only. Total functions collected (across all files). */
+  functionCount?: number;
 }
 
 export interface FunctionCoOccurrenceEntry {
@@ -88,8 +90,24 @@ export interface AxisMeta {
   uniqueTopNValues: number;
 }
 
+/**
+ * Single representative metric driving a hotspot's rank. `axis` is the
+ * `FunctionAxisId` where this candidate's rank within the per-axis list is
+ * highest (i.e. smallest index); `value` is the raw metric value at that
+ * axis. Mirrors `dup`'s `score: { axis, value }` so consumers can read the
+ * "headline number" off a hotspot uniformly across subcommands.
+ */
+export interface HotspotScore {
+  axis: FunctionAxisId;
+  value: number;
+}
+
 export interface HotspotCandidate {
+  /** Discriminator parallel to `dup`'s `kind: "duplication"`. */
+  kind: "complexity";
   ref: FunctionRef;
+  /** Headline metric — see `HotspotScore`. */
+  score: HotspotScore;
   metrics: Partial<FunctionMetrics>;
   dismissalId: string;
 }
@@ -116,10 +134,15 @@ export interface PrInfo {
 }
 
 export interface FunctionReport {
-  status: "ok";
   tool: ReportTool;
   project: ReportProject;
-  functionHotspotCandidates: HotspotCandidate[];
+  /**
+   * Per-function hotspot candidates. Renamed from
+   * `functionHotspotCandidates` so the envelope mirrors `dup`'s
+   * `hotspots[]` shape — both subcommands now expose a single ranked
+   * list under the same key.
+   */
+  hotspots: HotspotCandidate[];
   functionRankings?: Partial<Record<FunctionAxisId, RankedFunctionEntry[]>>;
   functionAxisMeta?: Record<FunctionAxisId, AxisMeta>;
   functionCoOccurrence?: FunctionCoOccurrenceEntry[];

@@ -21,11 +21,11 @@ You are working inside the ts-hotspots repo. ts-hotspots is a CLI that staticall
    ```
    node src/index.ts <<target path>> > /tmp/ts-hotspots-<<slug>>-functions.json
    ```
-   The default output contains only `functionHotspotCandidates` — the union of "co-occurrence ≥ 3 axes" and "discriminative axis top-3 rescue", with each candidate carrying its hit axes and raw values inline. This is the primary signal and is what we are evaluating.
+   The default output contains only `hotspots` — the union of "co-occurrence ≥ 3 axes" and "discriminative axis top-3 rescue", with each candidate carrying its hit axes and raw values inline. This is the primary signal and is what we are evaluating.
 
    If the target has no `tsconfig.json` at the root (e.g. a monorepo), pass the tsconfig you want to analyze directly. Handle errors (e.g. exclude out-of-scope paths with `--exclude`).
 
-2. **Validate `functionHotspotCandidates` against real code.** Read the candidates top-down and open each coordinate. Judge whether each candidate's `axes[]` and `metrics` (raw values on hit axes) line up with an actual code smell. Classify into at least:
+2. **Validate `hotspots` against real code.** Read the candidates top-down and open each coordinate. Judge whether each candidate's `axes[]` and `metrics` (raw values on hit axes) line up with an actual code smell. Classify into at least:
 
    - **True signal**: the coordinate is a legitimate refactor starting point.
    - **Structural false positive**: saturation from many identical values, interface-implementation boilerplate, etc. — structural facts, not code problems.

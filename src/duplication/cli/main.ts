@@ -22,6 +22,7 @@ import type {
   DuplicationErrorReport,
   ReportTool,
 } from "../domain/index.ts";
+import { serializeReport } from "../report/serializeReport.ts";
 import { ArgParseError, parseCliArgs, USAGE } from "./args.ts";
 import { JsonlPerfLogger, type PerfLogger } from "./perfLog.ts";
 import { runDetector } from "./runDetector.ts";
@@ -316,7 +317,7 @@ export async function main(
             threeDot: args.threeDot,
             config,
             perfLog,
-            includeCode: args.includeCode,
+            includeCode: args.verbose,
             tool: TOOL,
           })
         : await runWholeRepoDetector({
@@ -324,7 +325,7 @@ export async function main(
             ref: args.ref,
             config,
             perfLog,
-            includeCode: args.includeCode,
+            includeCode: args.verbose,
             tool: TOOL,
           });
 
@@ -342,8 +343,9 @@ export async function main(
       report.groups = report.groups.slice(0, args.limit);
     }
 
+    const output = serializeReport(report, { verbose: args.verbose });
     io.stdout.write(
-      args.format === "json" ? renderJson(report) : renderMarkdownBody(report),
+      args.format === "json" ? renderJson(output) : renderMarkdownBody(output),
     );
     io.stderr.write(
       renderStatsLine("duplication", buildStatsPayload(report, fullCount)),

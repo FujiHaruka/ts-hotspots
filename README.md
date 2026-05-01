@@ -35,22 +35,22 @@ ts-hotspots complexity <path>           # directory or tsconfig.json
 ts-hotspots comp <path>                 # short alias
 ```
 
-The output is a `FunctionReport` focused on hotspot candidates — the coordinates an agent should read first. By default it contains only the primary signal:
+The output is focused on hotspot candidates — the coordinates an agent should read first. By default it contains only the primary signal:
 
-- `functionHotspotCandidates` — refs that co-occur across multiple metric axes, or that rank near the top of a discriminative axis. Each candidate has a `ref` whose `location` is `file:start-end` (or `file:line` for single-line functions), and a `metrics` map with the raw values for the axes that triggered it. Candidates flagged by more axes come first.
+- `hotspots` — refs that co-occur across multiple metric axes, or that rank near the top of a discriminative axis. Each candidate has `kind: "complexity"`, a `ref` whose `location` is `file:start-end` (or `file:line` for single-line functions), a `score` (`{ axis, value }` — the metric where this candidate ranked highest), and a `metrics` map with the raw values for the axes that triggered it. Candidates flagged by more axes come first.
 
-Pass `--full` to also get `functionRankings` (top-N per axis), `functionAxisMeta` (per-axis dispersion metadata), `functionCoOccurrence` (raw co-occurrence entries), and `functions[]` (every function with its full metrics).
+Pass `--verbose` to also get `functionRankings` (top-N per axis), `functionAxisMeta` (per-axis dispersion metadata), `functionCoOccurrence` (raw co-occurrence entries), and `functions[]` (every function with its full metrics).
 
 Solution-style monorepos (root `tsconfig.json` with `references`) are supported — referenced projects are walked transitively and loaded into a single TypeChecker, so cross-package analysis works out of the box.
 
 Options:
 
 - `--format markdown|json` output format (default: markdown)
-- `--limit <N|all>` cap `functionHotspotCandidates[]` at the top N (default: 20). Pass `all` to keep every candidate.
+- `--limit <N|all>` cap `hotspots[]` at the top N (default: 20). Pass `all` to keep every candidate.
 - `--metrics <list>` comma-separated axis ids to include
 - `--exclude <glob...>` extra path globs to drop (repeatable; built-in defaults already cover `node_modules`, `dist`, generated files, and tests)
 - `--file <path>` single-file drill-down (returns raw metrics for every function in the file)
-- `--full` include `functionRankings`, `functionAxisMeta`, `functionCoOccurrence`, and `functions[]` alongside the candidates
+- `--verbose` include `functionRankings`, `functionAxisMeta`, `functionCoOccurrence`, and `functions[]` alongside the candidates
 
 ## Duplication candidates: `ts-hotspots duplication`
 
@@ -77,14 +77,16 @@ ts-hotspots duplication --whole-repo --format json > report.json
 ts-hotspots duplication --whole-repo --exclude 'src/legacy/**'
 ```
 
-By default the tool emits a Markdown document containing a short instruction block followed by the report data inside a fenced JSON code block — pipeable straight into an agent in plan mode. Each group bundles a set of fragments that look like the same code, with per-pair scores (token overlap, statement-kind similarity, call/property overlap, size compatibility), shared evidence (which calls / properties / statement kinds / token n-grams the members agree on), and a recommendation hint (`extract-function`, `parameterize`, or `manual-review`). Pass `--format json` for the machine-readable form.
+By default the tool emits a Markdown document containing a short instruction block followed by the report data inside a fenced JSON code block — pipeable straight into an agent in plan mode. Each entry in `hotspots[]` has `kind: "duplication"`, the coordinates of every fragment in the group (`anchor` in PR mode, `members[]` always), a `score` (`{ axis: "combined", value }` — the median similarity across pairs, in 0..1), and an `evidence` block listing the top shared `calls` and `properties` — just enough to point at why the group surfaced and where to read first. Pass `--format json` for the machine-readable form.
+
+For deeper diagnostics — per-member scores, fragment source, full evidence (statement kinds and token n-grams), the recommendation hint, and the analysis summary — re-run with `--verbose`.
 
 Common options:
 
 - `--format markdown|json` output format (default: markdown)
 - `--exclude <glob>` extra path glob to drop (repeatable; built-in defaults already cover `node_modules`, `dist`, generated files, and tests)
-- `--limit <N|all>` cap the group list at the top N groups by combined score (default: 20)
-- `--no-code` omit fragment source from the report
+- `--limit <N|all>` cap `hotspots[]` at the top N by combined score (default: 20)
+- `--verbose` emit the rich schema (per-member scores, fragment source, full evidence, recommendation hint, analysis summary)
 - `--ref <ref>` ref to scan in `--whole-repo` mode (default: `HEAD`)
 - `--phase-timings[=summary|verbose]` emit a JSON Lines perf log to stderr
 
@@ -97,7 +99,7 @@ The exit code is 0 even when zero candidates are reported — detection is the t
 Both features are heuristics — some surfaces will be fine as-is (intentional state-machine dispatchers, generated code, copy-pasted config tables, deliberate parallel structures). To keep the agent from re-evaluating the same false positives every run, each reported entry carries a `dismissalId`:
 
 - `comp:<hex>` for complexity hotspot candidates (one per function)
-- `dup:<hex>` for duplication groups (one per group, derived from the group's member set)
+- `dup:<hex>` for duplication hotspots (one per group, derived from the group's member set)
 
 Record a judgment with:
 

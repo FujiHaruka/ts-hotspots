@@ -34,10 +34,12 @@ export interface PrModeArgs {
    */
   limit: number;
   /**
-   * `false` when `--no-code` is passed: omit fragment source from the report.
-   * Default `true` so AI readers get actionable context out of the box.
+   * `true` when `--verbose` is passed: emit the rich output schema (per-
+   * member scores, full evidence, fragment source, recommendation hint,
+   * aggregate axes, analysis summary). Default `false` so an agent gets
+   * just coordinates + top evidence.
    */
-  includeCode: boolean;
+  verbose: boolean;
 }
 
 export interface WholeRepoModeArgs {
@@ -53,8 +55,8 @@ export interface WholeRepoModeArgs {
   phaseTimings: PhaseTimingsLevel | undefined;
   /** See `PrModeArgs.limit`. */
   limit: number;
-  /** See `PrModeArgs.includeCode`. */
-  includeCode: boolean;
+  /** See `PrModeArgs.verbose`. */
+  verbose: boolean;
 }
 
 export const DEFAULT_LIMIT = 20;
@@ -103,13 +105,15 @@ Options:
                            LEVEL is 'summary' (default) or 'verbose' (adds a
                            per-query record per changed fragment). Pipe with
                            '2> perf.log' to capture.
-  --limit <N|all>          Cap the groups list at the top N by combined
+  --limit <N|all>          Cap the hotspots list at the top N by combined
                            score (default: 20). Pass 'all' to keep every
                            group.
-  --no-code                Omit fragment source from the report. By default
-                           each candidate includes the changed and existing
-                           code so downstream AI readers have actionable
-                           context.
+  --verbose                Emit the rich schema: per-member scores,
+                           fragment source, full evidence (statement
+                           kinds, token n-grams), recommendation hint,
+                           aggregate score axes, and the analysis
+                           summary. Default output keeps just the
+                           coordinates and top shared evidence.
   -h, --help               Show this help and exit
 
 Examples:
@@ -163,7 +167,7 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
   const excludeGlobs = parseExcludeGlobs(values.exclude);
   const phaseTimings = parsePhaseTimingsLevel(values["phase-timings"]);
   const limit = parseLimit(values.limit);
-  const includeCode = values["no-code"] !== true;
+  const verbose = values.verbose === true;
 
   if (wholeRepo) {
     if (positionals.length > 1) {
@@ -180,7 +184,7 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
       excludeGlobs,
       phaseTimings,
       limit,
-      includeCode,
+      verbose,
     };
   }
 
@@ -224,7 +228,7 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
     excludeGlobs,
     phaseTimings,
     limit,
-    includeCode,
+    verbose,
   };
 }
 
@@ -318,7 +322,7 @@ const OPTIONS = {
   ref: { type: "string" },
   "phase-timings": { type: "string" },
   limit: { type: "string" },
-  "no-code": { type: "boolean" },
+  verbose: { type: "boolean" },
   help: { type: "boolean", short: "h" },
 } as const;
 
@@ -329,6 +333,6 @@ interface ParsedValues {
   ref?: string;
   "phase-timings"?: string;
   limit?: string;
-  "no-code"?: boolean;
+  verbose?: boolean;
   help?: boolean;
 }

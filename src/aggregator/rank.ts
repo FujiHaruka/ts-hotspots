@@ -238,6 +238,7 @@ function accumulateHits(
 function rankCandidates(
   acc: ReadonlyMap<string, AxisHits>,
   entryByKey: ReadonlyMap<string, FunctionEntry>,
+  rankings: Record<FunctionAxisId, RankedFunctionEntry[]>,
 ): HotspotCandidate[] {
   const intermediate: {
     candidate: HotspotCandidate;
@@ -257,9 +258,14 @@ function rankCandidates(
       }
     }
     const qualityHits = orderedAxes.filter(isQualityAxis).length;
+    const primaryAxis = pickPrimaryAxis(ref, orderedAxes, rankings);
+    const primaryValue =
+      entry !== undefined ? functionExtractors[primaryAxis](entry) : 0;
     intermediate.push({
       candidate: {
+        kind: "complexity",
         ref,
+        score: { axis: primaryAxis, value: primaryValue },
         metrics,
         dismissalId:
           entry !== undefined ? bodyHashToCompDismissalId(entry.bodyHash) : "",
@@ -286,7 +292,32 @@ export function computeFunctionHotspotCandidates(
 ): HotspotCandidate[] {
   const entryByKey = buildEntryIndex(entries);
   const acc = accumulateHits(rankings, axisMeta, coOccurrence);
-  return rankCandidates(acc, entryByKey);
+  return rankCandidates(acc, entryByKey, rankings);
+}
+
+/**
+ * Pick the axis where this ref ranks highest (smallest rank index).
+ * Ties break by `FUNCTION_AXIS_IDS` declaration order — `orderedAxes` is
+ * already in that order, and `<` comparison only replaces when strictly
+ * better, so the first-best axis wins.
+ */
+function pickPrimaryAxis(
+  ref: FunctionRef,
+  orderedAxes: readonly FunctionAxisId[],
+  rankings: Record<FunctionAxisId, RankedFunctionEntry[]>,
+): FunctionAxisId {
+  const refKey = functionRefKey(ref);
+  let best: { axis: FunctionAxisId; rankIndex: number } | undefined;
+  for (const axis of orderedAxes) {
+    const idx = rankings[axis].findIndex(
+      (r) => functionRefKey(r.ref) === refKey,
+    );
+    if (idx < 0) continue;
+    if (best === undefined || idx < best.rankIndex) {
+      best = { axis, rankIndex: idx };
+    }
+  }
+  return best?.axis ?? orderedAxes[0] ?? "cognitiveComplexity";
 }
 
 export function computeFunctionCoOccurrence(

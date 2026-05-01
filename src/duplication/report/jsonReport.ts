@@ -6,6 +6,7 @@ import type { Fragment } from "../domain/fragment.ts";
 import type {
   AnalysisSummary,
   CloneCandidateReport,
+  DuplicationPrInfo,
   ReportTool,
 } from "../domain/report.ts";
 import { isThinWrapperFragment } from "../features/internal/isThinWrapper.ts";
@@ -33,7 +34,7 @@ export interface ReportInput {
    * that ignore the field).
    */
   tool?: ReportTool;
-  pr: { baseSha: string; headSha: string };
+  pr: DuplicationPrInfo;
   pairs: readonly ScoredPair[];
   config: Config;
   summary: AnalysisSummary;
@@ -138,10 +139,7 @@ export function buildJsonReport(
   return {
     status: "ok",
     tool: input.tool ?? { name: "ts-hotspots", version: "0.0.0" },
-    pr: {
-      baseSha: input.pr.baseSha,
-      headSha: input.pr.headSha,
-    },
+    pr: input.pr,
     summary: input.summary,
     groups,
   };
