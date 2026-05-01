@@ -26,29 +26,30 @@ export function parseRevRange(input: string): RevRange {
     throw new RevRangeParseError("revrange is empty");
   }
 
-  const threeDotIdx = input.indexOf("...");
-  if (threeDotIdx !== -1) {
-    if (input.includes("...", threeDotIdx + 3)) {
-      throw new RevRangeParseError(`invalid revrange: "${input}"`);
-    }
-    const left = input.slice(0, threeDotIdx);
-    const right = input.slice(threeDotIdx + 3);
-    return build(left, right, true, input);
+  // `...` must be tried before `..` since `..` is a prefix of `...`.
+  const result =
+    trySplit(input, "...", true) ?? trySplit(input, "..", false);
+  if (result === null) {
+    throw new RevRangeParseError(
+      `revrange must contain ".." or "..." (got "${input}")`,
+    );
   }
+  return result;
+}
 
-  const twoDotIdx = input.indexOf("..");
-  if (twoDotIdx !== -1) {
-    if (input.includes("..", twoDotIdx + 2)) {
-      throw new RevRangeParseError(`invalid revrange: "${input}"`);
-    }
-    const left = input.slice(0, twoDotIdx);
-    const right = input.slice(twoDotIdx + 2);
-    return build(left, right, false, input);
+function trySplit(
+  input: string,
+  sep: string,
+  threeDot: boolean,
+): RevRange | null {
+  const idx = input.indexOf(sep);
+  if (idx === -1) return null;
+  if (input.includes(sep, idx + sep.length)) {
+    throw new RevRangeParseError(`invalid revrange: "${input}"`);
   }
-
-  throw new RevRangeParseError(
-    `revrange must contain ".." or "..." (got "${input}")`,
-  );
+  const left = input.slice(0, idx);
+  const right = input.slice(idx + sep.length);
+  return build(left, right, threeDot, input);
 }
 
 function build(
