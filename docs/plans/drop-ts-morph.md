@@ -8,7 +8,7 @@
 
 - [x] **M1** — Bridge: `Declaration` に `tsNode` / `tsSourceFile` を追加 (`.compilerNode` 経由) し、ts-only の walk / parse ヘルパを新設。production 挙動は不変。
 - [x] **M2-1** — complexity collectors (cognitive / sloc / parameter-count / max-nesting-depth) を ts-only に書き換え。
-- [ ] **M2-2** — effects + call-graph collectors (await-count / mutation-count / try-catch-count / callee-count) を ts-only に書き換え。
+- [x] **M2-2** — effects + call-graph collectors (await-count / mutation-count / try-catch-count / callee-count) を ts-only に書き換え。
 - [ ] **M2-3** — dismissal/hash と aggregator のテスト fixture を ts-only に書き換え。
 - [ ] **M3** — ts-morph 撤去: `Declaration.node` 削除 / `loadProject` を `ts.createSourceFile` 直接に書き換え / `enumerate-source-files.ts` を縮小 / `package.json` から `ts-morph` を削除 / dogfooding で性能・出力差確認。
 
@@ -264,3 +264,14 @@ src/dismissal/hash.test.ts
 - `BinaryExpression` の `getChildren()` ループは `ts.forEachChild` に置換。tokens (`operatorToken`) は構造的子ではないため `forEachChild` でスキップされるが、collector はトークンをカウントしないので score に影響なし (cognitive.test.ts 全 22 ケース pass で確認)。
 - 出力 dogfood: `node src/index.ts comp --format json --limit all --verbose` を pre/post で取得。`src/collectors/complexity/` 配下を除く 54 関数中 50 関数 (jq で除外) の metrics は **bit-identical**。complexity 配下の 4 ファイルは自身を書き換えたので metrics と bodyHash が変わる (期待動作)。
 - 副次効果: 書き直した cognitive.ts の `visit` arrow が `cognitiveComplexity 44 → 26`, `calleeCount 54 → 16` に低下 (ts-morph の chained method calls が直接 field access に置き換わったため)。挙動変化ではなく実装の slimming。
+
+### M2-2 (2026-05-01)
+
+- 4 collector (`await-count` / `mutation-count` / `try-catch-count` / `callee-count`) を機械的に ts-only に置換。共通点として全て `walkBodyExcludingNestedFunctions` に依存していたので、import 元を `../walk.ts` → `../walk-ts.ts` に切替。
+- `await-count` の `forOf.isAwaited()` → `(forOf as ts.ForOfStatement).awaitModifier !== undefined` に置換。
+- `mutation-count` の prefix/postfix unary は ts-morph で `getOperatorToken()` が直接 SyntaxKind を返す API だった (BinaryExpression の `getOperatorToken()` は token node を返す API と非対称)。ts では `(node as ts.PrefixUnaryExpression).operator` が SyntaxKind なので、対称性は raw ts のほうが綺麗。
+- 出力 dogfood: `src/collectors/effects/` と `src/collectors/call-graph/` を除いた 50 関数で metrics bit-identical を確認。
+
+実装メモ:
+
+- `getBody` ヘルパが今や 6 collector (cognitive, max-nesting-depth, await-count, mutation-count, try-catch-count, callee-count) で重複。M3 で `Declaration` から ts-morph `node` を消す段階で `decl.tsBody` を生やすか、`internal/getBody.ts` を切り出す判断に持ち越し。本 M2-2 では機械的置換に集中し、共通化は後回し。

@@ -1,34 +1,34 @@
-import { type Node, SyntaxKind } from "ts-morph";
+import ts from "typescript";
 import type {
   Collector,
   CollectorContext,
   DeclarationId,
-  FunctionLikeNode,
+  FunctionLikeTsNode,
 } from "../types.ts";
-import { walkBodyExcludingNestedFunctions } from "../walk.ts";
+import { walkBodyExcludingNestedFunctions } from "../walk-ts.ts";
 
 export interface TryCatchCountResult {
   tryCatchCount: number;
 }
 
-export function computeTryCatchCount(node: FunctionLikeNode): number {
+export function computeTryCatchCount(node: FunctionLikeTsNode): number {
   const body = getBody(node);
   if (!body) return 0;
 
   let count = 0;
   walkBodyExcludingNestedFunctions(body, (n) => {
-    if (n.getKind() === SyntaxKind.TryStatement) {
+    if (n.kind === ts.SyntaxKind.TryStatement) {
       count += 1;
     }
   });
   return count;
 }
 
-function getBody(node: FunctionLikeNode): Node | undefined {
-  if (node.getKind() === SyntaxKind.ArrowFunction) {
-    return node.asKindOrThrow(SyntaxKind.ArrowFunction).getBody();
+function getBody(node: FunctionLikeTsNode): ts.Node | undefined {
+  if (node.kind === ts.SyntaxKind.ArrowFunction) {
+    return (node as ts.ArrowFunction).body;
   }
-  return (node as unknown as { getBody(): Node | undefined }).getBody();
+  return (node as Exclude<FunctionLikeTsNode, ts.ArrowFunction>).body;
 }
 
 export const tryCatchCountCollector: Collector<TryCatchCountResult> = {
@@ -38,7 +38,7 @@ export const tryCatchCountCollector: Collector<TryCatchCountResult> = {
     for (const decl of ctx.declarations) {
       try {
         result.set(decl.id, {
-          tryCatchCount: computeTryCatchCount(decl.node),
+          tryCatchCount: computeTryCatchCount(decl.tsNode),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
