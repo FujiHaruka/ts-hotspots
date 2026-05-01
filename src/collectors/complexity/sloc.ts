@@ -1,10 +1,6 @@
 import ts from "typescript";
-import type {
-  Collector,
-  CollectorContext,
-  DeclarationId,
-  FunctionLikeNode,
-} from "../types.ts";
+import { makeCollector } from "../makeCollector.ts";
+import type { FunctionLikeNode } from "../types.ts";
 
 export interface SlocResult {
   sloc: number;
@@ -48,23 +44,7 @@ export function computeSloc(
   return count;
 }
 
-export const slocCollector: Collector<SlocResult> = {
+export const slocCollector = makeCollector<SlocResult>({
   name: "sloc",
-  collect(ctx: CollectorContext): Map<DeclarationId, SlocResult> {
-    const result = new Map<DeclarationId, SlocResult>();
-    for (const decl of ctx.declarations) {
-      try {
-        result.set(decl.id, {
-          sloc: computeSloc(decl.node, decl.sourceFile),
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(
-          `slocCollector failed at ${decl.file}:${String(decl.line)} (${decl.id}): ${msg}`,
-          { cause: err },
-        );
-      }
-    }
-    return result;
-  },
-};
+  compute: (decl) => ({ sloc: computeSloc(decl.node, decl.sourceFile) }),
+});

@@ -1,10 +1,6 @@
 import ts from "typescript";
-import type {
-  Collector,
-  CollectorContext,
-  DeclarationId,
-  FunctionLikeNode,
-} from "../types.ts";
+import { makeCollector } from "../makeCollector.ts";
+import type { FunctionLikeNode } from "../types.ts";
 
 export interface MaxNestingDepthResult {
   maxNestingDepth: number;
@@ -86,23 +82,9 @@ function getBody(node: FunctionLikeNode): ts.Node | undefined {
   return (node as Exclude<FunctionLikeNode, ts.ArrowFunction>).body;
 }
 
-export const maxNestingDepthCollector: Collector<MaxNestingDepthResult> = {
+export const maxNestingDepthCollector = makeCollector<MaxNestingDepthResult>({
   name: "maxNestingDepth",
-  collect(ctx: CollectorContext): Map<DeclarationId, MaxNestingDepthResult> {
-    const result = new Map<DeclarationId, MaxNestingDepthResult>();
-    for (const decl of ctx.declarations) {
-      try {
-        result.set(decl.id, {
-          maxNestingDepth: computeMaxNestingDepth(decl.node),
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(
-          `maxNestingDepthCollector failed at ${decl.file}:${String(decl.line)} (${decl.id}): ${msg}`,
-          { cause: err },
-        );
-      }
-    }
-    return result;
-  },
-};
+  compute: (decl) => ({
+    maxNestingDepth: computeMaxNestingDepth(decl.node),
+  }),
+});
