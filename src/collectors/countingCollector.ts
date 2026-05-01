@@ -23,13 +23,20 @@ export interface CountingCollectorOptions<K extends string> {
   matches: (n: ts.Node) => boolean;
 }
 
+export interface CountingCollectorBundle<K extends string> {
+  collector: Collector<Record<K, number>>;
+  count: (node: FunctionLikeNode) => number;
+}
+
 export function makeCountingCollector<K extends string>(
   opts: CountingCollectorOptions<K>,
-): Collector<Record<K, number>> {
+): CountingCollectorBundle<K> {
   const { name, resultKey, matches } = opts;
-  return makeCollector<Record<K, number>>({
+  const count = (node: FunctionLikeNode) => countMatches(node, matches);
+  const collector = makeCollector<Record<K, number>>({
     name,
     compute: (decl) =>
-      ({ [resultKey]: countMatches(decl.node, matches) }) as Record<K, number>,
+      ({ [resultKey]: count(decl.node) }) as Record<K, number>,
   });
+  return { collector, count };
 }

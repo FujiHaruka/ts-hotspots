@@ -1,6 +1,5 @@
 import ts from "typescript";
-import { makeCountingCollector, countMatches } from "../countingCollector.ts";
-import type { FunctionLikeNode } from "../types.ts";
+import { makeCountingCollector } from "../countingCollector.ts";
 
 export interface MutationCountResult {
   mutationSiteCount: number;
@@ -45,11 +44,10 @@ function matches(n: ts.Node): boolean {
   return n.kind === ts.SyntaxKind.DeleteExpression;
 }
 
-export function computeMutationCount(node: FunctionLikeNode): number {
-  return countMatches(node, matches);
-}
-
-export const mutationCountCollector = makeCountingCollector({
+export const {
+  collector: mutationCountCollector,
+  count: computeMutationCount,
+} = makeCountingCollector({
   name: "mutationCount",
   resultKey: "mutationSiteCount",
   matches,
