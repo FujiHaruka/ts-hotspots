@@ -4,12 +4,13 @@
 
 ts-hotspots is a CLI that statically analyzes a TypeScript project and hands coding agents like Claude Code a "where should I read first?" — it does not propose refactors, only coordinates (`file:line`) and metric facts.
 
-It exposes two parallel features as subcommands of one binary. Both parse sources via `ts.createSourceFile` directly (no `ts.Program`, no TypeChecker); the shared parser lives at `src/parser/parseSource.ts`.
+It exposes three parallel features as subcommands of one binary. All three parse sources via `ts.createSourceFile` directly (no `ts.Program`, no TypeChecker); the shared parser lives at `src/parser/parseSource.ts`.
 
 - **Complexity** (`ts-hotspots complexity`, alias `comp`): per-function metrics ranked into refactor-candidate coordinates. The primary ranking unit is the function (including methods, arrow functions, and TSX components); file-level rankings are returned alongside.
 - **Duplication** (`ts-hotspots duplication`, alias `dup`): Type-3 duplication candidates. Defaults to whole-repo scan at HEAD; pass `--diff <revrange>` to compare changed fragments on the head side against the rest of the codebase on the base side. Shells out to git for diff/source listing. Source lives under `src/duplication/`.
+- **Architecture** (`ts-hotspots architecture`, alias `arch`): exported-component dependency-graph hotspots. Builds a parser-only component graph, computes structural metrics (fan-in/out, reverse closure, PageRank, Brandes betweenness, instability), then ranks components against six smell types via percentile-weighted composites with a small-N z-score fallback. Source lives under `src/architecture/`.
 
-See `docs/requirements.md` for the full spec (Part A = complexity, Part B = duplication). Duplication algorithm internals live under `docs/dedup/algorithms/` and mirror the pipeline stages in `src/duplication/`.
+See `docs/requirements.md` for the full spec (Part A = complexity, Part B = duplication) and `docs/plans/architecture-subcommand.md` for the architecture design. Duplication algorithm internals live under `docs/dedup/algorithms/` and mirror the pipeline stages in `src/duplication/`.
 
 ## Duplication maintenance notes
 
@@ -21,7 +22,16 @@ See `docs/requirements.md` for the full spec (Part A = complexity, Part B = dupl
 
 ## CLI flag conventions
 
-- **Keep `comp` and `dup` flag surfaces in sync.** When adding, removing, or renaming a flag on either subcommand, look at the other and decide explicitly: mirror it, document a justified asymmetry, or align the spelling. Both subcommands are wired through `commander`: `comp` is registered inline in `src/cli.ts`, `dup` lives in `src/duplication/cli/registerCommand.ts` (`addDuplicationCommand`) and is mounted on the same root program. Option configurations are still written separately, so drift is silent — the discipline lives in review, not in types. Justified structural asymmetries today: `--diff` semantics (display filter vs. base/head sides), `--ref` (dup-only — comp reads working tree), `--metrics` / `--file` (comp-only — single-file drill-down doesn't map to a pairwise metric), `--phase-timings` (dup-only pipeline diagnostic). Anything else should match.
+- **Keep `comp`, `dup`, and `arch` flag surfaces in sync.** When adding, removing, or renaming a flag on any subcommand, look at the others and decide explicitly: mirror it, document a justified asymmetry, or align the spelling. All three are wired through `commander`: `comp` is registered inline in `src/cli.ts`, `dup` lives in `src/duplication/cli/registerCommand.ts` (`addDuplicationCommand`), and `arch` lives in `src/architecture/cli/registerCommand.ts` (`addArchitectureCommand`); all three are mounted on the same root program. Option configurations are written separately, so drift is silent — the discipline lives in review, not in types. Justified structural asymmetries today:
+  - `--diff` semantics — `comp` and `arch` both treat it as a display filter (rankings still computed against the full ref); `dup` instead defines the comparison's base/head sides at build time.
+  - `--ref` — `dup` and `arch` build the analysis at a specific commit; `comp` reads the working tree.
+  - `--metrics` / `--file` — `comp`-only. Single-file drill-down doesn't map to a pairwise metric (`dup`) or a graph node (`arch`).
+  - `--phase-timings` — `dup` and `arch` only (pipeline diagnostic).
+  - `--include-tests` — `arch`-only. Test edges distort fan-in/fan-out far more than they distort per-function complexity or per-fragment duplication.
+  - `--no-include-types` — `arch`-only. Type-only edges have a meaningful but lower weight than runtime edges; arch surfaces a toggle so users can drop them entirely.
+  - `--churn-window` / `--churn-ref` / `--no-churn` — `comp` and `dup` only. `arch` deliberately omits churn integration in v1; folding it in is a follow-up plan tracked under "Deferred" in `docs/plans/architecture-subcommand.md`.
+
+  Anything else should match.
 
 ## Development workflow
 

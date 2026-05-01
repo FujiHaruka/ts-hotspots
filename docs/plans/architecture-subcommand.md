@@ -396,6 +396,8 @@ Exit: `buildGraph(repoPath, opts)` returns a deterministic
 
 ### M2 — Structural metrics
 
+> Status: Completed (2026-05-01)
+
 Goal: compute every per-node metric except betweenness.
 
 - `src/architecture/metrics/`: fan-in, fan-out (weighted + unweighted
@@ -407,6 +409,8 @@ Goal: compute every per-node metric except betweenness.
 Exit: `computeMetrics(graph)` returns a per-node metric record.
 
 ### M3 — Betweenness
+
+> Status: Completed (2026-05-01)
 
 Split out because betweenness is the algorithmically heaviest metric and
 the most likely to need future sampling. Isolating it makes the
@@ -420,6 +424,8 @@ Exit: betweenness slots into the metric record from M2 without changing
 its shape.
 
 ### M4 — Ranking + scoring
+
+> Status: Completed (2026-05-01)
 
 Goal: turn metrics into ranked smell candidates.
 
@@ -437,6 +443,8 @@ breakdown.
 
 ### M5 — Reporters + dismissal integration
 
+> Status: Completed (2026-05-01)
+
 Goal: machine-readable and human-readable output, with dismissal IDs.
 
 - `src/architecture/report/`: Markdown renderer (summary + candidate
@@ -452,6 +460,8 @@ Exit: `report(candidates, format)` produces deterministic output;
 `dismiss arch:<hex>` round-trips through existing commands.
 
 ### M6 — CLI surface
+
+> Status: Completed (2026-05-01)
 
 Goal: wire everything to `ts-hotspots architecture` / alias `arch`.
 
@@ -478,6 +488,8 @@ public CLI surface. CLAUDE.md updated to document the justified
 asymmetries (`--include-tests`, `--include-types`, churn omission).
 
 ### M7 — Allowlist downweight + real-repo tuning
+
+> Status: Completed (2026-05-01)
 
 Goal: optional per-glob edge weight multipliers, plus calibration
 against a non-trivial real codebase.

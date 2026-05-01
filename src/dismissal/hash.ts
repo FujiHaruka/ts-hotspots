@@ -52,12 +52,35 @@ export function membersToDupDismissalId(
  * Normalize a user-provided dismissal id into the post-M2 `<feature>:<hex>`
  * form. Pre-M2 reports surfaced the raw `sha256:<hex>`; users who script
  * against those still pass them in. Anything already carrying a feature
- * prefix passes through unchanged so future `dup:<hex>` ids (M5) are
- * routed correctly.
+ * prefix passes through unchanged so `dup:<hex>` and `arch:<hex>` ids
+ * are routed correctly.
  */
 export function normalizeDismissalId(rawId: string): string {
-  if (rawId.startsWith("comp:") || rawId.startsWith("dup:")) return rawId;
+  if (
+    rawId.startsWith("comp:") ||
+    rawId.startsWith("dup:") ||
+    rawId.startsWith("arch:")
+  ) {
+    return rawId;
+  }
   return `comp:${stripSha256Prefix(rawId)}`;
+}
+
+/**
+ * Compute an `arch:<hex>` dismissal id from a component id of the form
+ * `<filePath>::<exportName>::<exportKind>`. Truncated to 16 hex chars
+ * (8 bytes) — wide enough to avoid collisions across realistic repo
+ * sizes, narrow enough to round-trip through a CLI argument cleanly.
+ *
+ * Bias: stable across code edits inside the component as long as its
+ * file path, export name, and export kind don't change. v1 does not
+ * track moves or renames; the dismissal expires when the component id
+ * itself shifts. Mirrors the comp/dup precedent — false expiration is
+ * preferred over false persistence.
+ */
+export function componentIdToArchDismissalId(componentId: string): string {
+  const hex = createHash("sha256").update(componentId).digest("hex");
+  return `arch:${hex.slice(0, 16)}`;
 }
 
 function stripSha256Prefix(hash: string): string {

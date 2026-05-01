@@ -1,4 +1,4 @@
-export type ReportFeature = "complexity" | "duplication";
+export type ReportFeature = "complexity" | "duplication" | "architecture";
 
 export const COMPLEXITY_REPORT_PROMPT = `# ts-hotspots report
 
@@ -48,6 +48,29 @@ export const DUPLICATION_ERROR_PROMPT = `# ts-hotspots duplication error
 \`ts-hotspots duplication\` failed to produce a report. See the error details below.
 `;
 
+export const ARCHITECTURE_REPORT_PROMPT = `# ts-hotspots architecture report
+
+This is the output of \`ts-hotspots architecture\`, a static analyzer that surfaces structurally load-bearing exported components in a TypeScript codebase. Each candidate is an exported declaration (named export, default export, function, class, const, type, interface, enum) ranked by a percentile-weighted composite of structural metrics (fan-in, fan-out, reverse closure size, PageRank, betweenness, instability, unstable-edge flag).
+
+## Your task
+
+You have been handed a list of architecture hotspots below in \`hotspots[]\`. Each hotspot has \`kind: "architecture"\`, a \`ref\` giving the export's defining \`file:line\` coordinate, the export name and kind, a \`score\` (\`{ axis: "composite", value }\` — the primary smell's composite, in 0..1), \`primarySmell\` (one of \`architectural_hub\`, \`high_fanout_component\`, \`high_impact_component\`, \`bridge_component\`, \`unstable_dependency_candidate\`, \`over_shared_component\`), up to two \`secondarySmells\`, a \`metrics\` map with the contributing axis values + percentiles, and a \`dismissalId\` (\`arch:<hex>\`).
+
+Walk the hotspots **from the top of the list downward**, evaluating them one at a time, until you find one that genuinely warrants restructuring. For each hotspot:
+
+1. Read the export at its coordinate, plus the most prominent callers/callees suggested by the dominant edge kinds.
+2. Decide whether the structural pressure is real and reducible. A high fan-in on a deliberately central type (a domain model, a public registry, a barrel that documents the public surface) is *not* a refactoring target — those are load-bearing on purpose. The same metrics on an accidental coupling point are.
+3. If the hotspot does **not** warrant work, briefly note why and run \`ts-hotspots dismiss <dismissalId> --reason "<why>"\` so it is filtered from future runs. Move on.
+4. If it **does**, stop the search and propose a concrete restructuring scoped to that single component (extract a sub-interface, split a barrel, invert a dependency, push a stable helper down a layer). Do not continue down the list in the same pass.
+
+If you reach the end of the list without finding a worthwhile target, say so rather than forcing a refactor. Focus on understanding before suggesting, and never propose changes without reading the actual code.
+`;
+
+export const ARCHITECTURE_ERROR_PROMPT = `# ts-hotspots architecture error
+
+\`ts-hotspots architecture\` failed to produce a report. See the error details below.
+`;
+
 export const REPORT_PROMPTS: Record<
   ReportFeature,
   { ok: string; error: string }
@@ -59,5 +82,9 @@ export const REPORT_PROMPTS: Record<
   duplication: {
     ok: DUPLICATION_REPORT_PROMPT,
     error: DUPLICATION_ERROR_PROMPT,
+  },
+  architecture: {
+    ok: ARCHITECTURE_REPORT_PROMPT,
+    error: ARCHITECTURE_ERROR_PROMPT,
   },
 };

@@ -15,6 +15,12 @@ import {
   isFunctionAxisId,
   rankFunctions,
 } from "./aggregator/rank.ts";
+import type { ArchParsedArgs } from "./architecture/cli/args.ts";
+import {
+  runPipeline as runArchitecturePipeline,
+  writeArchitectureParseError,
+} from "./architecture/cli/main.ts";
+import { addArchitectureCommand } from "./architecture/cli/registerCommand.ts";
 import { runDismiss, runListDismissed, runUndismiss } from "./cli/dismiss.ts";
 import { collectChurn } from "./collectors/churn/commit-count.ts";
 import { enumerateDeclarations } from "./collectors/enumerate-declarations.ts";
@@ -197,19 +203,41 @@ function findDuplicationCommandIndex(argv: readonly string[]): number {
   return -1;
 }
 
+function isArchitectureContext(argv: readonly string[]): boolean {
+  return findArchitectureCommandIndex(argv) !== -1;
+}
+
+function findArchitectureCommandIndex(argv: readonly string[]): number {
+  for (let i = 2; i < argv.length; i++) {
+    const tok = argv[i];
+    if (tok === undefined) continue;
+    if (tok.startsWith("-")) continue;
+    if (tok === "architecture" || tok === "arch") return i;
+    return -1;
+  }
+  return -1;
+}
+
 /**
- * If `argv` invokes the dup subcommand, rewrite the trailing portion so
- * commander's optional-value `[level]` for `--phase-timings` does not
- * greedily consume a following positional. Other subcommands are left
- * untouched. Mirrors the same preprocessing done by `parseCliArgs` and
- * `main(argv, io)` in `src/duplication/cli/`.
+ * Rewrite the trailing portion of argv so commander's optional-value
+ * `[level]` for `--phase-timings` does not greedily consume a following
+ * positional. Applied to both `dup` and `arch`, since both register
+ * `--phase-timings [level]`. Leaves other subcommands' argv untouched.
  */
 function preprocessArgv(argv: readonly string[]): string[] {
   const dupIdx = findDuplicationCommandIndex(argv);
-  if (dupIdx === -1) return [...argv];
-  const head = argv.slice(0, dupIdx + 1);
-  const tail = normalizePhaseTimingsArgv(argv.slice(dupIdx + 1));
-  return [...head, ...tail];
+  if (dupIdx !== -1) {
+    const head = argv.slice(0, dupIdx + 1);
+    const tail = normalizePhaseTimingsArgv(argv.slice(dupIdx + 1));
+    return [...head, ...tail];
+  }
+  const archIdx = findArchitectureCommandIndex(argv);
+  if (archIdx !== -1) {
+    const head = argv.slice(0, archIdx + 1);
+    const tail = normalizePhaseTimingsArgv(argv.slice(archIdx + 1));
+    return [...head, ...tail];
+  }
+  return [...argv];
 }
 
 type PendingInvocation =
@@ -237,6 +265,10 @@ type PendingInvocation =
   | {
       kind: "duplication";
       parsedArgs: DuplicationParsedArgs;
+    }
+  | {
+      kind: "architecture";
+      parsedArgs: ArchParsedArgs;
     };
 
 export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
@@ -347,6 +379,10 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
 
   addDuplicationCommand(program, (parsedArgs) => {
     onInvoke({ kind: "duplication", parsedArgs });
+  });
+
+  addArchitectureCommand(program, (parsedArgs) => {
+    onInvoke({ kind: "architecture", parsedArgs });
   });
 
   return program;
@@ -960,6 +996,14 @@ export async function run(
       );
       return 1;
     }
+    if (isArchitectureContext(argv)) {
+      writeArchitectureParseError(
+        { stdout, stderr, cwd: () => process.cwd() },
+        argv,
+        err,
+      );
+      return 1;
+    }
     const message = err instanceof Error ? err.message : String(err);
     stderr.write(`${message}\n`);
     return 1;
@@ -984,12 +1028,26 @@ export async function run(
     });
   }
 
+  if (invocation.kind === "architecture") {
+    return await runArchitecturePipeline(invocation.parsedArgs, {
+      stdout,
+      stderr,
+      cwd: () => process.cwd(),
+    });
+  }
+
   try {
     if (
       (invocation.kind === "dismiss" || invocation.kind === "undismiss") &&
       invocation.id.startsWith("dup:")
     ) {
       return runDupDismissalCommand(invocation, stdout, stderr);
+    }
+    if (
+      (invocation.kind === "dismiss" || invocation.kind === "undismiss") &&
+      invocation.id.startsWith("arch:")
+    ) {
+      return runArchDismissalCommand(invocation, stdout, stderr);
     }
     const rootDir = resolveRootDir(invocation.path);
     if (invocation.kind === "dismiss") {
@@ -1018,6 +1076,36 @@ export async function run(
     stderr.write(`${message}\n`);
     return 1;
   }
+}
+
+/**
+ * Route `arch:<hex>` ids to the git-root registry. `arch` resolves
+ * "the project" via `findGitRoot` (same as dup), so the registry key
+ * has to match — otherwise an arch run would never see entries
+ * written by `dismiss`.
+ */
+async function runArchDismissalCommand(
+  invocation:
+    | { kind: "dismiss"; id: string; reason: string; path: string | undefined }
+    | { kind: "undismiss"; id: string; path: string | undefined },
+  stdout: WritableLike,
+  stderr: WritableLike,
+): Promise<number> {
+  const start = invocation.path ?? process.cwd();
+  const rootDir = findGitRoot(resolve(start));
+  if (invocation.kind === "dismiss") {
+    return await runDismiss(
+      {
+        id: invocation.id,
+        reason: invocation.reason,
+        rootDir,
+        feature: "arch",
+      },
+      stdout,
+      stderr,
+    );
+  }
+  return runUndismiss({ id: invocation.id, rootDir }, stdout, stderr);
 }
 
 /**
