@@ -297,6 +297,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     .description(
       "rank functions and files by complexity / size / churn (per-function hotspot candidates)",
     )
+    .helpGroup("Analysis commands:")
     .option(
       "-e, --exclude <glob>",
       "extra path glob to exclude (repeatable). Added on top of the built-in defaults (node_modules, dist, generated files, test files, ...)",
@@ -344,11 +345,20 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
       onInvoke({ kind: "complexity", positional: pathArg, options: opts });
     });
 
+  addDuplicationCommand(program, (parsedArgs) => {
+    onInvoke({ kind: "duplication", parsedArgs });
+  });
+
+  addArchitectureCommand(program, (parsedArgs) => {
+    onInvoke({ kind: "architecture", parsedArgs });
+  });
+
   program
     .command("dismiss <id>")
     .description(
       "record a dismissal so this candidate is filtered from future runs",
     )
+    .helpGroup("Dismissal management:")
     .requiredOption(
       "--reason <text>",
       "why this candidate is not a real hotspot",
@@ -366,6 +376,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
   program
     .command("list-dismissed")
     .description("list entries in the dismissal registry")
+    .helpGroup("Dismissal management:")
     .option("--json", "emit raw JSON instead of a human-readable table")
     .option("--path <path>", "project directory (defaults to cwd)")
     .action((opts: ListDismissedCliOptions) => {
@@ -379,6 +390,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
   program
     .command("undismiss <id>")
     .description("remove a dismissal entry by id")
+    .helpGroup("Dismissal management:")
     .option("--path <path>", "project directory (defaults to cwd)")
     .action((id: string, opts: UndismissCliOptions) => {
       onInvoke({
@@ -387,14 +399,6 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
         path: opts.path,
       });
     });
-
-  addDuplicationCommand(program, (parsedArgs) => {
-    onInvoke({ kind: "duplication", parsedArgs });
-  });
-
-  addArchitectureCommand(program, (parsedArgs) => {
-    onInvoke({ kind: "architecture", parsedArgs });
-  });
 
   return program;
 }

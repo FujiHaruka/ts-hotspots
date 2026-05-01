@@ -95,6 +95,7 @@ export function addArchitectureCommand(
     .command("architecture [path]")
     .alias("arch")
     .description(SHORT_DESCRIPTION)
+    .helpGroup("Analysis commands:")
     .addHelpText("before", `\n${LONG_DESCRIPTION}\n`)
     .addHelpText("after", HELP_AFTER)
     .option(
