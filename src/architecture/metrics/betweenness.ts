@@ -1,8 +1,3 @@
-// oxlint-disable typescript/no-non-null-assertion
-//   -- Brandes BFS bounds the indices algorithmically; ! is the documented
-//   pattern. The conflicting `non-nullable-type-assertion-style` rule otherwise
-//   forces a contradictory `as number` cast.
-
 /**
  * Exact directed-graph betweenness centrality (Brandes 2001).
  *
