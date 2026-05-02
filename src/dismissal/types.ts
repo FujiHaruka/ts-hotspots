@@ -11,7 +11,7 @@ export interface DismissalEntryDisplay {
   startLine?: number;
 }
 
-export type DismissalFeature = "comp" | "dup" | "arch";
+export type DismissalFeature = "comp" | "dup" | "arch" | "coch";
 
 export interface DismissalEntry {
   /**

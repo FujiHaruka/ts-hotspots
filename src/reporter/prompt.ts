@@ -1,4 +1,8 @@
-export type ReportFeature = "complexity" | "duplication" | "architecture";
+export type ReportFeature =
+  | "complexity"
+  | "duplication"
+  | "architecture"
+  | "cochange";
 
 export const COMPLEXITY_REPORT_PROMPT = `# ts-hotspots report
 
@@ -71,6 +75,29 @@ export const ARCHITECTURE_ERROR_PROMPT = `# ts-hotspots architecture error
 \`ts-hotspots architecture\` failed to produce a report. See the error details below.
 `;
 
+export const COCHANGE_REPORT_PROMPT = `# ts-hotspots cochange report
+
+This is the output of \`ts-hotspots cochange\`, a static analyzer that surfaces logical coupling between TypeScript files: pairs that change together in git history, even when they are not statically connected by an \`import\`. The signal comes from a flat-window walk of \`git log --first-parent -m --name-status -M\`; renames are followed.
+
+## Your task
+
+You have been handed a list of file-pair hotspots below in \`hotspots[]\`. Each hotspot has \`kind: "cochange"\`, a \`members[]\` array (length 2 — the two files in the pair), a \`score\` (\`{ axis: "confidenceMax", value }\` — the most actionable directional confidence in 0..1), a \`metrics\` block with raw values (\`support\`, \`confidenceAtoB\`, \`confidenceBtoA\`, \`confidenceMax\`, \`lift\`), an \`evidence.recentCommits\` list of up to 5 short SHAs you can pass to \`git show\` to confirm the coupling, and a \`dismissalId\` (\`coch:<hex>\`) you can hand to the \`dismiss\` subcommand.
+
+Walk the hotspots **from the top of the list downward**, evaluating them one at a time, until you find one whose coupling is genuinely worth acting on. For each hotspot:
+
+1. Read both files at their coordinates. Run \`git show <sha>\` on one or two of the recent commits if you need to see the change pattern.
+2. Decide whether the coupling is real and worth surfacing: shared invariant ("when A's schema changes B must too"), implicit contract, missing abstraction, or just incidental ("both happened to be touched in the same refactor commit").
+3. If the hotspot does **not** warrant work, briefly note why and run \`ts-hotspots dismiss <dismissalId> --reason "<why>"\` so it is filtered from future runs. Move on to the next.
+4. If it **does**, stop the search and propose a concrete refactor plan: extract a shared module, formalise the implicit contract in types, or document the coupling. Do not continue down the list in the same pass.
+
+If you reach the end of the list without finding a worthwhile target, say so rather than forcing a refactor. Focus on understanding before suggesting, and never propose changes without reading the actual code at both ends of the pair.
+`;
+
+export const COCHANGE_ERROR_PROMPT = `# ts-hotspots cochange error
+
+\`ts-hotspots cochange\` failed to produce a report. See the error details below.
+`;
+
 export const REPORT_PROMPTS: Record<
   ReportFeature,
   { ok: string; error: string }
@@ -86,5 +113,9 @@ export const REPORT_PROMPTS: Record<
   architecture: {
     ok: ARCHITECTURE_REPORT_PROMPT,
     error: ARCHITECTURE_ERROR_PROMPT,
+  },
+  cochange: {
+    ok: COCHANGE_REPORT_PROMPT,
+    error: COCHANGE_ERROR_PROMPT,
   },
 };

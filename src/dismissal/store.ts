@@ -176,7 +176,9 @@ function normalizeRegistry(parsed: unknown): DismissalRegistry {
         ? "dup"
         : e.feature === "arch"
           ? "arch"
-          : "comp";
+          : e.feature === "coch"
+            ? "coch"
+            : "comp";
     const entry: DismissalEntry = {
       id: migrateLegacyId(e.id, feature),
       feature,
@@ -211,7 +213,8 @@ function migrateLegacyId(
   if (
     rawId.startsWith("comp:") ||
     rawId.startsWith("dup:") ||
-    rawId.startsWith("arch:")
+    rawId.startsWith("arch:") ||
+    rawId.startsWith("coch:")
   ) {
     return rawId;
   }
