@@ -4,13 +4,12 @@
  *
  * Mirrors `addDuplicationCommand`: same registrar pattern, same
  * help-text shape (`addHelpText("before", LONG_DESCRIPTION)`,
- * `addHelpText("after", HELP_AFTER)`), same `--phase-timings`
- * normalisation hook. Used by the root CLI in `src/cli.ts` so
- * `ts-hotspots --help` lists arch with its full flag surface.
+ * `addHelpText("after", HELP_AFTER)`). Used by the root CLI in
+ * `src/cli.ts` so `ts-hotspots --help` lists arch with its full flag
+ * surface.
  *
- * The action handler validates input invariants (e.g. unknown axes
- * for `--phase-timings`) and builds an `ArchParsedArgs`, then
- * invokes `onParsed`. Running the actual pipeline is the caller's
+ * The action handler builds an `ArchParsedArgs` and invokes
+ * `onParsed`. Running the actual pipeline is the caller's
  * responsibility — propagating exit codes through commander's
  * `parseAsync` is awkward, so orchestration stays outside the
  * registrar.
@@ -20,9 +19,6 @@ import { type Command, InvalidArgumentError } from "commander";
 import {
   DEFAULT_FORMAT,
   DEFAULT_LIMIT,
-  PHASE_TIMINGS_DEFAULT,
-  PHASE_TIMINGS_LEVELS,
-  type PhaseTimingsLevel,
   type ReportFormat,
 } from "../../cli-defaults.ts";
 import {
@@ -31,17 +27,6 @@ import {
 } from "../../util/git/parseRevRange.ts";
 import { EDGE_WEIGHTS } from "../graph/types.ts";
 import { type ArchParsedArgs } from "./args.ts";
-
-/**
- * Render the `LEVEL is 'a' (default) or 'b' or 'c'.` enumeration for
- * `--phase-timings`'s help text from the runtime level list. Keeping
- * this derived means adding a level updates the docs automatically.
- */
-function renderPhaseTimingsLevels(): string {
-  return PHASE_TIMINGS_LEVELS.map((l) =>
-    l === PHASE_TIMINGS_DEFAULT ? `'${l}' (default)` : `'${l}'`,
-  ).join(" or ");
-}
 
 const SHORT_DESCRIPTION =
   "rank exported components by structural pressure (fan-in / fan-out / centrality)";
@@ -87,7 +72,6 @@ interface ArchCliOptions {
   diff?: ReturnType<typeof parseRevRange>;
   ref?: string;
   format?: ReportFormat;
-  phaseTimings?: PhaseTimingsLevel | true;
   limit?: number;
   verbose?: boolean;
   includeTests?: boolean;
@@ -141,11 +125,6 @@ export function addArchitectureCommand(
       "commit/branch/tag to build the graph at (default: working tree)",
     )
     .option(
-      "--phase-timings [level]",
-      `emit a JSON Lines perf-debug log to stderr. LEVEL is ${renderPhaseTimingsLevels()}. Pipe with '2> perf.log' to capture.`,
-      parsePhaseTimingsOption,
-    )
-    .option(
       "--include-tests",
       "include test files (and stories/cypress/playwright) in the graph (default: off). Test edges distort fan-in/fan-out, so they are excluded by default.",
     )
@@ -162,7 +141,6 @@ function buildParsedArgs(
   pathArg: string | undefined,
   opts: ArchCliOptions,
 ): ArchParsedArgs {
-  const phaseTimings = resolvePhaseTimings(opts.phaseTimings);
   const format: ReportFormat = opts.format ?? DEFAULT_FORMAT;
   const limit = opts.limit ?? DEFAULT_LIMIT;
   return {
@@ -172,20 +150,11 @@ function buildParsedArgs(
     excludeGlobs: opts.exclude,
     ref: opts.ref,
     diff: opts.diff,
-    phaseTimings,
     limit,
     verbose: opts.verbose === true,
     includeTests: opts.includeTests === true,
     includeTypes: opts.includeTypes,
   };
-}
-
-function resolvePhaseTimings(
-  raw: PhaseTimingsLevel | true | undefined,
-): PhaseTimingsLevel | undefined {
-  if (raw === undefined) return undefined;
-  if (raw === true) return PHASE_TIMINGS_DEFAULT;
-  return raw;
 }
 
 function collectExcludeGlob(
@@ -214,13 +183,6 @@ function parseFormatOption(value: string): ReportFormat {
   if (value === "markdown" || value === "json") return value;
   throw new InvalidArgumentError(
     `invalid --format '${value}' (expected 'markdown' or 'json')`,
-  );
-}
-
-function parsePhaseTimingsOption(value: string): PhaseTimingsLevel {
-  if (value === "summary" || value === "verbose") return value;
-  throw new InvalidArgumentError(
-    `invalid --phase-timings level '${value}' (expected 'summary' or 'verbose')`,
   );
 }
 

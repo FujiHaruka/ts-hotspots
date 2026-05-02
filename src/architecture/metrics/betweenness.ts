@@ -20,31 +20,16 @@
  * betweenness, so all values are `0`.
  *
  * Performance: this is the heaviest metric in the pipeline and the
- * most likely candidate for sampling in a future milestone. The
- * `--phase-timings verbose` instrumentation around this call is what
- * surfaces the cost in the perf log.
+ * most likely candidate for sampling if a future repo blows past the
+ * implicit budget.
  */
 
 import type { Adjacency } from "./adjacency.ts";
 
-export interface ComputeBetweennessOptions {
-  /**
-   * Optional perf-log hook. Called once with `{ wallMs }` so the
-   * pipeline can route timings through `JsonlPerfLogger` without
-   * pulling that module into M2/M3.
-   */
-  readonly onTiming?: (info: { wallMs: number }) => void;
-}
-
-export function computeBetweenness(
-  adjacency: Adjacency,
-  options: ComputeBetweennessOptions = {},
-): number[] {
-  const start = performance.now();
+export function computeBetweenness(adjacency: Adjacency): number[] {
   const n = adjacency.nodeIds.length;
   const centrality: number[] = Array.from({ length: n }, () => 0);
   if (n < 3) {
-    options.onTiming?.({ wallMs: performance.now() - start });
     return centrality;
   }
 
@@ -99,7 +84,6 @@ export function computeBetweenness(
       centrality[i] = centrality[i]! / norm;
     }
   }
-  options.onTiming?.({ wallMs: performance.now() - start });
   return centrality;
 }
 
@@ -113,9 +97,8 @@ import type { MetricsRecord, NodeMetrics } from "./types.ts";
 export function withBetweenness(
   base: MetricsRecord,
   adjacency: Adjacency,
-  options: ComputeBetweennessOptions = {},
 ): MetricsRecord {
-  const values = computeBetweenness(adjacency, options);
+  const values = computeBetweenness(adjacency);
   const next = new Map<string, NodeMetrics>();
   for (const [i, id] of adjacency.nodeIds.entries()) {
     const prev = base.get(id);

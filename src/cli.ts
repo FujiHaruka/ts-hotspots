@@ -230,20 +230,14 @@ function findArchitectureCommandIndex(argv: readonly string[]): number {
 /**
  * Rewrite the trailing portion of argv so commander's optional-value
  * `[level]` for `--phase-timings` does not greedily consume a following
- * positional. Applied to both `dup` and `arch`, since both register
- * `--phase-timings [level]`. Leaves other subcommands' argv untouched.
+ * positional. Only `dup` registers `--phase-timings [level]`; other
+ * subcommands' argv is left untouched.
  */
 function preprocessArgv(argv: readonly string[]): string[] {
   const dupIdx = findDuplicationCommandIndex(argv);
   if (dupIdx !== -1) {
     const head = argv.slice(0, dupIdx + 1);
     const tail = normalizePhaseTimingsArgv(argv.slice(dupIdx + 1));
-    return [...head, ...tail];
-  }
-  const archIdx = findArchitectureCommandIndex(argv);
-  if (archIdx !== -1) {
-    const head = argv.slice(0, archIdx + 1);
-    const tail = normalizePhaseTimingsArgv(argv.slice(archIdx + 1));
     return [...head, ...tail];
   }
   return [...argv];

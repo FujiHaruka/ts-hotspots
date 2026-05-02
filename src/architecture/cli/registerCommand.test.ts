@@ -1,6 +1,5 @@
 import { Command, CommanderError } from "commander";
 import { describe, expect, it } from "vitest";
-import { normalizePhaseTimingsArgv } from "../../duplication/cli/registerCommand.ts";
 import type { ArchParsedArgs } from "./args.ts";
 import { addArchitectureCommand } from "./registerCommand.ts";
 
@@ -15,12 +14,7 @@ function parse(argv: readonly string[]): ArchParsedArgs {
   addArchitectureCommand(program, (args) => {
     captured = args;
   });
-  program.parse([
-    "node",
-    "ts-hotspots",
-    "architecture",
-    ...normalizePhaseTimingsArgv(argv),
-  ]);
+  program.parse(["node", "ts-hotspots", "architecture", ...argv]);
   if (captured === undefined) throw new Error("action did not run");
   return captured;
 }
@@ -45,7 +39,6 @@ describe("addArchitectureCommand — defaults", () => {
     expect(args.includeTypes).toBe(true);
     expect(args.ref).toBeUndefined();
     expect(args.diff).toBeUndefined();
-    expect(args.phaseTimings).toBeUndefined();
   });
 });
 
@@ -88,16 +81,6 @@ describe("addArchitectureCommand — flag parsing", () => {
     const args = parse(["--ref", "release/v2", "--diff", "origin/main..."]);
     expect(args.ref).toBe("release/v2");
     expect(args.diff?.baseRef).toBe("origin/main");
-  });
-
-  it("--phase-timings (bare) defaults to summary", () => {
-    const args = parse(["--phase-timings"]);
-    expect(args.phaseTimings).toBe("summary");
-  });
-
-  it("--phase-timings=verbose", () => {
-    const args = parse(["--phase-timings=verbose"]);
-    expect(args.phaseTimings).toBe("verbose");
   });
 
   it("repeatable -e collects globs", () => {

@@ -82,15 +82,4 @@ describe("withBetweenness", () => {
     expect(merged.get("B.ts::B::function")?.fanInUnweighted).toBe(1);
     expect(merged.get("B.ts::B::function")?.fanOutUnweighted).toBe(1);
   });
-
-  it("invokes the timing hook exactly once", () => {
-    const graph = build([comp("A")], []);
-    const { metrics, adjacency } = computeMetrics(graph);
-    const calls: number[] = [];
-    withBetweenness(metrics, adjacency, {
-      onTiming: ({ wallMs }) => calls.push(wallMs),
-    });
-    expect(calls.length).toBe(1);
-    expect(Number.isFinite(calls[0])).toBe(true);
-  });
 });

@@ -130,7 +130,6 @@ Common options:
 - `--ref <ref>` build the graph at the given commit (default: working tree)
 - `--include-tests` include test files (and stories / cypress / playwright) in the graph; off by default because test edges distort fan-in / fan-out
 - `--no-include-types` drop type-only edges entirely (default: keep them at weight 0.3)
-- `--phase-timings[=summary|verbose]` emit a JSON Lines perf log to stderr
 
 ### Optional config
 

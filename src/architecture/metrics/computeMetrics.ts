@@ -7,11 +7,10 @@
  * iterate the metrics record see deterministic output without
  * additional sorting.
  *
- * Betweenness is intentionally left at `0`. M3 fills it in via
- * `withBetweenness(metrics, graph, options)` so the heavy
- * Brandes pass stays a separate compose step — that keeps M2 cheap
- * for the small graphs where betweenness is overkill, and lets
- * `--phase-timings` attribute the cost cleanly.
+ * Betweenness is intentionally left at `0`. `withBetweenness(metrics,
+ * adjacency)` fills it in so the heavy Brandes pass stays a separate
+ * compose step — that keeps this pass cheap for the small graphs
+ * where betweenness is overkill.
  */
 
 import type { Edge, Graph } from "../graph/types.ts";

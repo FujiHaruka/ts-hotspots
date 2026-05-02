@@ -26,7 +26,7 @@ See `docs/requirements.md` for the full spec (Part A = complexity, Part B = dupl
   - `--diff` semantics — `comp` and `arch` both treat it as a display filter (rankings still computed against the full ref); `dup` instead defines the comparison's base/head sides at build time.
   - `--ref` — `dup` always builds at a ref (default `HEAD`, mutex with `--diff`); `arch` reads the working tree by default but builds at `<ref>` when `--ref` is passed (orthogonal to `--diff`); `comp` always reads the working tree.
   - `--metrics` / `--file` — `comp`-only. Single-file drill-down doesn't map to a pairwise metric (`dup`) or a graph node (`arch`).
-  - `--phase-timings` — `dup` and `arch` only (pipeline diagnostic).
+  - `--phase-timings` — `dup`-only (pipeline diagnostic). `arch` is fast enough on real repos that it ships without one; if a future repo blows past budget, fold instrumentation back in alongside the betweenness-sampling follow-up rather than carrying a no-op flag.
   - `--include-tests` — `arch`-only. Test edges distort fan-in/fan-out far more than they distort per-function complexity or per-fragment duplication.
   - `--no-include-types` — `arch`-only. Type-only edges have a meaningful but lower weight than runtime edges; arch surfaces a toggle so users can drop them entirely.
   - `--churn-window` / `--churn-ref` / `--no-churn` — `comp` and `dup` only. `arch` deliberately omits churn integration in v1; folding it in is a follow-up plan tracked under "Deferred" in `docs/plans/architecture-subcommand.md`. `--churn-ref` defaults differ between the two: `comp` hard-codes `HEAD`; `dup` adapts (the diff head ref in diff mode, `--ref` in whole-repo mode).

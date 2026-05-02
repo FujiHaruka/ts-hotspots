@@ -7,10 +7,7 @@
  * `./main.ts` is read-only against this object.
  */
 
-import type {
-  PhaseTimingsLevel,
-  ReportFormat,
-} from "../../cli-defaults.ts";
+import type { ReportFormat } from "../../cli-defaults.ts";
 import type { RevRange } from "../../util/git/parseRevRange.ts";
 
 export interface ArchParsedArgs {
@@ -31,7 +28,6 @@ export interface ArchParsedArgs {
    * `--diff` semantics exactly.
    */
   diff: RevRange | undefined;
-  phaseTimings: PhaseTimingsLevel | undefined;
   limit: number;
   verbose: boolean;
   /** `--include-tests` (default: off). */
