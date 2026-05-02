@@ -338,6 +338,8 @@ Examples:
   ts-hotspots complexity                       # rank functions in cwd
   ts-hotspots dup --diff origin/main...        # duplication in PR scope
   ts-hotspots arch --format json > arch.json   # JSON architecture report
+  ts-hotspots cochange                         # rank file pairs by change-coupling
+  ts-hotspots coch --file src/foo.ts           # cochange partners of one file
   ts-hotspots dismiss comp:abc123 --reason "intentional dispatch table"
 
 Run 'ts-hotspots <command> --help' for the full flag surface, examples,
