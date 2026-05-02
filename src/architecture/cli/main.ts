@@ -24,7 +24,18 @@
 import { resolve as resolvePath } from "node:path";
 import { Command, CommanderError } from "commander";
 import pkg from "../../../package.json" with { type: "json" };
+import {
+  buildErrorWriters,
+  type CliIO,
+  type CliWritable,
+  classifyGenericError,
+  sniffFormat,
+} from "../../cli/streaming.ts";
 import { TOOL_NAME } from "../../cli-defaults.ts";
+import {
+  DEFAULT_EXCLUDE_GLOBS,
+  DEFAULT_EXCLUDE_GLOBS_NO_TESTS,
+} from "../../defaults.ts";
 import {
   loadRegistry,
   pruneRegistry,
@@ -32,25 +43,17 @@ import {
   saveRegistry,
   withProjectPath,
 } from "../../dismissal/store.ts";
-import {
-  DEFAULT_EXCLUDE_GLOBS,
-  DEFAULT_EXCLUDE_GLOBS_NO_TESTS,
-} from "../../defaults.ts";
+import { normalizePhaseTimingsArgv } from "../../duplication/cli/registerCommand.ts";
 import {
   renderJson,
   renderMarkdownBody,
-  renderMarkdownErrorBody,
   renderMarkdownHead,
-  renderMarkdownPreError,
   renderStatsLine,
 } from "../../reporter/render.ts";
 import type { DismissedSummary } from "../../schema.ts";
 import { findGitRoot } from "../../util/git/findGitRoot.ts";
 import { listChangedFilePaths } from "../../util/git/listChangedFilePaths.ts";
-import {
-  parseRevRange,
-  type RevRange,
-} from "../../util/git/parseRevRange.ts";
+import { parseRevRange, type RevRange } from "../../util/git/parseRevRange.ts";
 import { resolveDiffEndpoints } from "../../util/git/runner.ts";
 import {
   ArchConfigError,
@@ -58,100 +61,32 @@ import {
   loadArchConfig,
 } from "../config/index.ts";
 import { buildGraph } from "../graph/buildGraph.ts";
-import {
-  computeMetrics,
-  withBetweenness,
-} from "../metrics/index.ts";
+import { computeMetrics, withBetweenness } from "../metrics/index.ts";
 import { serializeReport } from "../report/serializeReport.ts";
 import type { ArchHotspot, ArchReport, ArchTool } from "../report/types.ts";
 import { score } from "../scoring/score.ts";
-import {
-  buildLineCounts,
-  collectSmallNodeIds,
-} from "../scoring/sizeFloor.ts";
+import { buildLineCounts, collectSmallNodeIds } from "../scoring/sizeFloor.ts";
 import { collectTypeOnlyNodeIds } from "../scoring/typeOnlyNodes.ts";
 import { type ArchParsedArgs, ArgParseError } from "./args.ts";
-import { normalizePhaseTimingsArgv } from "../../duplication/cli/registerCommand.ts";
 import { loadArchSources } from "./loadSources.ts";
 import { addArchitectureCommand } from "./registerCommand.ts";
 
 const TOOL: ArchTool = { name: TOOL_NAME, version: pkg.version };
+const errorWriter = buildErrorWriters("architecture", TOOL);
 
-export interface ArchWritable {
-  write: (chunk: string) => unknown;
-}
-
-export interface ArchMainIO {
-  stdout: ArchWritable;
-  stderr: ArchWritable;
-  cwd: () => string;
-}
-
-const REAL_IO: ArchMainIO = {
+const REAL_IO: CliIO = {
   stdout: process.stdout,
   stderr: process.stderr,
   cwd: () => process.cwd(),
 };
 
-function buildErrorReport(code: string, message: string) {
-  return {
-    status: "error" as const,
-    tool: TOOL,
-    error: { code, message },
-  };
-}
-
-function writePreStreamError(
-  io: ArchMainIO,
-  format: "markdown" | "json",
-  code: string,
-  message: string,
-  humanDetail: string,
-): void {
-  const report = buildErrorReport(code, message);
-  io.stdout.write(
-    format === "json"
-      ? renderJson(report)
-      : renderMarkdownPreError("architecture", message),
-  );
-  io.stderr.write(`ts-hotspots architecture: ${humanDetail}\n`);
-}
-
-function writePostStreamError(
-  io: ArchMainIO,
-  format: "markdown" | "json",
-  code: string,
-  message: string,
-  humanDetail: string,
-): void {
-  const report = buildErrorReport(code, message);
-  io.stdout.write(
-    format === "json" ? renderJson(report) : renderMarkdownErrorBody(report),
-  );
-  io.stderr.write(`ts-hotspots architecture: ${humanDetail}\n`);
-}
-
-function sniffFormat(argv: readonly string[]): "markdown" | "json" {
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--format=json") return "json";
-    if (a === "--format=markdown") return "markdown";
-    if (a === "--format") {
-      const next = argv[i + 1];
-      if (next === "json") return "json";
-      if (next === "markdown") return "markdown";
-    }
-  }
-  return "markdown";
-}
-
 export function writeArchitectureParseError(
-  io: ArchMainIO,
+  io: CliIO,
   argv: readonly string[],
   err: unknown,
 ): void {
   const message = err instanceof Error ? err.message : String(err);
-  writePreStreamError(io, sniffFormat(argv), "INVALID_ARGS", message, message);
+  errorWriter.pre(io, sniffFormat(argv), "INVALID_ARGS", message, message);
 }
 
 function classifyError(err: unknown): { code: string; message: string } {
@@ -161,14 +96,7 @@ function classifyError(err: unknown): { code: string; message: string } {
   if (err instanceof ArchConfigError) {
     return { code: "INVALID_CONFIG", message: err.message };
   }
-  const message = err instanceof Error ? err.message : String(err);
-  if (message.startsWith("not in a git repository")) {
-    return { code: "NOT_A_GIT_REPO", message };
-  }
-  if (/git/i.test(message) || /spawn/i.test(message)) {
-    return { code: "GIT_FAILED", message };
-  }
-  return { code: "UNKNOWN_ERROR", message };
+  return classifyGenericError(err);
 }
 
 function effectiveExcludeGlobs(args: ArchParsedArgs): string[] {
@@ -211,7 +139,7 @@ async function resolveDiffScope(
 function applyDismissalRegistry(
   rootDir: string,
   hotspots: ArchHotspot[],
-  stderr: ArchWritable,
+  stderr: CliWritable,
 ): { hotspots: ArchHotspot[]; summary?: DismissedSummary } {
   const original = loadRegistry(rootDir, {
     onWarning: (msg) => {
@@ -255,7 +183,7 @@ function applyDismissalRegistry(
 
 export async function runPipeline(
   args: ArchParsedArgs,
-  io: ArchMainIO,
+  io: CliIO,
 ): Promise<number> {
   const startDir = args.path === undefined ? io.cwd() : resolvePath(args.path);
   let repoPath: string;
@@ -263,7 +191,7 @@ export async function runPipeline(
     repoPath = findGitRoot(startDir);
   } catch (err) {
     const { code, message } = classifyError(err);
-    writePreStreamError(io, args.format, code, message, message);
+    errorWriter.pre(io, args.format, code, message, message);
     return 1;
   }
 
@@ -313,7 +241,7 @@ export async function runPipeline(
         const { code, message } = classifyError(err);
         const detail =
           err instanceof Error ? (err.stack ?? err.message) : String(err);
-        writePostStreamError(io, args.format, code, message, detail);
+        errorWriter.post(io, args.format, code, message, detail);
         return 1;
       }
     }
@@ -371,7 +299,7 @@ export async function runPipeline(
     const { code, message } = classifyError(err);
     const detail =
       err instanceof Error ? (err.stack ?? err.message) : String(err);
-    writePostStreamError(io, args.format, code, message, detail);
+    errorWriter.post(io, args.format, code, message, detail);
     return 1;
   }
 }
@@ -403,7 +331,7 @@ function buildStatsPayload(
 
 export async function main(
   argv: readonly string[],
-  io: ArchMainIO = REAL_IO,
+  io: CliIO = REAL_IO,
 ): Promise<number> {
   let parsed: ArchParsedArgs | undefined;
   const program = new Command();
@@ -432,11 +360,11 @@ export async function main(
     if (err instanceof CommanderError) {
       if (err.code === "commander.helpDisplayed") return 0;
       const message = err.message;
-      writePreStreamError(io, sniffFormat(argv), "INVALID_ARGS", message, message);
+      errorWriter.pre(io, sniffFormat(argv), "INVALID_ARGS", message, message);
       return 1;
     }
     if (err instanceof ArgParseError) {
-      writePreStreamError(
+      errorWriter.pre(
         io,
         sniffFormat(argv),
         "INVALID_ARGS",
