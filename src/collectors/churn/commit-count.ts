@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { COMMIT_MARKER, walkChurnLog } from "../../util/git/walkChurnLog.ts";
 
 /**
  * Minimal file descriptor accepted by `collectChurn`.
@@ -21,8 +22,6 @@ export interface ChurnCollectorOptions {
   ref: string;
   onWarning?: (msg: string) => void;
 }
-
-const COMMIT_MARKER = "CMT";
 
 export function collectChurn(opts: ChurnCollectorOptions): Map<string, number> {
   const fileSet = new Set(opts.files.map((f) => f.path));
@@ -69,77 +68,30 @@ export function collectChurn(opts: ChurnCollectorOptions): Map<string, number> {
 
 // Walks `git log --name-status -M` output from newest to oldest, following
 // renames backward so pre-rename commits are credited to the current file.
+// Thin adapter over the shared rename-tracking walker in `walkChurnLog`.
 // Exported for unit tests.
 export function parseChurnLog(
   raw: string,
   fileSet: ReadonlySet<string>,
   prefix = "",
 ): Map<string, number> {
-  const prefixWithSlash = prefix === "" ? "" : `${prefix}/`;
-  const stripPrefix = (p: string): string | undefined => {
-    if (prefixWithSlash === "") return p;
-    if (!p.startsWith(prefixWithSlash)) return undefined;
-    return p.slice(prefixWithSlash.length);
-  };
-
-  // historical path → canonical (current) path. Starts with identity mapping
-  // for every currently-known file; grows as we walk renames back in time.
-  const tracked = new Map<string, string>();
-  for (const f of fileSet) tracked.set(f, f);
-
   const counts = new Map<string, number>();
-  const bump = (canonical: string, countedThisCommit: Set<string>): void => {
-    if (countedThisCommit.has(canonical)) return;
-    counts.set(canonical, (counts.get(canonical) ?? 0) + 1);
-    countedThisCommit.add(canonical);
-  };
-
   let countedThisCommit = new Set<string>();
-  const handleRenameOrCopy = (status: string, rest: string): void => {
-    const sep = rest.indexOf("\t");
-    if (sep < 0) return;
-    const oldRaw = rest.slice(0, sep);
-    const newRaw = rest.slice(sep + 1);
-    const newRel = stripPrefix(newRaw);
-    if (newRel === undefined) return;
-    const canonical = tracked.get(newRel);
-    if (canonical === undefined) return;
-
-    bump(canonical, countedThisCommit);
-
-    // Going back in time from this commit, the file no longer exists at
-    // newRel. For a rename, it existed at oldRel; for a copy, it didn't
-    // exist at all (copy creates a new file from an existing one).
-    tracked.delete(newRel);
-    if (status.startsWith("R")) {
-      const oldRel = stripPrefix(oldRaw);
-      if (oldRel !== undefined) tracked.set(oldRel, canonical);
-    }
-  };
-
-  for (const line of raw.split("\n")) {
-    if (line === "") continue;
-    if (line === COMMIT_MARKER) {
-      countedThisCommit = new Set();
-      continue;
-    }
-    const tab = line.indexOf("\t");
-    if (tab < 0) continue;
-    const status = line.slice(0, tab);
-    const rest = line.slice(tab + 1);
-
-    if (status.startsWith("R") || status.startsWith("C")) {
-      handleRenameOrCopy(status, rest);
-      continue;
-    }
-
-    const rel = stripPrefix(rest);
-    if (rel === undefined) continue;
-    const canonical = tracked.get(rel);
-    if (canonical === undefined) continue;
-    bump(canonical, countedThisCommit);
-  }
-
+  walkChurnLog(
+    raw,
+    fileSet,
+    { prefix },
+    {
+      onCommit: () => {
+        countedThisCommit = new Set();
+      },
+      onChange: (canonical) => {
+        if (countedThisCommit.has(canonical)) return;
+        counts.set(canonical, (counts.get(canonical) ?? 0) + 1);
+        countedThisCommit.add(canonical);
+      },
+    },
+  );
   return counts;
 }
 
