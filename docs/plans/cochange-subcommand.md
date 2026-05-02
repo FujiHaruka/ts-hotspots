@@ -425,3 +425,189 @@ in one place rather than spread across commit messages.
 - Strip-only check: `tools/check-strip-only.ts` already imports
   `src/cli.ts`, so registering `cochange` there transitively covers
   validation.
+
+## Implementation plan (milestone-level)
+
+Built bottom-up: data layer → metrics → gate → output → CLI →
+advanced flag modes → docs. Each milestone leaves the codebase in a
+shippable state — strip-only check passes, tests pass, no half-wired
+modules. Determinism is verified at every milestone that produces
+output (golden-snapshot tested), matching the discipline used for
+`dup` and `arch`.
+
+### M1 — Refactor: extract rename-tracking walker
+
+> Status: Not started
+
+Goal: lift the rename-following machinery out of `parseChurnLog`
+(`src/collectors/churn/commit-count.ts`) into a shared module so
+both the existing per-file counter and the upcoming pair walker
+build on one rename-tracking implementation.
+
+- New module `src/util/git/walkChurnLog.ts` (or similar) that
+  accepts a per-commit visitor callback and handles the rename-aware
+  walk over `git log --first-parent -m --name-status -M -n <window> <ref>`.
+- `parseChurnLog` becomes a thin adapter that registers a "bump
+  per file" visitor against the shared walker. No public API change.
+- `comp` and `dup` golden snapshots stay bit-identical — this is a
+  pure refactor.
+
+Exit: shared walker exists and is exercised by `parseChurnLog`'s
+existing test suite without regression. New unit tests cover the
+visitor contract directly. Strip-only check passes.
+
+### M2 — Pair walker + raw metrics
+
+> Status: Not started
+
+Goal: a deterministic git-walk that produces the raw co-change map
+and per-file change counts. No gate, no output, no CLI.
+
+- New module `src/cochange/walk/walkCochange.ts` that uses the M1
+  shared walker and emits a `Map<canonicalPath, number>` (per-file
+  changes) plus a `Map<pairKey, { support: number; recent: string[] }>`
+  (pair counts + capped 5-most-recent SHA list).
+- `--max-files-per-commit` skip applied (count canonical-and-tracked
+  files only; configured threshold injected as an option, hardcoded
+  to 50 by callers in this milestone).
+- New module `src/cochange/metrics/computeMetrics.ts` that derives
+  `confidenceAtoB` / `confidenceBtoA` / `confidenceMax` / `lift`
+  from the walker's two maps.
+- Unit tests with synthetic git fixtures (in-process by feeding
+  hand-crafted log strings, not by spinning up real git repos).
+
+Exit: `walkCochange(opts) → { perFileChanges, pairs, actualWindow,
+commitsSkippedAsLargeChange }` is deterministic. `computeMetrics`
+turns it into per-pair raw values. Strip-only check passes.
+
+### M3 — Gate + ranking
+
+> Status: Not started
+
+Goal: apply the candidate gate and produce the sorted candidate
+list. Still no I/O, no schema, no CLI.
+
+- `src/cochange/ranking/applyGate.ts`: drops pairs failing
+  `support >= minSupport`, `lift > 1.0`, `confidenceMax >= 0.30`.
+  All three thresholds injected as options; hardcoded defaults in
+  one place per the spec.
+- `src/cochange/ranking/sort.ts`: orders by
+  `support × confidenceMax` desc, then `lift` desc, then lex on
+  `(pathA, pathB)`. `--limit` truncation belongs here.
+- Unit tests cover threshold edge cases and tie-break determinism.
+
+Exit: `selectCandidates(walkResult, opts)` returns a deterministic
+sorted candidate list. Strip-only check passes.
+
+### M4 — Output schema + serializers
+
+> Status: Not started
+
+Goal: turn the candidate list into the public report shape and emit
+both Markdown and JSON.
+
+- `src/cochange/report/schema.ts`: type definitions mirroring
+  `SlimDupHotspot` (anchor + members + size + score + metrics +
+  evidence + dismissalId), plus the verbose extension.
+- `src/cochange/report/dismissalId.ts`:
+  `computeCochangePairDismissalId(pathA, pathB) → "coch:<hex>"`.
+  Update `src/dismissal/hash.ts` `normalizeDismissalId` to recognize
+  the `coch:` prefix alongside the existing three.
+- `src/cochange/report/serializeJson.ts` and
+  `src/cochange/report/serializeMarkdown.ts`: produce the slim-by-
+  default + `--verbose` re-attaches contract from the spec. Markdown
+  follows the card-per-hotspot shape used by comp/dup/arch.
+- Golden-snapshot tests for both formats covering: empty result,
+  single pair, multiple pairs, dismissal-filtered case, verbose
+  variant.
+
+Exit: given a candidate list, both formats round-trip deterministic
+output. Dismissal recognition works for `coch:` IDs. Strip-only
+check passes.
+
+### M5 — CLI registration + dismissal integration (whole-repo only)
+
+> Status: Not started
+
+Goal: end-to-end working command for the default whole-repo mode.
+No `--diff`, no `--file` yet — those land in M6/M7.
+
+- `src/cochange/cli/registerCommand.ts`: `addCochangeCommand(parent,
+  onParsed)` mirrors `addArchitectureCommand`. Wires
+  `-e, --exclude`, `--limit`, `--format`, `--verbose`, `--ref`,
+  `--window`, `--min-support`, `--max-files-per-commit`. Help text
+  follows the `addHelpText("before", LONG_DESCRIPTION)` /
+  `addHelpText("after", HELP_AFTER)` shape.
+- `src/cochange/cli/main.ts`: orchestrates the pipeline (loader →
+  walker → metrics → gate → dismissal filter → serializer). The
+  loader uses `git ls-files` filtered by `DEFAULT_EXCLUDE_GLOBS` +
+  user `--exclude`.
+- Wire the new subcommand in `src/cli.ts` alongside
+  `addArchitectureCommand`.
+- Graceful-skip path: non-git, missing git binary, shallow clone —
+  emit a single stderr warning and return an empty `hotspots[]`,
+  matching `comp`'s churn graceful-skip shape.
+- Integration test: invoke the CLI in-process against a fixture
+  repo, assert the JSON output.
+
+Exit: `ts-hotspots cochange [path]` works end-to-end with default
+options. `ts-hotspots dismiss coch:<hex>` correctly carries
+forward across runs. Strip-only check passes.
+
+### M6 — `--diff <revrange>` display filter
+
+> Status: Not started
+
+Goal: add the post-rank display filter — show only pairs where at
+least one file appears in the changed-file set.
+
+- Reuse `parseRevRange` and `listChangedFilePaths` from
+  `src/util/git/`.
+- Filter applied after gate + sort, before `--limit` truncation
+  (matching `comp --diff`'s display-filter semantics).
+- Emit the `diff` envelope block (`baseSha` / `headSha` /
+  `threeDot` / `changedFiles`) — same shape as comp's.
+- Integration test against a fixture repo with two refs.
+
+Exit: `ts-hotspots cochange --diff origin/main...` ranks the full
+window and filters the report. Strip-only check passes.
+
+### M7 — `--file <path>` single-anchor mode
+
+> Status: Not started
+
+Goal: switch the schema and sort key when the user pins an anchor file.
+
+- Filter the candidate list to pairs containing `<path>`.
+- Re-sort by `confidence(<path> → partner)` desc (NOT by
+  `support × confidenceMax`).
+- Schema shift: set `anchor = { ref: { location: <path>, kind: "file" } }`
+  and reduce `members` to length 1.
+- Validation: error if `<path>` is not in the analyzed file-set.
+- Integration test covering the schema-shift case.
+
+Exit: `ts-hotspots cochange --file src/foo.ts` returns the
+single-anchor schema with the correct sort. Strip-only check passes.
+
+### M8 — Documentation + asymmetry notes
+
+> Status: Not started
+
+Not test-bearing; pure docs and help-text work to land alongside
+the feature.
+
+- Update `CLAUDE.md`'s "CLI flag conventions" section with the
+  cochange-specific asymmetries: unprefixed `--window`/`--ref`
+  (precedent: `arch --ref`), `--file` semantic difference vs comp,
+  `--min-support` / `--max-files-per-commit` cochange-only flags,
+  `--phase-timings` staying dup-only.
+- Update `README.md` user-facing docs to describe cochange under
+  the same heading pattern as comp/dup/arch (write for a first-time
+  reader, not as a changelog — per CLAUDE.md's user-facing-docs
+  rules).
+- Add cochange examples to the root help text in `src/cli.ts`.
+- Add `ts-hotspots cochange` invocation to the dogfooding prompt
+  if it lives there.
+
+Exit: a first-time reader of README can run `ts-hotspots cochange`
+and understand the output without consulting the requirements doc.
