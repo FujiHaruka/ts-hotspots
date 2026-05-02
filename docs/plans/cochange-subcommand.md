@@ -45,10 +45,13 @@ refactor — same agent-facing role as the other three subcommands.
 The implementation reuses the existing parser-only / git-only stance
 (no AST parse is needed at all here — it is a pure history walk),
 follows `dup`'s module-layout discipline, must clear the strip-only
-TS check, must keep `perfLog` zero-cost when disabled (when added),
-and must produce bit-identical output for the same input. The CLI
-integrates via the same registrar pattern as `addArchitectureCommand`,
-with a new `cochange:<hex>` prefix in the dismissal registry.
+TS check, and must produce bit-identical output for the same input.
+No `--phase-timings` and no `perfLog` discipline: cochange is a
+single-pass git walk with no pipeline stages worth instrumenting
+(the `--phase-timings` surface stays dup-only, matching the
+existing asymmetry note in CLAUDE.md). The CLI integrates via the
+same registrar pattern as `addArchitectureCommand`, with a new
+`coch:<hex>` prefix in the dismissal registry.
 
 ## Naming: why `cochange`
 
@@ -96,8 +99,8 @@ help-output unambiguous.
 
 | Flag                       | Why cochange only |
 | -------------------------- | ----------------- |
-| `--window <N>`             | The window concept exists for `comp`/`dup` as `--churn-window`, but for `cochange` the window IS the entire input — it is not "an axis among many". Naming it `--window` is more honest at the surface than reusing `--churn-window` (which wrongly implies the command computes churn). Default 200, matching the `--churn-window` default. |
-| `--ref <ref>`              | Endpoint for the history window. Default `HEAD`. Same role as `--churn-ref` in `comp`/`dup` and `--ref` in `arch`. The spelling matches `arch` (which is also a single-purpose `--ref`). |
+| `--window <N>`             | A window concept exists in `comp`/`dup` as `--churn-window`, but there it scopes only the **churn axis** — one input among many. In cochange the window IS the entire input. Reusing `--churn-window` would falsely imply churn is a side axis here. Following the precedent set by `arch --ref` (which is **not** spelled `--churn-ref` because the ref isn't a churn axis there either), cochange uses unprefixed `--window`. Default 200, matching the `--churn-window` default. **This is the first time the project has an unprefixed `--window`; CLAUDE.md needs a note when this lands.** |
+| `--ref <ref>`              | Endpoint of the history window. Default `HEAD`. Spelling matches `arch --ref` (also unprefixed for the same reason). Role is identical to `--churn-ref` in `comp`/`dup` but the un-prefixed spelling reflects that the entire command is the time-windowed walk. |
 | `--min-support <N>`        | Floor on the raw co-change count. Defaults to `3` to drop one-off coincidences that produce N² noise. Filters before ranking. No equivalent in other subcommands; needed because cochange is the only command with a quadratic-in-input search space. |
 | `--max-files-per-commit <N>` | Ignore commits touching more than N files. Defaults to `50`. A single 200-file commit produces C(200,2) = 19,900 pair updates, almost all coincidental (mass renames, formatter passes, dependency bumps). This guard is critical for both signal quality and runtime; the threshold mirrors the rule of thumb in the change-coupling literature. |
 
@@ -105,10 +108,10 @@ help-output unambiguous.
 
 | Flag                        | Subcommand(s)        | Why cochange doesn't have it                                  |
 | --------------------------- | -------------------- | ------------------------------------------------------------- |
-| `-m, --metrics`             | comp                 | Selects which axes to compute. cochange's metrics are co-derived from the same walk; per-axis selection is not meaningful. |
-| `--file <path>`             | comp                 | Single-file drill-down: see "Single-anchor mode" below — cochange does support it but reuses `--file` rather than inventing a new name. |
-| `--churn-window` / `--churn-ref` / `--no-churn` | comp, dup | cochange does not compute churn as a side axis; the analogous concept is `--window`/`--ref` above. Including the `--churn-*` spellings would falsely imply a separate churn axis. |
-| `--include-tests`           | arch                 | Same answer as comp/dup: test files do not distort cochange in the way they distort fan-in/out, because cochange already filters by `--exclude`. The default exclude list (`DEFAULT_EXCLUDE_GLOBS`, which already covers test files) is sufficient. |
+| `-m, --metrics`             | comp                 | Selects which axes to compute. cochange's metrics are all co-derived from the same git walk; per-axis selection has no execution-cost saving and would just hide rows from the report. |
+| `--file <path>`             | comp                 | **Same flag name, different drill-down axis.** comp's `--file X` lists every function inside file X (vertical drill-down: file → its functions). cochange's `--file X` lists every cochange partner of X (horizontal drill-down: file → other files coupled to it). Reusing the name is justified because in both cases the user has fixed attention on file X and wants "everything relevant about X" — the orthogonality of "inside vs. partnered with" is a subordinate detail. Spelled out in "Single-anchor mode" below so agents understand the schema shift. |
+| `--churn-window` / `--churn-ref` / `--no-churn` | comp, dup | cochange does not compute churn as a side axis; the analogous concept is `--window`/`--ref` above. Including the `--churn-*` spellings would falsely imply a separate churn axis. There is no `--no-cochange` analog either: disabling the command's only signal is meaningless. |
+| `--include-tests`           | arch                 | Including test files would surface every source file's own test as its #1 partner — by testing discipline, `feature.ts` and `feature.test.ts` always change together. That is a **tautology**, not an insight, and it would crowd the top of every report. (Compare arch, where the same default-exclude exists for a different reason: test edges distort fan-in/fan-out, not the result's information content.) |
 | `--include-types`           | arch                 | cochange does not parse imports. There is no edge typing to toggle. |
 
 ### Subcommand-name collision check
@@ -120,12 +123,17 @@ zone is `c<TAB>`; documented above and accepted.
 
 ### Dismissal ID prefix
 
-`comp:<hex>`, `dup:<hex>`, `arch:<hex>` exist today. cochange adopts
-`cochange:<hex>`. The ID is computed as
-`sha256(pathA + "\n" + pathB)` where `(pathA, pathB)` is the
-canonical-ordered pair (lexicographic on POSIX path). The existing
-`dismiss` / `list-dismissed` / `undismiss` commands route through
-`src/dismissal/store.ts` and need a new prefix recognizer.
+The existing prefixes (`comp:`, `dup:`, `arch:`) all match the
+subcommand alias rather than the long name. cochange follows the
+same rule: **`coch:<hex>`** (alias-aligned), not `cochange:<hex>`.
+
+The ID is computed as `sha256(pathA + "\n" + pathB)` where
+`(pathA, pathB)` is the canonical-ordered pair (lexicographic on
+POSIX path). `src/dismissal/hash.ts` currently recognizes
+`comp: | dup: | arch:` in its `normalizeDismissalId` allowlist; it
+needs `coch:` added there alongside a new
+`computeCochangePairDismissalId` helper paralleling
+`computeArchComponentDismissalId`.
 
 ## Subcommand shape (final)
 
@@ -156,16 +164,19 @@ ts-hotspots cochange [path]
 ## Unit of analysis
 
 The reporting unit is a **pair** of repo-root-relative POSIX paths,
-canonically ordered (lexicographic). Each pair appears at most once in
-the output.
+canonically ordered (lexicographic). Each pair appears at most once
+in the output. The pair is materialized in the schema using dup's
+existing `anchor?` + `members[]` shape (see "Output: hotspots"
+below) so downstream agents read every subcommand through the same
+type.
 
 File-level only (no `:line` precision). Per-function or per-symbol
 cochange would require `git log -L`, which the project explicitly
 ruled out for `comp` (§10 of `docs/requirements.md`) on the same
 grounds: execution cost and fragile boundary tracking. The same
-verdict applies here. The output for each side is therefore the
-file path alone, with the `kind` discriminator carrying the file/path
-nature.
+verdict applies here. The schema reuses `HotspotRef = { location, kind }`
+from comp/dup; for cochange `location` is the file path with no line
+range and `kind` is the literal string `"file"`.
 
 The default file-set is the same as the other subcommands: tracked
 `.ts` / `.tsx` / `.mts` / `.cts` files via `git ls-files`, minus
@@ -223,11 +234,18 @@ churn axis applied pairwise).
 When `--file <path>` is passed:
 
 - Only pairs containing `<path>` are returned.
-- The output is sorted by `confidenceAtoB` descending where A is the
-  anchor — the "if you touch this, also read…" reading.
+- Each surviving pair sets `anchor = { ref: { location: <path>, kind: "file" } }`
+  and `members = [{ ref: { location: <partner>, kind: "file" } }]`
+  (length 1). Without `--file`, `anchor` is omitted and `members`
+  carries the full lex-ordered pair (length 2). `size` is `2` in
+  both cases — see the schema table under "Output: hotspots".
+- Sort key changes: pairs are ordered by `confidence(<path> → partner)`
+  descending — the "if you touch X, also read…" reading. The
+  unfiltered sort key (`support * confidenceMax`) is wrong here
+  because the anchor's direction is fixed.
 - `--min-support` and the gating thresholds still apply.
-- This mirrors the agent flow: "Claude has been asked to edit X.
-  Run `ts-hotspots cochange --file X` to find adjacent files."
+- Agent flow: "Claude has been asked to edit X. Run
+  `ts-hotspots cochange --file X` to find adjacent files."
 
 ## Output: hotspots
 
@@ -245,19 +263,30 @@ walk consumed — may be less than `--window` on shallow clones or
 short histories) and `analyzedFileCount`. `--verbose` adds
 `commitsTouchedByPair` and `pairCandidateCountBeforeGate`.
 
-Each `hotspots[]` entry carries:
+Each `hotspots[]` entry carries (shape mirrors `SlimDupHotspot` in
+`src/duplication/report/serializeReport.ts`):
 
 - `kind: "cochange"` — discriminator for agents that consume multiple subcommands.
-- `pair` — `[{ ref: { path } }, { ref: { path } }]`, two-element tuple. No `location` key with `:line` here; the unit is the file. Order is canonical (lexicographic by POSIX path).
+- `size: 2` — total files in the pair, computed `(anchor ? 1 : 0) + members.length`, identical formula to dup.
 - `score` — `{ axis: "confidenceMax", value: 0..1 }` — single representative axis. `confidenceMax` is chosen because it is bounded `[0, 1]`, comparable across pairs / windows / repos, and answers the agent's actionable question directly ("if I touch one of these, how likely is the other to need attention?"). The integer evidence count (`support`) and the above-chance multiplier (`lift`) live in the `metrics` block alongside it for agents that want to re-rank.
+- `anchor?: { ref: HotspotRef }` — present only in single-anchor mode (`--file <X>`); omitted in whole-repo and `--diff` modes (cochange's `--diff` is a display filter, **not** an anchor-defining mode like dup's). When present, `anchor.ref.location === <X>`.
+- `members: { ref: HotspotRef }[]` — the other file(s) in the pair. Length 2 when `anchor` is omitted (whole-repo / `--diff`), length 1 when `anchor` is set (`--file` mode). `HotspotRef = { location, kind: "file" }`; `location` is the repo-root-relative POSIX path with no line range.
 - `metrics` — the five raw values listed above.
 - `evidence` — `{ recentCommits: string[] }` — short SHAs (7-char) of up to the 5 most recent commits that touched both files. Lets the agent run `git show <sha>` to confirm the coupling pattern without re-deriving it.
-- `dismissalId` — `cochange:<hex>` (see Dismissal section above).
+- `dismissalId` — `coch:<hex>` (see "Dismissal ID prefix" above).
+
+Mode-by-mode shape (parallel to dup's whole-repo-vs-diff schema variation):
+
+| Mode                       | `anchor`              | `members.length` | `size` |
+| -------------------------- | --------------------- | ---------------- | ------ |
+| whole-repo (default)       | omitted               | 2                | 2      |
+| `--diff <revrange>`        | omitted (display filter only) | 2        | 2      |
+| `--file <path>`            | `{ ref: <path> }`     | 1                | 2      |
 
 `--verbose` re-attaches:
 
 - `summary` — window stats (`requestedWindow`, `actualWindow`, `commitsSkippedAsLargeChange`, `pairsBeforeGate`, `pairsAfterGate`).
-- `pair[].metrics.changesOfA` / `changesOfB` — denominators for the conditional-probability calculations.
+- `metrics.changesOfA` / `metrics.changesOfB` — denominators for the conditional-probability calculations (slim default omits these because the ratios are already in `confidenceAtoB` / `confidenceBtoA`).
 - `evidence.allCoChangeCommits` — full SHA list (not truncated).
 - `evidence.coChangeWindow` — the first/last SHA in the actual window walked, so the agent can re-derive the metric.
 
@@ -389,8 +418,10 @@ in one place rather than spread across commit messages.
 - CLI registrar pattern: `src/architecture/cli/registerCommand.ts`
   (`addArchitectureCommand`) — cochange's
   `addCochangeCommand(parent, onParsed)` mirrors this exactly.
-- Dismissal registry: `src/dismissal/`. `cochange:<hex>` IDs route
-  through the same `dismiss` / `list-dismissed` / `undismiss` commands.
+- Dismissal registry: `src/dismissal/`. `coch:<hex>` IDs route
+  through the same `dismiss` / `list-dismissed` / `undismiss` commands;
+  `normalizeDismissalId` in `src/dismissal/hash.ts` needs `coch:`
+  added to its prefix allowlist.
 - Strip-only check: `tools/check-strip-only.ts` already imports
   `src/cli.ts`, so registering `cochange` there transitively covers
   validation.
