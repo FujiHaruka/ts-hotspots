@@ -57,8 +57,17 @@ export interface PackageInfo {
   readonly exportsMap: ExportsMap | null;
   /** Repo-relative POSIX path to `main`'s target, or `null`. */
   readonly mainTarget: string | null;
-  /** Repo-relative POSIX path to the package's `tsconfig.json`, or `null`. M3 wires this up. */
+  /** Repo-relative POSIX path to the package's `tsconfig.json`, or `null`. */
   readonly tsconfigPath: string | null;
+  /**
+   * Loaded tsconfig resolution data for the package, populated by
+   * `buildPackageMap` after the package map's name index is built so
+   * workspace `extends` chains can be rewritten. `null` when the
+   * package has no tsconfig.
+   */
+  readonly tsconfig:
+    | import("../resolve/tsconfigPaths.ts").TsconfigResolution
+    | null;
 }
 
 export interface PackageMap {

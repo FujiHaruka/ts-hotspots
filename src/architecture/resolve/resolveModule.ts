@@ -68,7 +68,9 @@ export function resolveModule(
   }
 
   // (2) tsconfig path mappings — patterns can include exactly one `*`.
-  const tsconfig = ctx.tsconfig;
+  // Pick the per-package tsconfig when the importing file belongs to a
+  // workspace package (M3); otherwise fall back to the root tsconfig.
+  const tsconfig = tsconfigForFile(fromFile, ctx);
   if (tsconfig !== undefined && tsconfig.mappings.length > 0) {
     const fromPaths = resolveViaPathMappings(specifier, tsconfig, known);
     if (fromPaths !== null) return fromPaths;
@@ -82,6 +84,22 @@ export function resolveModule(
   }
 
   return null;
+}
+
+/**
+ * Choose the right tsconfig for an importing file. Per-package tsconfig
+ * wins when the file belongs to a workspace package that has one;
+ * otherwise the root tsconfig is the fallback (E7). When neither
+ * exists, returns `undefined` — the resolver treats that as "no path
+ * mappings" and skips the branch.
+ */
+function tsconfigForFile(
+  fromFile: string,
+  ctx: ResolveContext,
+): TsconfigResolution | undefined {
+  const pkg = ctx.packageMap?.byFile(fromFile);
+  if (pkg?.tsconfig != null) return pkg.tsconfig;
+  return ctx.tsconfig;
 }
 
 /**
