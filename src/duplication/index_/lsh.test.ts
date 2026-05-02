@@ -8,6 +8,7 @@ const baseParams: LshParams = {
   seedCount: 1,
   seed: 1,
   maxBucketSize: 0,
+  minFeatures: 1,
 };
 
 function collect(
@@ -17,7 +18,7 @@ function collect(
   const lsh = buildLshIndex(inputs, params);
   const pairs: string[] = [];
   lsh.forEachCandidatePair((a, b) => {
-    pairs.push(`${a}|${b}`);
+    pairs.push(`${String(a)}|${String(b)}`);
   });
   return pairs.sort();
 }
@@ -38,10 +39,10 @@ describe("buildLshIndex", () => {
     // forEachCandidatePair must dedup.
     const features = new Set(["a", "b", "c", "d", "e"]);
     const inputs: LshIndexInput[] = [
-      { fragmentId: "f1", features: features },
-      { fragmentId: "f2", features: features },
+      { fragmentId: 1, features: features },
+      { fragmentId: 2, features: features },
     ];
-    expect(collect(inputs, baseParams)).toEqual(["f1|f2"]);
+    expect(collect(inputs, baseParams)).toEqual(["1|2"]);
   });
 
   it("emits no pairs for entirely disjoint sets (high prob)", () => {
@@ -49,24 +50,27 @@ describe("buildLshIndex", () => {
     // probability of any-band collision for J=0 is 0 (excluding hash
     // accidents), so the candidate set is empty.
     const inputs: LshIndexInput[] = [
-      { fragmentId: "f1", features: new Set(["a1", "a2", "a3", "a4"]) },
-      { fragmentId: "f2", features: new Set(["b1", "b2", "b3", "b4"]) },
+      { fragmentId: 1, features: new Set(["a1", "a2", "a3", "a4"]) },
+      { fragmentId: 2, features: new Set(["b1", "b2", "b3", "b4"]) },
     ];
     expect(collect(inputs, baseParams)).toEqual([]);
   });
 
-  it("emits canonical pair keys (lex-smaller first)", () => {
+  it("emits canonical pair keys (numerically-smaller first)", () => {
+    // The visitor sees `(lo, hi)` regardless of insertion order: the
+    // legacy lex contract is now the caller's responsibility (the
+    // runner sorts its `infoByIndex` lex).
     const features = new Set(["x", "y", "z"]);
     const inputs: LshIndexInput[] = [
-      { fragmentId: "zebra", features: features },
-      { fragmentId: "alpha", features: features },
+      { fragmentId: 7, features: features },
+      { fragmentId: 3, features: features },
     ];
-    expect(collect(inputs, baseParams)).toEqual(["alpha|zebra"]);
+    expect(collect(inputs, baseParams)).toEqual(["3|7"]);
   });
 
   it("is deterministic across runs given fixed params", () => {
     const inputs: LshIndexInput[] = Array.from({ length: 10 }, (_, i) => ({
-      fragmentId: `f${String(i)}`,
+      fragmentId: i,
       features: new Set([
         `x${String(i % 3)}`,
         `y${String(i % 4)}`,
@@ -82,9 +86,9 @@ describe("buildLshIndex", () => {
     // 3 fragments, two empty + one non-empty. If empties were included,
     // they'd all collide on the all-UINT32_MAX signature and emit a pair.
     const inputs: LshIndexInput[] = [
-      { fragmentId: "empty1", features: new Set() },
-      { fragmentId: "empty2", features: new Set() },
-      { fragmentId: "real", features: new Set(["a", "b"]) },
+      { fragmentId: 0, features: new Set() },
+      { fragmentId: 1, features: new Set() },
+      { fragmentId: 2, features: new Set(["a", "b"]) },
     ];
     expect(collect(inputs, baseParams)).toEqual([]);
   });
@@ -94,7 +98,7 @@ describe("buildLshIndex", () => {
     // With cap 5, the bucket is dropped.
     const features = new Set(["a", "b", "c"]);
     const inputs: LshIndexInput[] = Array.from({ length: 10 }, (_, i) => ({
-      fragmentId: `f${String(i)}`,
+      fragmentId: i,
       features: features,
     }));
     const capped = collect(inputs, { ...baseParams, maxBucketSize: 5 });
@@ -117,10 +121,10 @@ describe("buildLshIndex", () => {
     expect(trueJ).toBeGreaterThan(0.8);
 
     const inputs: LshIndexInput[] = [
-      { fragmentId: "a", features: a },
-      { fragmentId: "b", features: b },
+      { fragmentId: 1, features: a },
+      { fragmentId: 2, features: b },
     ];
-    expect(collect(inputs, baseParams)).toEqual(["a|b"]);
+    expect(collect(inputs, baseParams)).toEqual(["1|2"]);
   });
 
   it("seedCount > 1 builds independent passes (more candidates)", () => {
@@ -133,8 +137,8 @@ describe("buildLshIndex", () => {
     for (let i = 0; i < 10; i++) a.add(`x${String(i)}`);
     for (let i = 5; i < 20; i++) b.add(`x${String(i)}`);
     const inputs: LshIndexInput[] = [
-      { fragmentId: "a", features: a },
-      { fragmentId: "b", features: b },
+      { fragmentId: 1, features: a },
+      { fragmentId: 2, features: b },
     ];
     const single = collect(inputs, { ...baseParams, seedCount: 1 });
     const multi = collect(inputs, { ...baseParams, seedCount: 4 });

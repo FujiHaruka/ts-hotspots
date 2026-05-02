@@ -51,8 +51,22 @@ export interface ReportInput {
    * `dropThinWrapperPairs`. When the hook is omitted (e.g. tests) or
    * returns `undefined`, the filter conservatively treats the fragment
    * as not-thin and the pair survives.
+   *
+   * Mutually exclusive with `isThinFragmentById`. Whole-repo mode
+   * precomputes the thin-wrapper map in worker threads to avoid
+   * keeping `ts.SourceFile`s on the main thread; PR mode and tests
+   * still use this lazy hook.
    */
   getSourceFile?: (filePath: string) => ts.SourceFile | undefined;
+  /**
+   * Pre-judged thin-wrapper map keyed by `fragment.id`. When provided,
+   * the pipeline uses it directly instead of calling `getSourceFile`
+   * to (re-)judge per fragment. Whole-repo mode populates this from
+   * the parallel base index workers, where each worker has the
+   * `ts.SourceFile` in scope and can run `isThinWrapperFragment` for
+   * free alongside feature extraction.
+   */
+  isThinFragmentById?: ReadonlyMap<string, boolean>;
   /**
    * Map from project-relative POSIX path to the file's recent commit
    * count. Used to compute each group's churn-amplified ranking score
@@ -165,13 +179,18 @@ function buildThinWrapperMap(
   pairs: readonly ScoredPair[],
   input: ReportInput,
 ): ReadonlyMap<string, boolean> {
-  const map = new Map<string, boolean>();
-  if (
-    !input.config.report.thinWrapper.enabled ||
-    input.getSourceFile === undefined
-  ) {
-    return map;
+  if (!input.config.report.thinWrapper.enabled) {
+    return new Map<string, boolean>();
   }
+  // Caller (whole-repo mode) precomputed the map alongside feature
+  // extraction in worker threads — use it as-is.
+  if (input.isThinFragmentById !== undefined) {
+    return input.isThinFragmentById;
+  }
+  // Legacy lazy path: PR mode + tests resolve `ts.SourceFile` on demand
+  // and judge each fragment that appears in `pairs` once.
+  const map = new Map<string, boolean>();
+  if (input.getSourceFile === undefined) return map;
   const thinCfg = input.config.report.thinWrapper;
   const judge = (fragment: Fragment): void => {
     if (map.has(fragment.id)) return;

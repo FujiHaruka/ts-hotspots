@@ -44,6 +44,7 @@
     "bench:sweep": "node tools/bench/sweep.ts",
     "bench:sweep-self": "node tools/bench/sweepSelf.ts",
     "bench:ngram": "node tools/bench/microNgramBuild.ts",
+    "perf:dup": "node tools/perf/dupMeasure.ts",
     "check:strip-only": "node tools/check-strip-only.ts",
     "prepare": "simple-git-hooks"
   },

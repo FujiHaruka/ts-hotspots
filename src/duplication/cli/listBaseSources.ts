@@ -1,5 +1,5 @@
 import type { Config } from "../config/index.ts";
-import { execGit, gitShow } from "../diff/gitRunner.ts";
+import { execGit, gitCatFileBatch } from "../diff/gitRunner.ts";
 import { matchesAnyGlob } from "../diff/internal/globMatch.ts";
 
 export interface BaseSource {
@@ -70,15 +70,19 @@ export async function listBaseSources(
   }
   paths.sort();
 
+  // Read every blob in one `git cat-file --batch` child process instead of
+  // fork+exec'ing N separate `git show` calls. Specs that resolve to a
+  // missing object or a non-blob are silently dropped (matching the
+  // legacy per-file silent-skip for binary blobs and submodule gitlinks).
+  const specs = paths.map((p) => `${baseSha}:${p}`);
+  const { contents } = await gitCatFileBatch(repoPath, specs);
   const sources: BaseSource[] = [];
-  for (const path of paths) {
-    let text: string;
-    try {
-      // oxlint-disable-next-line no-await-in-loop -- sequential git show keeps child-process count bounded
-      text = await gitShow(repoPath, baseSha, path);
-    } catch {
-      continue;
-    }
+  for (let i = 0; i < paths.length; i++) {
+    const path = paths[i];
+    const spec = specs[i];
+    if (path === undefined || spec === undefined) continue;
+    const text = contents.get(spec);
+    if (text === undefined) continue;
     sources.push({ path, text });
   }
   return { sources, excludedCount };
