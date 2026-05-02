@@ -1143,17 +1143,23 @@ export async function run(
   }
 
   try {
-    if (
-      (invocation.kind === "dismiss" || invocation.kind === "undismiss") &&
-      invocation.id.startsWith("dup:")
-    ) {
-      return await runDupDismissalCommand(invocation, stdout, stderr);
-    }
-    if (
-      (invocation.kind === "dismiss" || invocation.kind === "undismiss") &&
-      invocation.id.startsWith("arch:")
-    ) {
-      return await runArchDismissalCommand(invocation, stdout, stderr);
+    if (invocation.kind === "dismiss" || invocation.kind === "undismiss") {
+      if (invocation.id.startsWith("dup:")) {
+        return await runFeatureDismissalCommand(
+          "dup",
+          invocation,
+          stdout,
+          stderr,
+        );
+      }
+      if (invocation.id.startsWith("arch:")) {
+        return await runFeatureDismissalCommand(
+          "arch",
+          invocation,
+          stdout,
+          stderr,
+        );
+      }
     }
     const rootDir = resolveRootDir(invocation.path);
     if (invocation.kind === "dismiss") {
@@ -1185,12 +1191,13 @@ export async function run(
 }
 
 /**
- * Route `arch:<hex>` ids to the git-root registry. `arch` resolves
- * "the project" via `findGitRoot` (same as dup), so the registry key
- * has to match — otherwise an arch run would never see entries
+ * Route `dup:<hex>` and `arch:<hex>` ids to the git-root registry. Both
+ * features resolve "the project" via `findGitRoot`, so the registry key
+ * has to match — otherwise a dup/arch run would never see entries
  * written by `dismiss`.
  */
-async function runArchDismissalCommand(
+async function runFeatureDismissalCommand(
+  feature: "arch" | "dup",
   invocation:
     | { kind: "dismiss"; id: string; reason: string; path: string | undefined }
     | { kind: "undismiss"; id: string; path: string | undefined },
@@ -1205,36 +1212,7 @@ async function runArchDismissalCommand(
         id: invocation.id,
         reason: invocation.reason,
         rootDir,
-        feature: "arch",
-      },
-      stdout,
-      stderr,
-    );
-  }
-  return runUndismiss({ id: invocation.id, rootDir }, stdout, stderr);
-}
-
-/**
- * Route `dup:<hex>` ids to the git-root registry. `dup` resolves "the
- * project" via `findGitRoot`, so the registry key has to match —
- * otherwise a dup run would never see entries written by `dismiss`.
- */
-async function runDupDismissalCommand(
-  invocation:
-    | { kind: "dismiss"; id: string; reason: string; path: string | undefined }
-    | { kind: "undismiss"; id: string; path: string | undefined },
-  stdout: WritableLike,
-  stderr: WritableLike,
-): Promise<number> {
-  const start = invocation.path ?? process.cwd();
-  const rootDir = findGitRoot(resolve(start));
-  if (invocation.kind === "dismiss") {
-    return await runDismiss(
-      {
-        id: invocation.id,
-        reason: invocation.reason,
-        rootDir,
-        feature: "dup",
+        feature,
       },
       stdout,
       stderr,
