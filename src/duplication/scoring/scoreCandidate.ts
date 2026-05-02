@@ -6,7 +6,6 @@ import type { FragmentFeatureSets } from "./featureSets.ts";
 import {
   intersectionSorted,
   jaccardCount,
-  jaccardWithIntersection,
 } from "./internal/jaccardWithIntersection.ts";
 import { lengthScore } from "./lengthScore.ts";
 import { sizeCompatibility } from "./sizeCompatibility.ts";
@@ -167,11 +166,11 @@ export function buildIntersectionsFromSets(
  * combined / per-axis scores **and** the per-axis intersection sets used
  * as evidence by the report generator.
  *
- * Convenience wrapper that builds intersections eagerly. Tests and other
- * non-hot-path callers can keep using this; the candidate-search /
- * scoring loop uses `scoreCandidateFromSets` + `buildIntersectionsFromSets`
- * to skip the array allocation for the ~96% of pairs that won't be
- * reported.
+ * Convenience wrapper. Tests and other non-hot-path callers can keep
+ * using this; the candidate-search / scoring loop should call
+ * `scoreCandidateFromSets` directly and only invoke
+ * `buildIntersectionsFromSets` for the ~4% of pairs that pass
+ * `shouldReport`.
  *
  * Pure / deterministic given fixed `inputs` and `config`.
  */
@@ -179,70 +178,11 @@ export function scoreCandidateDetailedFromSets(
   inputs: ScoreInputsFromSets,
   config: Config,
 ): DetailedScore {
-  const tokens = jaccardWithIntersection(
-    inputs.changedFeatureSets.tokens,
-    inputs.baseFeatureSets.tokens,
-  );
-  const statements = jaccardWithIntersection(
-    inputs.changedFeatureSets.statements,
-    inputs.baseFeatureSets.statements,
-  );
-  const calls = jaccardWithIntersection(
-    inputs.changedFeatureSets.calls,
-    inputs.baseFeatureSets.calls,
-  );
-  const useContainment = shouldUseContainment(
-    inputs.changedFragment,
-    inputs.baseFragment,
-    config.scoring.containment,
-  );
-  const alpha = config.scoring.containment.alpha;
-  const breakdown = {
-    tokenOverlap: blendSimilarity(
-      tokens.jaccard,
-      tokens.overlapCoefficient,
-      useContainment,
-      alpha,
-    ),
-    statementKindSimilarity: blendSimilarity(
-      statements.jaccard,
-      statements.overlapCoefficient,
-      useContainment,
-      alpha,
-    ),
-    callOverlap: blendSimilarity(
-      calls.jaccard,
-      calls.overlapCoefficient,
-      useContainment,
-      alpha,
-    ),
-    sizeCompatibility: sizeCompatibility(
-      inputs.changedFragment,
-      inputs.baseFragment,
-    ),
-    lengthScore: lengthScore(
-      inputs.changedFragment,
-      inputs.baseFragment,
-      config.scoring.lengthSaturation,
-    ),
-  };
-  const combined = combinedScore(
-    breakdown,
-    config.scoring.weights,
-    config.features.enabled,
-  );
-  const score: CandidateScore = {
-    changedFragmentId: inputs.candidate.changedFragmentId,
-    baseFragmentId: inputs.candidate.baseFragmentId,
-    combined,
-    breakdown,
-  };
   return {
-    score,
-    intersections: {
-      tokens: tokens.intersection,
-      statements: statements.intersection,
-      calls: calls.intersection,
-    },
+    score: scoreCandidateFromSets(inputs, config),
+    intersections: buildIntersectionsFromSets(
+      inputs.changedFeatureSets,
+      inputs.baseFeatureSets,
+    ),
   };
 }

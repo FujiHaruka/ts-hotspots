@@ -21,13 +21,6 @@ export interface JaccardCount {
   intersectionSize: number;
 }
 
-export interface JaccardWithIntersection {
-  jaccard: number;
-  overlapCoefficient: number;
-  /** Ascending-sorted intersection keys. */
-  intersection: string[];
-}
-
 /**
  * Compute Jaccard + overlap-coefficient ratios + intersection size without
  * materialising the intersection array. Walks the smaller set once and
@@ -69,30 +62,4 @@ export function intersectionSorted(
   }
   out.sort();
   return out;
-}
-
-/**
- * Single-pass Jaccard + overlap-coef + intersection for callers that need
- * all at once (e.g. tests and the legacy `scoreCandidateDetailedFromSets`
- * helper). The hot scoring loop should prefer `jaccardCount` +
- * `intersectionSorted`.
- */
-export function jaccardWithIntersection(
-  a: ReadonlySet<string>,
-  b: ReadonlySet<string>,
-): JaccardWithIntersection {
-  if (a.size === 0 && b.size === 0) {
-    return { jaccard: 0, overlapCoefficient: 0, intersection: [] };
-  }
-  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
-  const intersection: string[] = [];
-  for (const key of small) {
-    if (large.has(key)) intersection.push(key);
-  }
-  intersection.sort();
-  const unionSize = a.size + b.size - intersection.length;
-  const jaccard = unionSize === 0 ? 0 : intersection.length / unionSize;
-  const minSize = Math.min(a.size, b.size);
-  const overlapCoefficient = minSize === 0 ? 0 : intersection.length / minSize;
-  return { jaccard, overlapCoefficient, intersection };
 }
