@@ -181,10 +181,10 @@ export async function runWholeRepoDetector(
 
   // Intern fragmentIds to integer indices so the cross-axis dedup Set
   // and the per-pair lookups in `scoreOne` operate on integers rather
-  // than strings. At repo scale (~4k fragments × ~50k unique pairs)
-  // this saves tens of thousands of `${a}|${b}` string allocations
-  // and Map<string, ...> hash lookups.
-  const fragmentIndexById = new Map<string, number>();
+  // than strings. The infoByIndex array is sorted lex by fragmentId so
+  // that numeric `(lo, hi)` pair canonicalization matches the legacy
+  // lex canonical contract (downstream code that pivots on
+  // `changedFragment.id < baseFragment.id` keeps working unchanged).
   interface FragmentInfo {
     readonly fragment: Fragment;
     readonly sets: FragmentFeatureSets;
@@ -193,8 +193,16 @@ export async function runWholeRepoDetector(
   for (const { fragment } of entries) {
     const sets = featureSetsById.get(fragment.id);
     if (sets === undefined) continue;
-    fragmentIndexById.set(fragment.id, infoByIndex.length);
     infoByIndex.push({ fragment, sets });
+  }
+  infoByIndex.sort((a, b) =>
+    a.fragment.id < b.fragment.id ? -1 : a.fragment.id > b.fragment.id ? 1 : 0,
+  );
+  const fragmentIndexById = new Map<string, number>();
+  for (let i = 0; i < infoByIndex.length; i++) {
+    const info = infoByIndex[i];
+    if (info === undefined) continue;
+    fragmentIndexById.set(info.fragment.id, i);
   }
   const fragmentIndexCount = infoByIndex.length;
   const stride = fragmentIndexCount + 1;
@@ -291,8 +299,6 @@ export async function runWholeRepoDetector(
 
   if (useLsh) {
     candidatePairs = runLshCandidateGeneration(
-      entries,
-      fragmentIndexById,
       infoByIndex,
       stride,
       seenPairIds,
@@ -428,8 +434,6 @@ export async function runWholeRepoDetector(
 function runLshCandidateGeneration<
   TInfo extends { fragment: Fragment; sets: FragmentFeatureSets },
 >(
-  entries: readonly IndexInput[],
-  fragmentIndexById: ReadonlyMap<string, number>,
   infoByIndex: readonly TInfo[],
   stride: number,
   seenPairIds: Set<number>,
@@ -458,9 +462,11 @@ function runLshCandidateGeneration<
     if (!axisCfg.enabled) continue;
 
     const lshInputs: LshIndexInput[] = [];
-    for (const info of infoByIndex) {
+    for (let i = 0; i < infoByIndex.length; i++) {
+      const info = infoByIndex[i];
+      if (info === undefined) continue;
       lshInputs.push({
-        fragmentId: info.fragment.id,
+        fragmentId: i,
         features: axis.pickFeatures(info.sets),
       });
     }
@@ -470,25 +476,17 @@ function runLshCandidateGeneration<
     const buildWall = now() - ts;
     totalBuildWall += buildWall;
 
-    // Pairs surfaced by THIS axis (before union dedup).
+    // Pairs surfaced by THIS axis (before union dedup). The visitor
+    // receives `(lo, hi)` numeric indices directly — no string round
+    // trip — so the per-pair cost is just two array lookups + a
+    // packed-key Set probe.
     let axisCount = 0;
-    lsh.forEachCandidatePair((a, b) => {
-      // Drop same-file sliding-window siblings at search time, mirroring
-      // the inverted-index path (`candidateSearch.ts#tally`). The LSH
-      // index itself is keyed only by feature sets, so file/line
-      // information lives in the runner's `infoByIndex` — translate
-      // both fragmentIds to integer indices first and short-circuit on
-      // overlap before scoring or counts.
-      const aIdx = fragmentIndexById.get(a);
-      const bIdx = fragmentIndexById.get(b);
-      if (aIdx === undefined || bIdx === undefined) return;
-      const aInfo = infoByIndex[aIdx];
-      const bInfo = infoByIndex[bIdx];
+    lsh.forEachCandidatePair((lo, hi) => {
+      const aInfo = infoByIndex[lo];
+      const bInfo = infoByIndex[hi];
       if (aInfo === undefined || bInfo === undefined) return;
       if (isSameFileOverlap(aInfo.fragment, bInfo.fragment)) return;
       axisCount += 1;
-      const lo = aIdx < bIdx ? aIdx : bIdx;
-      const hi = aIdx < bIdx ? bIdx : aIdx;
       const key = lo * stride + hi;
       if (seenPairIds.has(key)) return;
       seenPairIds.add(key);
@@ -502,7 +500,7 @@ function runLshCandidateGeneration<
       axis.name,
       axisCfg,
       lsh.stats,
-      entries.length,
+      infoByIndex.length,
       axisCount,
       buildWall,
     );
