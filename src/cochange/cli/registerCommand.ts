@@ -13,9 +13,6 @@
  * responsibility — propagating exit codes through commander's
  * `parseAsync` is awkward, so orchestration stays outside the
  * registrar.
- *
- * `--file` (M7) is deliberately not registered here yet. The shape is
- * left future-friendly so adding it is mechanical.
  */
 
 import { type Command, InvalidArgumentError } from "commander";
@@ -88,6 +85,7 @@ interface CochangeCliOptions {
   window: number;
   minSupport: number;
   maxFilesPerCommit: number;
+  file?: string;
 }
 
 export function addCochangeCommand(
@@ -149,6 +147,10 @@ export function addCochangeCommand(
       parsePositiveInteger("--max-files-per-commit"),
       DEFAULT_COCHANGE_MAX_FILES_PER_COMMIT,
     )
+    .option(
+      "--file <path>",
+      "single-anchor mode: rank co-change partners of <path> only",
+    )
     .action((pathArg: string | undefined, opts: CochangeCliOptions) => {
       onParsed(buildParsedArgs(pathArg, opts));
     });
@@ -172,6 +174,7 @@ function buildParsedArgs(
     maxFilesPerCommit: opts.maxFilesPerCommit,
     limit,
     verbose: opts.verbose === true,
+    file: opts.file,
   };
 }
 

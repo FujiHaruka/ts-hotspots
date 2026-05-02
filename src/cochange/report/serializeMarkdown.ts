@@ -71,7 +71,12 @@ function renderCard(
   opts: SerializeOptions,
 ): string[] {
   const lines: string[] = [];
-  lines.push(`## #${String(rank)} ${c.pathA} <-> ${c.pathB}`);
+  if (c.anchor !== undefined) {
+    const partner = c.anchor === c.pathA ? c.pathB : c.pathA;
+    lines.push(`## #${String(rank)} ${c.anchor} -> ${partner}`);
+  } else {
+    lines.push(`## #${String(rank)} ${c.pathA} <-> ${c.pathB}`);
+  }
   lines.push("");
   lines.push(
     `- score: confidenceMax = ${formatRatio(c.metrics.confidenceMax)}`,

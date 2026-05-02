@@ -80,11 +80,11 @@ export function serializeReport(
 }
 
 function toSlimHotspot(candidate: Candidate): SlimCochangeHotspot {
-  return {
+  const hotspot: SlimCochangeHotspot = {
     kind: "cochange",
     size: 2,
     score: { axis: "confidenceMax", value: candidate.metrics.confidenceMax },
-    members: [{ ref: toRef(candidate.pathA) }, { ref: toRef(candidate.pathB) }],
+    members: anchoredMembers(candidate),
     metrics: {
       support: candidate.metrics.support,
       confidenceAtoB: candidate.metrics.confidenceAtoB,
@@ -98,6 +98,19 @@ function toSlimHotspot(candidate: Candidate): SlimCochangeHotspot {
       candidate.pathB,
     ),
   };
+  if (candidate.anchor !== undefined) {
+    hotspot.anchor = { ref: toRef(candidate.anchor) };
+  }
+  return hotspot;
+}
+
+function anchoredMembers(candidate: Candidate): { ref: CochangeHotspotRef }[] {
+  if (candidate.anchor === undefined) {
+    return [{ ref: toRef(candidate.pathA) }, { ref: toRef(candidate.pathB) }];
+  }
+  const partner =
+    candidate.anchor === candidate.pathA ? candidate.pathB : candidate.pathA;
+  return [{ ref: toRef(partner) }];
 }
 
 function toVerboseHotspot(

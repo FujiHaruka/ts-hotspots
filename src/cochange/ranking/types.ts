@@ -12,4 +12,11 @@ export interface Candidate {
   pathB: string;
   metrics: PairMetrics;
   recent: string[];
+  /**
+   * Single-anchor mode (`--file <path>`) sets this to the anchor's path.
+   * `pathA`/`pathB` keep their lex-canonical order so dismissalIds remain
+   * stable; the serializer reads `anchor` to decide which side becomes the
+   * `anchor.ref` slot in the output schema. Omitted in whole-repo / `--diff`.
+   */
+  anchor?: string;
 }
