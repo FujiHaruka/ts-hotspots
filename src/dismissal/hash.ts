@@ -52,14 +52,15 @@ export function membersToDupDismissalId(
  * Normalize a user-provided dismissal id into the post-M2 `<feature>:<hex>`
  * form. Pre-M2 reports surfaced the raw `sha256:<hex>`; users who script
  * against those still pass them in. Anything already carrying a feature
- * prefix passes through unchanged so `dup:<hex>` and `arch:<hex>` ids
- * are routed correctly.
+ * prefix passes through unchanged so `dup:<hex>`, `arch:<hex>`, and
+ * `coch:<hex>` ids are routed correctly.
  */
 export function normalizeDismissalId(rawId: string): string {
   if (
     rawId.startsWith("comp:") ||
     rawId.startsWith("dup:") ||
-    rawId.startsWith("arch:")
+    rawId.startsWith("arch:") ||
+    rawId.startsWith("coch:")
   ) {
     return rawId;
   }
