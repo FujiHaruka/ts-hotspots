@@ -1,8 +1,3 @@
-// oxlint-disable typescript/no-non-null-assertion
-//   -- BFS bounds the queue indices algorithmically; ! is the documented
-//   pattern. The conflicting `non-nullable-type-assertion-style` rule otherwise
-//   forces a contradictory `as number` cast.
-
 /**
  * Reverse closure size — for each node, the number of distinct
  * ancestors that can reach it via directed edges. This is the
