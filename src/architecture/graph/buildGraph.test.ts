@@ -1,7 +1,34 @@
 import { describe, expect, it } from "vitest";
 import { parseTsconfigResolution } from "../resolve/tsconfigPaths.ts";
+import { parseExportsField } from "../workspace/exportsMap.ts";
+import type { PackageInfo, PackageMap } from "../workspace/types.ts";
 import { buildGraph, type SourceInput } from "./buildGraph.ts";
 import type { Edge, Graph } from "./types.ts";
+
+function makePackageMap(...packages: PackageInfo[]): PackageMap {
+  const byName = new Map<string, PackageInfo>();
+  for (const p of packages) byName.set(p.name, p);
+  const sorted = [...packages].sort((a, b) => b.root.length - a.root.length);
+  const byFile = (file: string): PackageInfo | undefined => {
+    for (const p of sorted) {
+      if (file === p.root) return p;
+      if (file.startsWith(`${p.root}/`)) return p;
+    }
+    return undefined;
+  };
+  return { byName, byFile, packages: [...packages] };
+}
+
+function pkg(name: string, root: string, exportsField?: unknown): PackageInfo {
+  return {
+    name,
+    root,
+    exportsMap:
+      exportsField === undefined ? null : parseExportsField(exportsField),
+    mainTarget: null,
+    tsconfigPath: null,
+  };
+}
 
 function build(...sources: SourceInput[]): Graph {
   return buildGraph({ sources });
@@ -297,6 +324,93 @@ describe("buildGraph — determinism", () => {
       text: `export function f() {}`,
     };
     expect(build(a, b)).toEqual(build(b, a));
+  });
+});
+
+describe("buildGraph — workspace package resolution", () => {
+  it("connects edges across packages via package-name imports", () => {
+    const packageMap = makePackageMap(
+      pkg("@scope/db", "packages/db", { ".": "./src/index.ts" }),
+      pkg("@scope/web", "apps/web"),
+    );
+    const g = buildGraph({
+      sources: [
+        {
+          path: "packages/db/src/index.ts",
+          text: `export function connect() {}`,
+        },
+        {
+          path: "apps/web/src/main.ts",
+          text: `import { connect } from "@scope/db";\nexport const start = () => connect();`,
+        },
+      ],
+      resolveCtx: { packageMap },
+    });
+    expect(
+      g.edges.find(
+        (e) =>
+          e.from === "apps/web/src/main.ts::start::const" &&
+          e.to === "packages/db/src/index.ts::connect::function",
+      ),
+    ).toBeDefined();
+  });
+
+  it("chases star re-exports across packages", () => {
+    const packageMap = makePackageMap(
+      pkg("@scope/db", "packages/db", { ".": "./src/index.ts" }),
+      pkg("@scope/web", "apps/web"),
+    );
+    const g = buildGraph({
+      sources: [
+        {
+          path: "packages/db/src/index.ts",
+          text: `export * from "./impl";`,
+        },
+        {
+          path: "packages/db/src/impl.ts",
+          text: `export function connect() {}`,
+        },
+        {
+          path: "apps/web/src/main.ts",
+          text: `import { connect } from "@scope/db";\nexport const start = () => connect();`,
+        },
+      ],
+      resolveCtx: { packageMap },
+    });
+    // Edge points to the original definition site, not the barrel.
+    expect(
+      g.edges.find(
+        (e) =>
+          e.from === "apps/web/src/main.ts::start::const" &&
+          e.to === "packages/db/src/impl.ts::connect::function",
+      ),
+    ).toBeDefined();
+  });
+
+  it("drops edges when exports declares no matching subpath (E12)", () => {
+    const packageMap = makePackageMap(
+      pkg("@scope/db", "packages/db", { ".": "./src/index.ts" }),
+    );
+    const g = buildGraph({
+      sources: [
+        {
+          path: "packages/db/src/index.ts",
+          text: `export function connect() {}`,
+        },
+        {
+          path: "packages/db/src/internal.ts",
+          text: `export function helper() {}`,
+        },
+        {
+          path: "apps/web/src/main.ts",
+          text: `import { helper } from "@scope/db/internal";\nexport const start = () => helper();`,
+        },
+      ],
+      resolveCtx: { packageMap },
+    });
+    expect(
+      g.edges.find((e) => e.from === "apps/web/src/main.ts::start::const"),
+    ).toBeUndefined();
   });
 });
 

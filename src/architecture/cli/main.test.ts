@@ -145,6 +145,69 @@ describe("architecture pipeline composition — root tsconfig.paths", () => {
   });
 });
 
+describe("architecture pipeline composition — workspace mode", () => {
+  const repos: TempRepo[] = [];
+  afterEach(() => {
+    while (repos.length > 0) repos.pop()?.cleanup();
+  });
+
+  function newRepo(): TempRepo {
+    const r = createTempRepo("ts-hotspots-arch-m2-");
+    repos.push(r);
+    return r;
+  }
+
+  it("connects cross-package edges for a pnpm workspace fixture", async () => {
+    const r = newRepo();
+    r.write(
+      "pnpm-workspace.yaml",
+      `packages:\n  - "packages/*"\n  - "apps/*"\n`,
+    );
+    r.write(
+      "package.json",
+      JSON.stringify({ name: "monorepo", private: true }),
+    );
+
+    r.write(
+      "packages/db/package.json",
+      JSON.stringify({
+        name: "@scope/db",
+        exports: { ".": "./src/index.ts" },
+      }),
+    );
+    r.write(
+      "packages/db/src/index.ts",
+      "export function connect() { return 1; }\n",
+    );
+
+    r.write("apps/web/package.json", JSON.stringify({ name: "@scope/web" }));
+    r.write(
+      "apps/web/src/main.ts",
+      `import { connect } from "@scope/db";\nexport const start = () => connect();\n`,
+    );
+
+    r.commit("setup");
+
+    const cap = captureIO(r.path);
+    const code = await main([r.path, "--format", "json"], cap.io);
+    expect(code).toBe(0);
+    expect(cap.stderr()).toContain(
+      "discovered 2 workspace packages (mode: pnpm-workspace)",
+    );
+  });
+
+  it("does not emit the workspace stats line on a plain repo", async () => {
+    const r = newRepo();
+    r.write("src/a.ts", "export const a = 1;\n");
+    r.commit("setup");
+
+    const cap = captureIO(r.path);
+    const code = await main([r.path, "--format", "json"], cap.io);
+    expect(code).toBe(0);
+    expect(cap.stderr()).not.toContain("discovered");
+  });
+});
+
 describe("architecture main — smoke", () => {
   const repos: TempRepo[] = [];
   afterEach(() => {

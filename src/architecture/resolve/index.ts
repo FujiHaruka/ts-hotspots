@@ -1,7 +1,7 @@
-export { resolveModule, type ResolveOptions } from "./resolveModule.ts";
+export { type ResolveContext, resolveModule } from "./resolveModule.ts";
 export {
+  type PathMapping,
   parseTsconfigResolution,
   readTsconfigResolution,
-  type PathMapping,
   type TsconfigResolution,
 } from "./tsconfigPaths.ts";

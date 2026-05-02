@@ -21,7 +21,10 @@
  */
 
 import { parseSource } from "../../parser/parseSource.ts";
-import { resolveModule } from "../resolve/resolveModule.ts";
+import {
+  type ResolveContext,
+  resolveModule,
+} from "../resolve/resolveModule.ts";
 import type { TsconfigResolution } from "../resolve/tsconfigPaths.ts";
 import { DYNAMIC_FANOUT, extractEdges } from "./extractEdges.ts";
 import { extractExports, type FileExports } from "./extractExports.ts";
@@ -42,14 +45,32 @@ export interface SourceInput {
 
 export interface BuildGraphOptions {
   readonly sources: readonly SourceInput[];
+  /**
+   * Preferred entry point. Bundles `tsconfig`, `packageMap`, and the
+   * derived `knownFiles` set so resolution is consistent across the
+   * top-level edge pass and barrel re-export chasing.
+   */
+  readonly resolveCtx?: Omit<ResolveContext, "knownFiles">;
+  /**
+   * @deprecated Pass via `resolveCtx.tsconfig` instead. Kept for one
+   * release while callers migrate; will be removed in M3.
+   */
   readonly tsconfig?: TsconfigResolution;
 }
 
 export function buildGraph(opts: BuildGraphOptions): Graph {
-  const { sources, tsconfig } = opts;
+  const { sources } = opts;
 
   const knownFiles = new Set<string>();
   for (const s of sources) knownFiles.add(s.path);
+
+  // oxlint-disable-next-line no-deprecated -- intentional fallback for the legacy tsconfig field; removed in M3
+  const legacyTsconfig = opts.tsconfig;
+  const ctx: ResolveContext = {
+    knownFiles,
+    tsconfig: opts.resolveCtx?.tsconfig ?? legacyTsconfig,
+    packageMap: opts.resolveCtx?.packageMap,
+  };
 
   const importsByPath = new Map<string, readonly ImportBinding[]>();
   const exportsByPath = new Map<string, FileExports>();
@@ -77,7 +98,7 @@ export function buildGraph(opts: BuildGraphOptions): Graph {
     }
   }
 
-  const resolveExportRef = makeExportResolver(exportsByPath, knownFiles, tsconfig);
+  const resolveExportRef = makeExportResolver(exportsByPath, ctx);
 
   const edges: Edge[] = [];
   for (const [filePath, fileExports] of exportsByPath) {
@@ -93,10 +114,7 @@ export function buildGraph(opts: BuildGraphOptions): Graph {
       );
       const rawEdges = extractEdges(local.declarationNode, importsByLocal);
       for (const re of rawEdges) {
-        const targetFile = resolveModule(re.moduleSpecifier, filePath, {
-          knownFiles,
-          tsconfig,
-        });
+        const targetFile = resolveModule(re.moduleSpecifier, filePath, ctx);
         if (targetFile === null) continue;
 
         if (re.remoteName === DYNAMIC_FANOUT) {
@@ -164,8 +182,7 @@ interface CanonicalExport {
  */
 function makeExportResolver(
   exportsByPath: ReadonlyMap<string, FileExports>,
-  knownFiles: ReadonlySet<string>,
-  tsconfig: TsconfigResolution | undefined,
+  ctx: ResolveContext,
 ): (file: string, name: string) => CanonicalExport | null {
   const resolveOn = (
     file: string,
@@ -191,19 +208,13 @@ function makeExportResolver(
 
     const named = fileExports.namedReexports.get(name);
     if (named !== undefined) {
-      const target = resolveModule(named.moduleSpecifier, file, {
-        knownFiles,
-        tsconfig,
-      });
+      const target = resolveModule(named.moduleSpecifier, file, ctx);
       if (target === null) return null;
       return resolveOn(target, named.remoteName, visited);
     }
 
     for (const star of fileExports.starReexports) {
-      const target = resolveModule(star.moduleSpecifier, file, {
-        knownFiles,
-        tsconfig,
-      });
+      const target = resolveModule(star.moduleSpecifier, file, ctx);
       if (target === null) continue;
       const found = resolveOn(target, name, visited);
       if (found !== null) return found;
