@@ -36,14 +36,14 @@ export const defaultConfig: Config = {
       call: {
         enabled: true,
         numHashes: 128,
-        // Looser banding (inflection ≈ 0.13) than the token axis: call
-        // sets are 1-2 orders of magnitude smaller (mean ~6 keys), so
-        // their MinHash signatures have higher variance and we need to
-        // cast a wider net to surface pairs that pass via call axis
-        // alone. Bench-verified to lift file-pair Jaccard meaningfully
-        // without flooding scoring.
-        bands: 64,
-        rows: 2,
+        // Same banding shape as the token axis (inflection ≈ 0.42). The
+        // earlier looser setting (rows=2, inflection 0.13) was meant to
+        // cast a wider net for the small call set, but that produced
+        // mega-bucket collisions (max 143 deep) and ~22k candidate
+        // pairs whose call Jaccard was too low to clear the 0.4
+        // statement-axis report threshold anyway.
+        bands: 32,
+        rows: 4,
         seedCount: 1,
         // Distinct seed so the call axis uses an independent hash family
         // from the token axis. Same seed would produce correlated
@@ -56,11 +56,16 @@ export const defaultConfig: Config = {
       statement: {
         enabled: true,
         numHashes: 128,
-        // Same banding shape as call: statement n-gram sets are also
-        // small (statementNgramSizes [2,3,4,5] over 5-15 statement
-        // sequences), and the wider net is needed for the same reason.
-        bands: 64,
-        rows: 2,
+        // Tighter banding than the call axis (inflection ≈ 0.42 vs 0.13).
+        // Statement n-gram sets are small (mean ≈ 2.7, p50=0) and their
+        // alphabet is tiny, so a loose threshold floods the candidate
+        // stream with mega-bucket collisions (worst observed: 234
+        // fragments deep). Genuine clones tend to share most of their
+        // statement n-grams when they share any (the alphabet is small),
+        // so the surviving signal at J ≥ 0.42 stays well above the
+        // 0.45 statement-axis report threshold.
+        bands: 32,
+        rows: 4,
         seedCount: 1,
         seed: 0xfeedface,
         maxBucketSize: 64,
