@@ -1,0 +1,126 @@
+/**
+ * Output schema emitted by `ts-hotspots cochange`. Mirrors the slim/verbose
+ * pattern used by `dup`'s `serializeReport` family: an envelope (`tool`,
+ * `project`, `hotspots[]`, optional `diff` / `dismissed` / `summary`) plus
+ * a per-hotspot card (`anchor?`, `members[]`, `metrics`, `evidence`,
+ * `dismissalId`).
+ *
+ * The unit of analysis is a file pair. The pair is materialised in the
+ * schema using dup's `anchor?` + `members[]` shape so consumers branch on
+ * the same keys across subcommands. In whole-repo mode (M4/M5/M6) `anchor`
+ * is omitted and `members` carries the lex-ordered pair (length 2). In
+ * single-anchor mode (M7) `anchor` carries the pinned file and `members`
+ * shrinks to the partner (length 1).
+ */
+
+import type { DiffInfo, DismissedSummary, ReportTool } from "../../schema.ts";
+
+export interface CochangeHotspotRef {
+  /** Repo-root-relative POSIX path. No `:line` range — cochange is file-level. */
+  location: string;
+  kind: "file";
+}
+
+export interface CochangeScore {
+  axis: "confidenceMax";
+  value: number;
+}
+
+export interface SlimCochangePairMetrics {
+  support: number;
+  confidenceAtoB: number;
+  confidenceBtoA: number;
+  confidenceMax: number;
+  lift: number;
+}
+
+export interface VerboseCochangePairMetrics extends SlimCochangePairMetrics {
+  /** Total commits touching A in the window (denominator for confidenceAtoB). */
+  changesOfA: number;
+  /** Total commits touching B in the window (denominator for confidenceBtoA). */
+  changesOfB: number;
+}
+
+export interface SlimCochangeEvidence {
+  /**
+   * Up to the 5 most recent commits (short SHAs) where both files were
+   * touched. The walker caps this at 5 — agents wanting more should
+   * re-derive from the full window.
+   */
+  recentCommits: string[];
+}
+
+export interface VerboseCochangeEvidence extends SlimCochangeEvidence {
+  /**
+   * Full SHA list for the pair. M2's walker only retains the first 5
+   * recent SHAs, so today this aliases `recentCommits`. If a future
+   * milestone teaches the walker to keep the full list, this field is
+   * the place to surface it.
+   */
+  allCoChangeCommits: string[];
+  /**
+   * First and last SHA in the surviving (capped-at-5) co-change list.
+   * Lets the agent re-derive the metric without re-walking the entire
+   * window. Absent when the pair has zero recorded commits.
+   */
+  coChangeWindow?: { firstSha: string; lastSha: string };
+}
+
+export interface SlimCochangeHotspot {
+  kind: "cochange";
+  /** `(anchor ? 1 : 0) + members.length`. Always `2` for a pair. */
+  size: 2;
+  score: CochangeScore;
+  /** Single-anchor mode only (`--file <path>`); omitted in whole-repo / `--diff`. */
+  anchor?: { ref: CochangeHotspotRef };
+  /** Length 2 when `anchor` is omitted, length 1 when `anchor` is set. */
+  members: { ref: CochangeHotspotRef }[];
+  metrics: SlimCochangePairMetrics;
+  evidence: SlimCochangeEvidence;
+  /** `coch:<hex>` — see `computeCochangePairDismissalId`. */
+  dismissalId: string;
+}
+
+export interface VerboseCochangeHotspot extends SlimCochangeHotspot {
+  metrics: VerboseCochangePairMetrics;
+  evidence: VerboseCochangeEvidence;
+}
+
+export interface CochangeProject {
+  /** Actual commits the walk consumed (may be < `--window` on shallow clones). */
+  windowCommits: number;
+  /** TS files in the analysed file-set (post-exclude). */
+  analyzedFileCount: number;
+  /** Verbose only: pair count before the gate ran. */
+  pairCandidateCountBeforeGate?: number;
+}
+
+export interface CochangeSummary {
+  /** Window size requested via `--window`. */
+  requestedWindow: number;
+  /** Commits the walk actually saw (may be < `requestedWindow` on shallow clones). */
+  actualWindow: number;
+  /** Commits dropped by `--max-files-per-commit`. */
+  commitsSkippedAsLargeChange: number;
+  /** Pair count entering the gate. */
+  pairsBeforeGate: number;
+  /** Pair count surviving the gate (pre-sort, pre-`--limit`). */
+  pairsAfterGate: number;
+}
+
+export interface SerializedCochangeReport {
+  tool: ReportTool;
+  project: CochangeProject;
+  /** Diff envelope is M6's responsibility; the slot is reserved here. */
+  diff?: DiffInfo;
+  hotspots: SlimCochangeHotspot[];
+  dismissed?: DismissedSummary;
+  /** `--verbose` only — see `SerializedCochangeReportVerbose`. */
+  summary?: CochangeSummary;
+}
+
+export interface SerializedCochangeReportVerbose
+  extends SerializedCochangeReport {
+  hotspots: VerboseCochangeHotspot[];
+  summary: CochangeSummary;
+}
