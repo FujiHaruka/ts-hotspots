@@ -249,7 +249,7 @@ Each `hotspots[]` entry carries:
 
 - `kind: "cochange"` — discriminator for agents that consume multiple subcommands.
 - `pair` — `[{ ref: { path } }, { ref: { path } }]`, two-element tuple. No `location` key with `:line` here; the unit is the file. Order is canonical (lexicographic by POSIX path).
-- `score` — `{ axis: "support", value: N }` — single representative axis. `support` is chosen as the primary score axis because it is the integer foundation that confidence and lift derive from; the agent reading just `score` knows immediately whether the pair has thin or thick evidence.
+- `score` — `{ axis: "confidenceMax", value: 0..1 }` — single representative axis. `confidenceMax` is chosen because it is bounded `[0, 1]`, comparable across pairs / windows / repos, and answers the agent's actionable question directly ("if I touch one of these, how likely is the other to need attention?"). The integer evidence count (`support`) and the above-chance multiplier (`lift`) live in the `metrics` block alongside it for agents that want to re-rank.
 - `metrics` — the five raw values listed above.
 - `evidence` — `{ recentCommits: string[] }` — short SHAs (7-char) of up to the 5 most recent commits that touched both files. Lets the agent run `git show <sha>` to confirm the coupling pattern without re-deriving it.
 - `dismissalId` — `cochange:<hex>` (see Dismissal section above).
@@ -337,32 +337,42 @@ the `--max-files-per-commit` cap keeps linear-ish in window size.
   IS a churn-derived signal; double-counting it would be incoherent.
 - **MCP server packaging.** Same answer as the other subcommands.
 
-## Open questions (for review)
+## Decisions resolved during requirements review
 
-The following decisions are best-guesses in this draft. Each is
-flagged because review may want to flip them:
+The following defaults were tentative in earlier drafts; review has
+locked them in. Recorded here so a future revisit has the rationale
+in one place rather than spread across commit messages.
 
-- **Naming.** `cochange` vs `evolution`. Default: `cochange` for
-  literature-alignment, accepting the `c<TAB>` ambiguity with `comp`.
-- **Default `--max-files-per-commit`.** 50 is the rule-of-thumb
-  number from the change-coupling literature. Some repos with
-  legitimate large-PR culture (codemod-heavy, monorepo migrations)
-  will lose signal. Worth a sanity-check against this repo's history
-  before locking in.
-- **Default `--min-support` = 3.** Tight enough to drop one-off
-  coincidences; loose enough to surface real coupling on smaller
-  repos. May want to scale with `--window` (e.g. `max(3, window/50)`)
-  rather than fix at 3.
-- **`confidenceMax >= 0.30` floor.** 30% is a defensible "more than
-  noise" line but ultimately a guess. Worth dogfooding before locking.
-- **Pair score axis.** Currently `support`. Alternative: a derived
-  `coupling = sqrt(support * confidenceMax * lift)`. Argued against
-  because it violates "no synthesized score"; argued for because
-  agents reading just `score` would get a more useful single number.
-  Default: stay with `support`, raw.
-- **`--include-non-ts`.** Deliberately omitted in v1 per "Out of
-  scope". If review wants it from day one, add the flag and lift
-  the file-set filter in step 1; everything else is unchanged.
+- **Naming**: `cochange` / alias `coch`. The `c<TAB>` ambiguity with
+  `comp` was acknowledged and accepted; resolves uniquely from
+  `co<TAB>` onward, and "cochange" matches the standard term in the
+  change-coupling literature.
+- **`--max-files-per-commit` default**: `50`. Matches the literature
+  rule of thumb. On this repo's empirical distribution
+  (51 commits sampled: p50=3, p90=19, p99=47, max=284) it excludes
+  the clear sweep outlier (284, a tsconfig drop) while keeping
+  legitimate medium PRs. The 47-file ts-morph drop sits just under
+  the threshold; the `support >= 3` floor + `lift > 1.0` gate
+  bound the residual confidence-inflation risk.
+- **`--min-support` default**: `3`, fixed (not scaled with `--window`).
+  Predictability matters more here than adaptive tuning; the
+  downstream `lift > 1.0` and `confidenceMax >= 0.30` gates already
+  filter chance co-occurrence on large windows. Users opt into a
+  tighter floor with explicit `--min-support`.
+- **`confidenceMax >= 0.30` floor**: kept. Adds a directional
+  guardrail orthogonal to the lift gate ("the actionable read
+  exceeds 1-in-3"). Worth dogfooding before locking in v2.
+- **Pair score axis**: `confidenceMax` (changed from earlier draft's
+  `support`). Bounded `[0, 1]`, comparable across pairs / repos /
+  windows, and aligns with the agent's actionable question. Evidence
+  weight (`support`) and chance multiplier (`lift`) remain in the
+  `metrics` block.
+- **`--include-non-ts`**: deferred to v2. v1 stays TS-only with no
+  flag. Adding it later is a mechanical change (drop the file-set
+  filter in step 1 of the algorithm sketch). Default exclude globs
+  already cover lock files / generated / snapshots, so when the
+  flag does land, the noisiest source of false coupling is already
+  handled by the existing exclude infrastructure.
 
 ## Reused infrastructure
 
