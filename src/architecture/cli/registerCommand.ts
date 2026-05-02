@@ -17,20 +17,20 @@
  */
 
 import { type Command, InvalidArgumentError } from "commander";
-import { EDGE_WEIGHTS } from "../graph/types.ts";
+import {
+  DEFAULT_FORMAT,
+  DEFAULT_LIMIT,
+  PHASE_TIMINGS_DEFAULT,
+  PHASE_TIMINGS_LEVELS,
+  type PhaseTimingsLevel,
+  type ReportFormat,
+} from "../../cli-defaults.ts";
 import {
   parseRevRange,
   RevRangeParseError,
 } from "../../util/git/parseRevRange.ts";
-import {
-  type ArchParsedArgs,
-  DEFAULT_FORMAT,
-  DEFAULT_LIMIT,
-  type PhaseTimingsLevel,
-  PHASE_TIMINGS_DEFAULT,
-  PHASE_TIMINGS_LEVELS,
-  type ReportFormat,
-} from "./args.ts";
+import { EDGE_WEIGHTS } from "../graph/types.ts";
+import { type ArchParsedArgs } from "./args.ts";
 
 /**
  * Render the `LEVEL is 'a' (default) or 'b' or 'c'.` enumeration for

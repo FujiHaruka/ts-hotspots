@@ -24,6 +24,7 @@
 import { resolve as resolvePath } from "node:path";
 import { Command, CommanderError } from "commander";
 import pkg from "../../../package.json" with { type: "json" };
+import { TOOL_NAME } from "../../cli-defaults.ts";
 import {
   loadRegistry,
   pruneRegistry,
@@ -69,16 +70,12 @@ import {
   collectSmallNodeIds,
 } from "../scoring/sizeFloor.ts";
 import { collectTypeOnlyNodeIds } from "../scoring/typeOnlyNodes.ts";
-import {
-  type ArchParsedArgs,
-  ArgParseError,
-  DEFAULT_LIMIT as _DEFAULT_LIMIT,
-} from "./args.ts";
+import { type ArchParsedArgs, ArgParseError } from "./args.ts";
 import { normalizePhaseTimingsArgv } from "../../duplication/cli/registerCommand.ts";
 import { loadArchSources } from "./loadSources.ts";
 import { addArchitectureCommand } from "./registerCommand.ts";
 
-const TOOL: ArchTool = { name: "ts-hotspots", version: pkg.version };
+const TOOL: ArchTool = { name: TOOL_NAME, version: pkg.version };
 
 export interface ArchWritable {
   write: (chunk: string) => unknown;
@@ -427,7 +424,7 @@ export async function main(
   try {
     await program.parseAsync([
       "node",
-      "ts-hotspots",
+      TOOL_NAME,
       "architecture",
       ...normalizePhaseTimingsArgv(argv),
     ]);

@@ -1,6 +1,5 @@
 import { performance } from "node:perf_hooks";
-
-export type PhaseTimingsLevel = "summary" | "verbose";
+import type { PhaseTimingsLevel } from "../../cli-defaults.ts";
 
 /**
  * Detailed perf-debug logger.

@@ -1,4 +1,5 @@
 import type ts from "typescript";
+import { TOOL_NAME } from "../../cli-defaults.ts";
 import type { PerfLogger } from "../cli/perfLog.ts";
 import type { Config } from "../config/config.ts";
 import type { CandidateScore } from "../domain/candidate.ts";
@@ -153,7 +154,7 @@ export function buildJsonReport(
 
   return {
     status: "ok",
-    tool: input.tool ?? { name: "ts-hotspots", version: "0.0.0" },
+    tool: input.tool ?? { name: TOOL_NAME, version: "0.0.0" },
     diff: input.diff,
     summary: input.summary,
     groups,

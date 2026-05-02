@@ -1,12 +1,13 @@
 import { Command, CommanderError } from "commander";
 import {
+  type PhaseTimingsLevel,
+  type ReportFormat,
+  TOOL_NAME,
+} from "../../cli-defaults.ts";
+import {
   addDuplicationCommand,
   normalizePhaseTimingsArgv,
 } from "./registerCommand.ts";
-
-export type ReportFormat = "markdown" | "json";
-
-export type PhaseTimingsLevel = "summary" | "verbose";
 
 /**
  * Resolved churn-collector settings for one duplication run.
@@ -79,16 +80,6 @@ export interface WholeRepoModeArgs {
   churn: ChurnCliConfig;
 }
 
-export const DEFAULT_LIMIT = 20;
-export const DEFAULT_CHURN_WINDOW = 200;
-export const DEFAULT_FORMAT: ReportFormat = "markdown";
-export const DEFAULT_REF = "HEAD";
-export const PHASE_TIMINGS_LEVELS: readonly PhaseTimingsLevel[] = [
-  "summary",
-  "verbose",
-];
-export const PHASE_TIMINGS_DEFAULT: PhaseTimingsLevel = "summary";
-
 export type ParsedArgs = DiffModeArgs | WholeRepoModeArgs;
 
 export interface HelpArgs {
@@ -131,7 +122,7 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
   try {
     program.parse([
       "node",
-      "ts-hotspots",
+      TOOL_NAME,
       "duplication",
       ...normalizePhaseTimingsArgv(argv),
     ]);

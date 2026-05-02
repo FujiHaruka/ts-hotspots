@@ -1,5 +1,6 @@
 import { Command, CommanderError } from "commander";
 import pkg from "../../../package.json" with { type: "json" };
+import { TOOL_NAME } from "../../cli-defaults.ts";
 import {
   loadRegistry,
   pruneRegistry,
@@ -33,7 +34,7 @@ import {
 import { runDetector } from "./runDetector.ts";
 import { runWholeRepoDetector } from "./runWholeRepoDetector.ts";
 
-const TOOL: ReportTool = { name: "ts-hotspots", version: pkg.version };
+const TOOL: ReportTool = { name: TOOL_NAME, version: pkg.version };
 
 /**
  * Build the error JSON envelope. Mirrors `comp`'s shape so an agent
@@ -393,7 +394,7 @@ export async function main(
   try {
     await program.parseAsync([
       "node",
-      "ts-hotspots",
+      TOOL_NAME,
       "duplication",
       ...normalizePhaseTimingsArgv(argv),
     ]);

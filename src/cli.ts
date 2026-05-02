@@ -22,6 +22,14 @@ import {
 } from "./architecture/cli/main.ts";
 import { addArchitectureCommand } from "./architecture/cli/registerCommand.ts";
 import { runDismiss, runListDismissed, runUndismiss } from "./cli/dismiss.ts";
+import {
+  DEFAULT_CHURN_WINDOW,
+  DEFAULT_FORMAT,
+  DEFAULT_LIMIT,
+  DEFAULT_REF,
+  type ReportFormat,
+  TOOL_NAME,
+} from "./cli-defaults.ts";
 import { collectChurn } from "./collectors/churn/commit-count.ts";
 import { enumerateDeclarations } from "./collectors/enumerate-declarations.ts";
 import { DEFAULT_EXCLUDE_GLOBS } from "./defaults.ts";
@@ -86,13 +94,6 @@ export interface WritableLike {
 // computation. Not user-facing — bumping this widens the candidate pool
 // before `--limit` truncation.
 const INTERNAL_AXIS_TOP_N = 10;
-
-export const DEFAULT_LIMIT = 20;
-export const DEFAULT_FORMAT = "markdown" as const;
-export const DEFAULT_CHURN_WINDOW = 200;
-export const DEFAULT_CHURN_REF = "HEAD";
-
-type ReportFormat = "markdown" | "json";
 
 interface ChurnCliOptions {
   churnWindow?: number;
@@ -424,7 +425,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     .option(
       "--churn-ref <ref>",
       "git ref from which churn is counted",
-      DEFAULT_CHURN_REF,
+      DEFAULT_REF,
     )
     .option("--no-churn", "disable git churn collection")
     .option(
@@ -554,7 +555,7 @@ function resolveChurnOptions(opts: ChurnCliOptions): ChurnPrepareOptions {
   return {
     enabled: opts.churn !== false,
     window: opts.churnWindow ?? DEFAULT_CHURN_WINDOW,
-    ref: opts.churnRef ?? DEFAULT_CHURN_REF,
+    ref: opts.churnRef ?? DEFAULT_REF,
   };
 }
 
@@ -655,14 +656,14 @@ function buildFunctionReport(input: BuildFunctionReportInput): FunctionReport {
   } = input;
   if (!verbose) {
     return {
-      tool: { name: "ts-hotspots", version: pkg.version },
+      tool: { name: TOOL_NAME, version: pkg.version },
       project: slimProject(projectInfo),
       hotspots,
     };
   }
   const usedFunctionKeys = collectFunctionRefKeys(rankings);
   return {
-    tool: { name: "ts-hotspots", version: pkg.version },
+    tool: { name: TOOL_NAME, version: pkg.version },
     project: projectInfo,
     functionRankings: rankings,
     functionAxisMeta: axisMeta,
@@ -942,7 +943,7 @@ async function runFunctions(
         f.location.startsWith(prefix),
       );
       const report: FunctionReport = {
-        tool: { name: "ts-hotspots", version: pkg.version },
+        tool: { name: TOOL_NAME, version: pkg.version },
         project: projectInfo,
         hotspots: [],
         functions: targetFunctions,

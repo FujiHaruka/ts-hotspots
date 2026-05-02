@@ -7,11 +7,11 @@
  * `./main.ts` is read-only against this object.
  */
 
+import type {
+  PhaseTimingsLevel,
+  ReportFormat,
+} from "../../cli-defaults.ts";
 import type { RevRange } from "../../util/git/parseRevRange.ts";
-
-export type ReportFormat = "markdown" | "json";
-
-export type PhaseTimingsLevel = "summary" | "verbose";
 
 export interface ArchParsedArgs {
   kind: "run";
@@ -39,14 +39,6 @@ export interface ArchParsedArgs {
   /** `--include-types` (default: on). */
   includeTypes: boolean;
 }
-
-export const DEFAULT_LIMIT = 20;
-export const DEFAULT_FORMAT: ReportFormat = "markdown";
-export const PHASE_TIMINGS_LEVELS: readonly PhaseTimingsLevel[] = [
-  "summary",
-  "verbose",
-];
-export const PHASE_TIMINGS_DEFAULT: PhaseTimingsLevel = "summary";
 
 export class ArgParseError extends Error {
   override readonly name = "ArgParseError";
