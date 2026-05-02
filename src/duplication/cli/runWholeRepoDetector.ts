@@ -1,5 +1,4 @@
 import { performance } from "node:perf_hooks";
-import type ts from "typescript";
 import { collectChurn } from "../../collectors/churn/commit-count.ts";
 import type { Config } from "../config/index.ts";
 import { resolveSha } from "../diff/gitRunner.ts";
@@ -9,17 +8,14 @@ import type {
   ReportTool,
   ScopeStats,
 } from "../domain/index.ts";
-import { buildFileFeatureContext, extractFeatures } from "../features/index.ts";
 import {
   buildInvertedIndex,
   buildLshIndex,
-  type IndexInput,
   type LshIndexInput,
 } from "../index_/index.ts";
-import { extractFragments, parseSource } from "../indexer/index.ts";
+import { buildBaseIndex } from "../indexer/index.ts";
 import { buildJsonReport, type ScoredPair } from "../report/index.ts";
 import {
-  buildFeatureSets,
   buildIntersectionsFromSets,
   type FragmentFeatureSets,
   meetsMinSize,
@@ -32,7 +28,6 @@ import {
   searchCandidates,
 } from "../search/index.ts";
 import { countLines, listBaseSources } from "./listBaseSources.ts";
-import type { ChurnRunOptions } from "./runDetector.ts";
 import type { PerfLogger } from "./perfLog.ts";
 import {
   emitDecideSummary,
@@ -49,6 +44,7 @@ import {
   type PerHitTracker,
   recordPassReasons,
 } from "./perfLogEvents.ts";
+import type { ChurnRunOptions } from "./runDetector.ts";
 
 export interface WholeRepoOptions {
   repoPath: string;
@@ -129,35 +125,20 @@ export async function runWholeRepoDetector(
 
   t0 = now();
   emitPhaseStart(perfLog, "baseIndex");
-  const entries: IndexInput[] = [];
-  const fragmentById = new Map<string, Fragment>();
-  const featureSetsById = new Map<string, FragmentFeatureSets>();
-  const sourceFileByPath = new Map<string, ts.SourceFile>();
-  const fragmentsByKind = { function: 0, block: 0, window: 0 };
-  const fragmentsPerFile: number[] = [];
-
-  for (const source of sources) {
-    const parsed = parseSource(source.path, source.text);
-    sourceFileByPath.set(source.path, parsed.sourceFile);
-    const fragments = extractFragments(parsed, config);
-    fragmentsPerFile.push(fragments.length);
-    // Build per-file context once and share across every fragment of this
-    // file — keeps `extractFeatures` from rebuilding type/regex ranges
-    // (full-AST walks) per fragment.
-    const fileCtx = buildFileFeatureContext(parsed.sourceFile);
-    for (const fragment of fragments) {
-      fragmentsByKind[fragment.kind] += 1;
-      const features = extractFeatures(
-        fragment,
-        parsed.sourceFile,
-        config,
-        fileCtx,
-      );
-      entries.push({ fragment, features });
-      fragmentById.set(fragment.id, fragment);
-      featureSetsById.set(fragment.id, buildFeatureSets(features));
-    }
-  }
+  // Drive parse + fragment extraction + per-fragment feature work in a
+  // worker pool. The thin-wrapper judgement is computed alongside since
+  // the worker already has the `ts.SourceFile` in scope — that lets the
+  // main thread skip persisting `sourceFileByPath` entirely.
+  const baseIndexResult = await buildBaseIndex(sources, config, {
+    thinWrapperEnabled: config.report.thinWrapper.enabled,
+  });
+  const {
+    entries,
+    featureSetsById,
+    thinWrapperByFragmentId,
+    fragmentsByKind,
+    fragmentsPerFile,
+  } = baseIndexResult;
 
   // The inverted index is only consumed by the legacy candidate generator.
   // Skip the build (and the per-key Map allocations) when LSH is in charge.
@@ -179,25 +160,45 @@ export async function runWholeRepoDetector(
   t0 = now();
   emitPhaseStart(perfLog, "headSearch");
   const tracker = newPerHitTracker();
-  const seenPairs = new Set<string>();
   const scoredPairs: ScoredPair[] = [];
 
+  // Intern fragmentIds to integer indices so the cross-axis dedup Set
+  // and the per-pair lookups in `scoreOne` operate on integers rather
+  // than strings. The infoByIndex array is sorted lex by fragmentId so
+  // that numeric `(lo, hi)` pair canonicalization matches the legacy
+  // lex canonical contract (downstream code that pivots on
+  // `changedFragment.id < baseFragment.id` keeps working unchanged).
+  interface FragmentInfo {
+    readonly fragment: Fragment;
+    readonly sets: FragmentFeatureSets;
+  }
+  const infoByIndex: FragmentInfo[] = [];
+  for (const { fragment } of entries) {
+    const sets = featureSetsById.get(fragment.id);
+    if (sets === undefined) continue;
+    infoByIndex.push({ fragment, sets });
+  }
+  infoByIndex.sort((a, b) =>
+    a.fragment.id < b.fragment.id ? -1 : a.fragment.id > b.fragment.id ? 1 : 0,
+  );
+  const fragmentIndexById = new Map<string, number>();
+  for (let i = 0; i < infoByIndex.length; i++) {
+    const info = infoByIndex[i];
+    if (info === undefined) continue;
+    fragmentIndexById.set(info.fragment.id, i);
+  }
+  const fragmentIndexCount = infoByIndex.length;
+  const stride = fragmentIndexCount + 1;
+  const seenPairIds = new Set<number>();
+
   /** Score one candidate pair and, if it passes, push it into `scoredPairs`. */
-  const scoreOne = (aId: string, bId: string): void => {
-    const aFragment = fragmentById.get(aId);
-    const bFragment = fragmentById.get(bId);
-    const aSets = featureSetsById.get(aId);
-    const bSets = featureSetsById.get(bId);
+  const scoreOneByInfo = (aInfo: FragmentInfo, bInfo: FragmentInfo): void => {
     if (
-      aFragment === undefined ||
-      bFragment === undefined ||
-      aSets === undefined ||
-      bSets === undefined
-    ) {
-      return;
-    }
-    if (
-      !meetsMinSize(aFragment, bFragment, config.scoring.thresholds.minLines)
+      !meetsMinSize(
+        aInfo.fragment,
+        bInfo.fragment,
+        config.scoring.thresholds.minLines,
+      )
     ) {
       return;
     }
@@ -206,17 +207,17 @@ export async function runWholeRepoDetector(
     const score = scoreCandidateFromSets(
       {
         candidate: {
-          changedFragmentId: aId,
-          baseFragmentId: bId,
+          changedFragmentId: aInfo.fragment.id,
+          baseFragmentId: bInfo.fragment.id,
           // hitCounts is an internal ranking signal used only by the
           // inverted-index candidate sort. Downstream scoring / decide /
           // report don't read it, so zero-fill in the LSH path.
           hitCounts: { token: 0, statement: 0, call: 0 },
         },
-        changedFragment: aFragment,
-        baseFragment: bFragment,
-        changedFeatureSets: aSets,
-        baseFeatureSets: bSets,
+        changedFragment: aInfo.fragment,
+        baseFragment: bInfo.fragment,
+        changedFeatureSets: aInfo.sets,
+        baseFeatureSets: bInfo.sets,
       },
       config,
     );
@@ -249,7 +250,7 @@ export async function runWholeRepoDetector(
     }
 
     if (!ok) return;
-    const intersections = buildIntersectionsFromSets(aSets, bSets);
+    const intersections = buildIntersectionsFromSets(aInfo.sets, bInfo.sets);
     if (perfLog !== undefined) {
       tracker.intersectionTokens.push(intersections.tokens.length);
       tracker.intersectionStatements.push(intersections.statements.length);
@@ -257,25 +258,38 @@ export async function runWholeRepoDetector(
     }
     scoredPairs.push({
       score,
-      changedFragment: aFragment,
-      baseFragment: bFragment,
+      changedFragment: aInfo.fragment,
+      baseFragment: bInfo.fragment,
       intersections,
     });
+  };
+
+  /**
+   * String-id facade over `scoreOneByInfo` for the legacy inverted-index
+   * candidate path, which still hands out string id pairs.
+   */
+  const scoreOneByIds = (aId: string, bId: string): void => {
+    const aIdx = fragmentIndexById.get(aId);
+    const bIdx = fragmentIndexById.get(bId);
+    if (aIdx === undefined || bIdx === undefined) return;
+    const aInfo = infoByIndex[aIdx];
+    const bInfo = infoByIndex[bIdx];
+    if (aInfo === undefined || bInfo === undefined) return;
+    scoreOneByInfo(aInfo, bInfo);
   };
 
   let candidatePairs = 0;
 
   if (useLsh) {
     candidatePairs = runLshCandidateGeneration(
-      entries,
-      fragmentById,
-      featureSetsById,
+      infoByIndex,
+      stride,
+      seenPairIds,
       config,
       perfLog,
       now,
       tracker,
-      scoreOne,
-      seenPairs,
+      scoreOneByInfo,
     );
   } else {
     if (invertedIndex === null) {
@@ -314,10 +328,15 @@ export async function runWholeRepoDetector(
         const otherId = candidate.baseFragmentId;
         const aId = fragment.id < otherId ? fragment.id : otherId;
         const bId = fragment.id < otherId ? otherId : fragment.id;
-        const key = `${aId}|${bId}`;
-        if (seenPairs.has(key)) continue;
-        seenPairs.add(key);
-        scoreOne(aId, bId);
+        const aIdx = fragmentIndexById.get(aId);
+        const bIdx = fragmentIndexById.get(bId);
+        if (aIdx === undefined || bIdx === undefined) continue;
+        const lo = aIdx < bIdx ? aIdx : bIdx;
+        const hi = aIdx < bIdx ? bIdx : aIdx;
+        const key = lo * stride + hi;
+        if (seenPairIds.has(key)) continue;
+        seenPairIds.add(key);
+        scoreOneByIds(aId, bId);
       }
     }
   }
@@ -334,11 +353,11 @@ export async function runWholeRepoDetector(
       tracker.atCapCount,
     );
   }
-  // Both paths dedup pairs via `seenPairs` — legacy at canonical-key
-  // construction, LSH at axis-union time. `candidatePairs` is the
-  // **post-dedup** count for LSH mode (unionPairs) and the **pre-dedup**
-  // raw count for legacy mode.
-  const uniquePairs = seenPairs.size;
+  // Both paths dedup pairs via `seenPairIds` (numeric packed (lo, hi)
+  // index keys) — legacy at canonical-key construction, LSH at
+  // axis-union time. `candidatePairs` is the **post-dedup** count for
+  // LSH mode (unionPairs) and the **pre-dedup** raw count for legacy.
+  const uniquePairs = seenPairIds.size;
   emitScoringSummary(perfLog, candidatePairs, uniquePairs, tracker);
   emitDecideSummary(perfLog, tracker);
   emitPairsDedup(perfLog, candidatePairs, uniquePairs);
@@ -368,7 +387,7 @@ export async function runWholeRepoDetector(
         },
       },
       includeCode,
-      getSourceFile: (filePath) => sourceFileByPath.get(filePath),
+      isThinFragmentById: thinWrapperByFragmentId,
       churnByFile,
     },
     perfLog,
@@ -386,24 +405,26 @@ export async function runWholeRepoDetector(
  *   2. Build an LSH index using that axis's params.
  *   3. Iterate the index's candidate pairs.
  *
- * Pairs are unioned across axes via the runner-level `seenPairs` Set —
- * `forEachCandidatePair` only dedups within a single index, so a pair
- * that collides on both token and call axes would otherwise be scored
- * twice. The first axis to surface a pair "wins" (drives the scoring
- * call); later axes that collide on the same pair are no-ops.
+ * Pairs are unioned across axes via the runner-level `seenPairIds` Set
+ * (numeric packed (lo, hi) index key) — `forEachCandidatePair` only
+ * dedups within a single index, so a pair that collides on both token
+ * and call axes would otherwise be scored twice. The first axis to
+ * surface a pair "wins" (drives the scoring call); later axes that
+ * collide on the same pair are no-ops.
  *
  * Returns the **union** candidate-pair count for downstream stats.
  */
-function runLshCandidateGeneration(
-  entries: readonly IndexInput[],
-  fragmentById: ReadonlyMap<string, Fragment>,
-  featureSetsById: ReadonlyMap<string, FragmentFeatureSets>,
+function runLshCandidateGeneration<
+  TInfo extends { fragment: Fragment; sets: FragmentFeatureSets },
+>(
+  infoByIndex: readonly TInfo[],
+  stride: number,
+  seenPairIds: Set<number>,
   config: Config,
   perfLog: PerfLogger | undefined,
   now: () => number,
   tracker: PerHitTracker,
-  scoreOne: (aId: string, bId: string) => void,
-  seenPairs: Set<string>,
+  scoreOneByInfo: (a: TInfo, b: TInfo) => void,
 ): number {
   interface Axis {
     name: "token" | "call" | "statement";
@@ -424,12 +445,12 @@ function runLshCandidateGeneration(
     if (!axisCfg.enabled) continue;
 
     const lshInputs: LshIndexInput[] = [];
-    for (const { fragment } of entries) {
-      const sets = featureSetsById.get(fragment.id);
-      if (sets === undefined) continue;
+    for (let i = 0; i < infoByIndex.length; i++) {
+      const info = infoByIndex[i];
+      if (info === undefined) continue;
       lshInputs.push({
-        fragmentId: fragment.id,
-        features: axis.pickFeatures(sets),
+        fragmentId: i,
+        features: axis.pickFeatures(info.sets),
       });
     }
 
@@ -438,29 +459,22 @@ function runLshCandidateGeneration(
     const buildWall = now() - ts;
     totalBuildWall += buildWall;
 
-    // Pairs surfaced by THIS axis (before union dedup).
+    // Pairs surfaced by THIS axis (before union dedup). The visitor
+    // receives `(lo, hi)` numeric indices directly — no string round
+    // trip — so the per-pair cost is just two array lookups + a
+    // packed-key Set probe.
     let axisCount = 0;
-    lsh.forEachCandidatePair((a, b) => {
-      // Drop same-file sliding-window siblings at search time, mirroring
-      // the inverted-index path (`candidateSearch.ts#tally`). The LSH
-      // index itself is keyed only by feature sets, so file/line
-      // information lives in `fragmentById` — look both fragments up here
-      // and skip overlapping pairs before they reach scoring or counts.
-      const aFragment = fragmentById.get(a);
-      const bFragment = fragmentById.get(b);
-      if (
-        aFragment !== undefined &&
-        bFragment !== undefined &&
-        isSameFileOverlap(aFragment, bFragment)
-      ) {
-        return;
-      }
+    lsh.forEachCandidatePair((lo, hi) => {
+      const aInfo = infoByIndex[lo];
+      const bInfo = infoByIndex[hi];
+      if (aInfo === undefined || bInfo === undefined) return;
+      if (isSameFileOverlap(aInfo.fragment, bInfo.fragment)) return;
       axisCount += 1;
-      const key = `${a}|${b}`;
-      if (seenPairs.has(key)) return;
-      seenPairs.add(key);
+      const key = lo * stride + hi;
+      if (seenPairIds.has(key)) return;
+      seenPairIds.add(key);
       unionPairs += 1;
-      scoreOne(a, b);
+      scoreOneByInfo(aInfo, bInfo);
     });
     axisPairCounts[axis.name] = axisCount;
 
@@ -469,7 +483,7 @@ function runLshCandidateGeneration(
       axis.name,
       axisCfg,
       lsh.stats,
-      entries.length,
+      infoByIndex.length,
       axisCount,
       buildWall,
     );
