@@ -1,14 +1,14 @@
 ## `arch` monorepo / tsconfig エイリアス対応 計画
 
-> Status: Ready (E1-E12 確定済み、未着手)
+> Status: Done (M1-M3 完了)
 > Goal: `ts-hotspots architecture` を pnpm / npm / yarn workspaces 構成のモノレポでも実用的に動かす。具体的には (1) 同一パッケージ内の tsconfig `paths` エイリアス、(2) パッケージ名 import (`@scope/foo`, `@scope/foo/sub`)、(3) パッケージごとに分かれた `tsconfig.json` (`extends` チェーンを含む) の 3 つを resolveModule が解像できるようにする。
 > 非 Goal: `comp` / `dup` 側の挙動変更 (`comp` は既に tsconfig 非依存、`dup` はもともと tsconfig を読まない)。複数パッケージを **別レポートに分割** する出力形 (集約は単一 ranking を維持)。`node_modules` 内の外部パッケージへのエッジ追加 (スコープ外)。
 
 ## 0. Progress
 
-- [ ] **M1** — root tsconfig 配線 (現状の dead code を本番経路に通す)
-- [ ] **M2** — workspace 検出 + `package.json#exports` ベースのクロスパッケージ解像
-- [ ] **M3** — per-package tsconfig + `extends` チェーン解決
+- [x] **M1** — root tsconfig 配線 (現状の dead code を本番経路に通す)
+- [x] **M2** — workspace 検出 + `package.json#exports` ベースのクロスパッケージ解像
+- [x] **M3** — per-package tsconfig + `extends` チェーン解決
 
 ## 1. 経緯
 
