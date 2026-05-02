@@ -10,7 +10,7 @@
  * with the window stats and gate pair counts.
  */
 
-import type { ReportTool } from "../../schema.ts";
+import type { DiffInfo, ReportTool } from "../../schema.ts";
 import type { Candidate } from "../ranking/types.ts";
 import { computeCochangePairDismissalId } from "./dismissalId.ts";
 import type {
@@ -35,6 +35,8 @@ export interface CochangeReportInput {
   requestedWindow: number;
   actualWindow: number;
   tool: ReportTool;
+  /** Diff envelope when `--diff <revrange>` is active; absent otherwise. */
+  diff?: DiffInfo;
 }
 
 export interface SerializeOptions {

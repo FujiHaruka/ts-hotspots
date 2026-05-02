@@ -14,8 +14,8 @@
  * `parseAsync` is awkward, so orchestration stays outside the
  * registrar.
  *
- * `--diff` (M6) and `--file` (M7) are deliberately not registered here
- * yet. The shape is left future-friendly so adding them is mechanical.
+ * `--file` (M7) is deliberately not registered here yet. The shape is
+ * left future-friendly so adding it is mechanical.
  */
 
 import { type Command, InvalidArgumentError } from "commander";
@@ -25,6 +25,10 @@ import {
   DEFAULT_REF,
   type ReportFormat,
 } from "../../cli-defaults.ts";
+import {
+  parseRevRange,
+  RevRangeParseError,
+} from "../../util/git/parseRevRange.ts";
 import { DEFAULT_MIN_SUPPORT } from "../ranking/defaults.ts";
 import { type CochangeParsedArgs } from "./args.ts";
 import {
@@ -54,9 +58,20 @@ const HELP_AFTER = `
 Examples:
   ts-hotspots cochange > report.md
   ts-hotspots cochange --format json > report.json
+  ts-hotspots coch --diff origin/main...        # narrow display to PR files
   ts-hotspots coch --window 500 --min-support 5
   ts-hotspots coch --ref release/v2 --exclude 'src/legacy/**'
   ts-hotspots coch --verbose
+
+<revrange> forms accepted by --diff:
+  A...B   diff from merge-base(A, B) to B (PR semantics; recommended)
+  A..B    diff base against head directly
+  A...    head side defaults to HEAD
+  ...B    base side defaults to HEAD
+
+\`--diff\` and \`--ref\` are orthogonal: --ref selects the history-window
+endpoint, --diff narrows the displayed pairs to those touching at least
+one file changed between two refs. Both can be passed.
 
 Each reported hotspot carries a 'dismissalId' (coch:<hex>) you can pass
 to 'ts-hotspots dismiss <id> --reason <text>' to filter it from future
@@ -65,6 +80,7 @@ runs.
 
 interface CochangeCliOptions {
   exclude: string[];
+  diff?: ReturnType<typeof parseRevRange>;
   ref?: string;
   format?: ReportFormat;
   limit?: number;
@@ -106,6 +122,11 @@ export function addCochangeCommand(
       "emit the rich schema: window stats, gate counts, full denominators, and full SHA list",
     )
     .option(
+      "--diff <revrange>",
+      "scope hotspot output to pairs touching at least one file changed by <revrange> (e.g. origin/main...). Display filter only — rankings are still computed against the full window so the distribution is intact. (Note: `dup --diff` instead defines the comparison's base/head sides.)",
+      parseDiffOption,
+    )
+    .option(
       "--ref <ref>",
       `endpoint of the history window (default: ${DEFAULT_REF})`,
       DEFAULT_REF,
@@ -145,12 +166,24 @@ function buildParsedArgs(
     format,
     excludeGlobs: opts.exclude,
     ref: opts.ref,
+    diff: opts.diff,
     window: opts.window,
     minSupport: opts.minSupport,
     maxFilesPerCommit: opts.maxFilesPerCommit,
     limit,
     verbose: opts.verbose === true,
   };
+}
+
+function parseDiffOption(value: string): ReturnType<typeof parseRevRange> {
+  try {
+    return parseRevRange(value);
+  } catch (err) {
+    if (err instanceof RevRangeParseError) {
+      throw new InvalidArgumentError(err.message);
+    }
+    throw err;
+  }
 }
 
 function collectExcludeGlob(

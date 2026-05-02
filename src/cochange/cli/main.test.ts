@@ -92,6 +92,7 @@ function makeArgs(
     format: "json",
     excludeGlobs: [],
     ref: "HEAD",
+    diff: undefined,
     window: 200,
     minSupport: 3,
     maxFilesPerCommit: 50,
@@ -101,15 +102,41 @@ function makeArgs(
   };
 }
 
+interface DiffStubOptions {
+  baseSha: string;
+  headSha: string;
+  changedFiles: readonly string[];
+}
+
 function makeDeps(
   rawLog: string | undefined,
   isShallow = false,
+  diffStub?: DiffStubOptions,
 ): CochangeRunDeps {
   const runGitLog: typeof runGitLogReal = () => rawLog;
   return {
     runGitLog,
     runGitShowPrefix: () => "",
     runGitIsShallow: () => isShallow,
+    resolveDiffEndpoints: (_cwd, _baseRef, _headRef, _threeDot) => {
+      if (diffStub === undefined) {
+        return Promise.reject(
+          new Error("resolveDiffEndpoints called but no diff stub provided"),
+        );
+      }
+      return Promise.resolve({
+        baseSha: diffStub.baseSha,
+        headSha: diffStub.headSha,
+      });
+    },
+    listChangedFilePaths: (_repoPath, _baseSha, _headSha) => {
+      if (diffStub === undefined) {
+        return Promise.reject(
+          new Error("listChangedFilePaths called but no diff stub provided"),
+        );
+      }
+      return Promise.resolve([...diffStub.changedFiles]);
+    },
   };
 }
 
@@ -237,5 +264,182 @@ describe("cochange CLI: runPipeline", () => {
     };
     expect(out.status).toBe("error");
     expect(out.error.code).toBe("NOT_A_GIT_REPO");
+  });
+
+  test("--diff filters out pairs that don't touch any changed file and emits the diff envelope", async () => {
+    const repo = createFixtureRepo([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+    ]);
+    cleanups.push(repo.cleanup);
+    const cap = captureIO(repo.path);
+    // Two pairs clear the gate independently:
+    //   (a, b) — three co-change commits
+    //   (c, d) — three co-change commits
+    // Padding commits keep both pairs distinct in window stats.
+    const rawLog = [
+      withSha("aaa1111"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("aaa2222"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("aaa3333"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("ccc1111"),
+      "M\tsrc/c.ts",
+      "M\tsrc/d.ts",
+      withSha("ccc2222"),
+      "M\tsrc/c.ts",
+      "M\tsrc/d.ts",
+      withSha("ccc3333"),
+      "M\tsrc/c.ts",
+      "M\tsrc/d.ts",
+    ].join("\n");
+    const diffStub = {
+      baseSha: "0".repeat(40),
+      headSha: "1".repeat(40),
+      // Only src/a.ts is in the changed-file set; (a, b) survives the
+      // filter, (c, d) is dropped.
+      changedFiles: ["src/a.ts"],
+    };
+    const code = await runPipeline(
+      makeArgs({
+        path: repo.path,
+        diff: { baseRef: "origin/main", headRef: "HEAD", threeDot: true },
+      }),
+      cap.io,
+      makeDeps(rawLog, false, diffStub),
+    );
+    expect(code).toBe(0);
+    const out = JSON.parse(cap.stdout()) as {
+      diff?: {
+        baseSha: string;
+        headSha: string;
+        threeDot: boolean;
+        changedFiles: number;
+      };
+      hotspots: {
+        members: { ref: { location: string } }[];
+      }[];
+    };
+    expect(out.diff).toBeDefined();
+    expect(out.diff?.baseSha).toBe(diffStub.baseSha);
+    expect(out.diff?.headSha).toBe(diffStub.headSha);
+    expect(out.diff?.threeDot).toBe(true);
+    expect(out.diff?.changedFiles).toBe(1);
+    // Only the (a, b) pair survives; (c, d) is dropped.
+    expect(out.hotspots).toHaveLength(1);
+    const locations = out.hotspots[0]?.members
+      .map((m) => m.ref.location)
+      .sort();
+    expect(locations).toEqual(["src/a.ts", "src/b.ts"]);
+  });
+
+  test("--diff keeps a pair when at least one side is in the changed-file set", async () => {
+    const repo = createFixtureRepo(["src/a.ts", "src/b.ts", "src/c.ts"]);
+    cleanups.push(repo.cleanup);
+    const cap = captureIO(repo.path);
+    const rawLog = [
+      withSha("aaa1111"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("aaa2222"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("aaa3333"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("padddd1"),
+      "M\tsrc/c.ts",
+      withSha("padddd2"),
+      "M\tsrc/c.ts",
+    ].join("\n");
+    const diffStub = {
+      baseSha: "a".repeat(40),
+      headSha: "b".repeat(40),
+      // Neither pathA nor pathB is here directly — only the OTHER side
+      // of the pair (b) is in the set. Asserts the OR-logic: any
+      // member matching keeps the pair.
+      changedFiles: ["src/b.ts"],
+    };
+    const code = await runPipeline(
+      makeArgs({
+        path: repo.path,
+        diff: { baseRef: "main", headRef: "HEAD", threeDot: false },
+      }),
+      cap.io,
+      makeDeps(rawLog, false, diffStub),
+    );
+    expect(code).toBe(0);
+    const out = JSON.parse(cap.stdout()) as {
+      diff?: { changedFiles: number };
+      hotspots: { members: { ref: { location: string } }[] }[];
+    };
+    expect(out.diff?.changedFiles).toBe(1);
+    expect(out.hotspots).toHaveLength(1);
+  });
+
+  test("--ref and --diff are orthogonal: both can be passed simultaneously", async () => {
+    const repo = createFixtureRepo(["src/a.ts", "src/b.ts", "src/c.ts"]);
+    cleanups.push(repo.cleanup);
+    const cap = captureIO(repo.path);
+    const rawLog = [
+      withSha("aaa1111"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("aaa2222"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("aaa3333"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("padddd1"),
+      "M\tsrc/c.ts",
+      withSha("padddd2"),
+      "M\tsrc/c.ts",
+    ].join("\n");
+    let observedRef: string | undefined;
+    const runGitLog: typeof runGitLogReal = (opts) => {
+      observedRef = opts.ref;
+      return rawLog;
+    };
+    const diffStub = {
+      baseSha: "0".repeat(40),
+      headSha: "1".repeat(40),
+      changedFiles: ["src/a.ts"],
+    };
+    const code = await runPipeline(
+      makeArgs({
+        path: repo.path,
+        ref: "release/v2",
+        diff: { baseRef: "origin/main", headRef: "HEAD", threeDot: true },
+      }),
+      cap.io,
+      {
+        runGitLog,
+        runGitShowPrefix: () => "",
+        runGitIsShallow: () => false,
+        resolveDiffEndpoints: () =>
+          Promise.resolve({
+            baseSha: diffStub.baseSha,
+            headSha: diffStub.headSha,
+          }),
+        listChangedFilePaths: () => Promise.resolve([...diffStub.changedFiles]),
+      },
+    );
+    expect(code).toBe(0);
+    // --ref selected the window endpoint passed to git log...
+    expect(observedRef).toBe("release/v2");
+    const out = JSON.parse(cap.stdout()) as {
+      diff?: { changedFiles: number };
+      hotspots: unknown[];
+    };
+    // ...while --diff still produced the display filter and envelope.
+    expect(out.diff?.changedFiles).toBe(1);
+    expect(out.hotspots).toHaveLength(1);
   });
 });

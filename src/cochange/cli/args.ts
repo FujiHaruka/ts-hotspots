@@ -6,12 +6,13 @@
  * value type. Anything user-tunable lives here; the orchestrator in
  * `./main.ts` is read-only against this object.
  *
- * `--diff` and `--file` are M6/M7 work and are not present here. The
- * shape is left future-friendly: when those land, add `diff?: RevRange`
- * and `file?: string` and the registrar fans the new options into them.
+ * `--file` is M7 work and is not present here. The shape is left
+ * future-friendly: when it lands, add `file?: string` and the registrar
+ * fans the new option into it.
  */
 
 import type { ReportFormat } from "../../cli-defaults.ts";
+import type { RevRange } from "../../util/git/parseRevRange.ts";
 
 export interface CochangeParsedArgs {
   kind: "run";
@@ -25,6 +26,12 @@ export interface CochangeParsedArgs {
    * resolved value straight through to `git log`.
    */
   ref: string | undefined;
+  /**
+   * Optional `--diff` revrange. Display filter only — the full window
+   * walk and gate still run against the ref selected by `ref`. Matches
+   * comp/arch's `--diff` semantics exactly. Orthogonal to `--ref`.
+   */
+  diff: RevRange | undefined;
   /** Number of commits the walker will consume (`-n <window>`). */
   window: number;
   /** Floor on the raw co-change count; pairs below are dropped pre-rank. */
