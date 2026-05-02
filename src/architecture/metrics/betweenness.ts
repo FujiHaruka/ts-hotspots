@@ -1,3 +1,8 @@
+// oxlint-disable typescript/no-non-null-assertion
+//   -- Brandes BFS bounds the indices algorithmically; ! is the documented
+//   pattern. The conflicting `non-nullable-type-assertion-style` rule otherwise
+//   forces a contradictory `as number` cast.
+
 /**
  * Exact directed-graph betweenness centrality (Brandes 2001).
  *
@@ -42,7 +47,7 @@ export function computeBetweenness(
 ): number[] {
   const start = performance.now();
   const n = adjacency.nodeIds.length;
-  const centrality = new Array<number>(n).fill(0);
+  const centrality: number[] = Array.from({ length: n }, () => 0);
   if (n < 3) {
     options.onTiming?.({ wallMs: performance.now() - start });
     return centrality;
@@ -51,19 +56,19 @@ export function computeBetweenness(
   for (let s = 0; s < n; s++) {
     const stack: number[] = [];
     const predecessors: number[][] = Array.from({ length: n }, () => []);
-    const sigma = new Array<number>(n).fill(0);
+    const sigma: number[] = Array.from({ length: n }, () => 0);
     sigma[s] = 1;
-    const distance = new Array<number>(n).fill(-1);
+    const distance: number[] = Array.from({ length: n }, () => -1);
     distance[s] = 0;
 
     const queue: number[] = [s];
     let head = 0;
     while (head < queue.length) {
-      const v = queue[head++] as number;
+      const v = queue[head++]!;
       stack.push(v);
       const out = adjacency.outEdges[v] ?? [];
-      const dv = distance[v] as number;
-      const sv = sigma[v] as number;
+      const dv = distance[v]!;
+      const sv = sigma[v]!;
       for (const e of out) {
         const w = e.targetIndex;
         if (distance[w] === -1) {
@@ -71,24 +76,24 @@ export function computeBetweenness(
           queue.push(w);
         }
         if (distance[w] === dv + 1) {
-          sigma[w] = (sigma[w] ?? 0) + sv;
-          (predecessors[w] as number[]).push(v);
+          sigma[w] = sigma[w]! + sv;
+          predecessors[w]!.push(v);
         }
       }
     }
 
-    const delta = new Array<number>(n).fill(0);
+    const delta: number[] = Array.from({ length: n }, () => 0);
     while (stack.length > 0) {
-      const w = stack.pop() as number;
-      const sw = sigma[w] ?? 0;
-      const dw = delta[w] ?? 0;
-      for (const v of predecessors[w] as number[]) {
-        const sv = sigma[v] ?? 0;
+      const w = stack.pop()!;
+      const sw = sigma[w]!;
+      const dw = delta[w]!;
+      for (const v of predecessors[w]!) {
+        const sv = sigma[v]!;
         if (sw === 0) continue;
-        delta[v] = (delta[v] ?? 0) + (sv / sw) * (1 + dw);
+        delta[v] = delta[v]! + (sv / sw) * (1 + dw);
       }
       if (w !== s) {
-        centrality[w] = (centrality[w] ?? 0) + dw;
+        centrality[w] = centrality[w]! + dw;
       }
     }
   }
@@ -96,7 +101,7 @@ export function computeBetweenness(
   const norm = (n - 1) * (n - 2);
   if (norm > 0) {
     for (let i = 0; i < n; i++) {
-      centrality[i] = (centrality[i] ?? 0) / norm;
+      centrality[i] = centrality[i]! / norm;
     }
   }
   options.onTiming?.({ wallMs: performance.now() - start });
@@ -117,8 +122,7 @@ export function withBetweenness(
 ): MetricsRecord {
   const values = computeBetweenness(adjacency, options);
   const next = new Map<string, NodeMetrics>();
-  for (let i = 0; i < adjacency.nodeIds.length; i++) {
-    const id = adjacency.nodeIds[i] as string;
+  for (const [i, id] of adjacency.nodeIds.entries()) {
     const prev = base.get(id);
     if (prev === undefined) continue;
     next.set(id, { ...prev, betweenness: values[i] ?? 0 });

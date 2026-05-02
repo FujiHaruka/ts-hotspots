@@ -118,6 +118,7 @@ function readAxisValue(node: NodeMetrics, axis: AxisId): number {
       return node.unstableEdgeRatio;
     case "size_pct":
     case "suppress_flag":
+    default:
       return 0;
   }
 }
@@ -181,8 +182,7 @@ export function score(
       // on more-unstable downstream code, and that is the SDP violation
       // the smell tracks.
       if (
-        (smell === "bridge_component" ||
-          smell === "high_fanout_component") &&
+        (smell === "bridge_component" || smell === "high_fanout_component") &&
         node.fanInUnweighted <= 1
       ) {
         continue;

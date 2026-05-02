@@ -50,10 +50,7 @@ import {
   addDuplicationCommand,
   normalizePhaseTimingsArgv,
 } from "./duplication/cli/registerCommand.ts";
-import {
-  listRepoSources,
-  NotAGitRepositoryError,
-} from "./loader/listRepoSources.ts";
+import { listRepoSources } from "./loader/listRepoSources.ts";
 import { loadProject } from "./loader/load-project.ts";
 import {
   renderJson,
@@ -382,7 +379,7 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     .name("ts-hotspots")
     .description("TypeScript metrics reporter")
     .version(pkg.version)
-    .addHelpCommand(false)
+    .helpCommand(false)
     .addHelpText("before", `\n${ROOT_LONG_DESCRIPTION}\n`)
     .addHelpText("after", ROOT_HELP_AFTER);
 
@@ -627,7 +624,9 @@ function validateFunctionCliInputs(
     throw new InvalidArgsError(`path is not a directory: ${rootDir}`);
   }
   const functionAxes =
-    options.metrics !== undefined ? parseFunctionAxes(options.metrics) : undefined;
+    options.metrics !== undefined
+      ? parseFunctionAxes(options.metrics)
+      : undefined;
   if (options.diff !== undefined && options.file !== undefined) {
     throw new InvalidArgsError("--diff and --file are mutually exclusive");
   }
@@ -1154,13 +1153,13 @@ export async function run(
       (invocation.kind === "dismiss" || invocation.kind === "undismiss") &&
       invocation.id.startsWith("dup:")
     ) {
-      return runDupDismissalCommand(invocation, stdout, stderr);
+      return await runDupDismissalCommand(invocation, stdout, stderr);
     }
     if (
       (invocation.kind === "dismiss" || invocation.kind === "undismiss") &&
       invocation.id.startsWith("arch:")
     ) {
-      return runArchDismissalCommand(invocation, stdout, stderr);
+      return await runArchDismissalCommand(invocation, stdout, stderr);
     }
     const rootDir = resolveRootDir(invocation.path);
     if (invocation.kind === "dismiss") {

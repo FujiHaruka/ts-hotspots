@@ -8,8 +8,8 @@ function parse(argv: readonly string[]): ArchParsedArgs {
   const program = new Command();
   program.exitOverride();
   program.configureOutput({
-    writeOut: () => {},
-    writeErr: () => {},
+    writeOut: () => undefined,
+    writeErr: () => undefined,
   });
   let captured: ArchParsedArgs | undefined;
   addArchitectureCommand(program, (args) => {
@@ -25,7 +25,9 @@ function parse(argv: readonly string[]): ArchParsedArgs {
   return captured;
 }
 
-function tryParse(argv: readonly string[]): { ok: true; args: ArchParsedArgs } | { ok: false; err: unknown } {
+function tryParse(
+  argv: readonly string[],
+): { ok: true; args: ArchParsedArgs } | { ok: false; err: unknown } {
   try {
     return { ok: true, args: parse(argv) };
   } catch (err) {

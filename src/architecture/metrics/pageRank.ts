@@ -28,8 +28,8 @@ export function computePageRank(adjacency: Adjacency): number[] {
   const n = adjacency.nodeIds.length;
   if (n === 0) return [];
   const initial = 1 / n;
-  let rank = new Array<number>(n).fill(initial);
-  const totalOutWeight = new Array<number>(n).fill(0);
+  let rank: number[] = Array.from({ length: n }, () => initial);
+  const totalOutWeight = Array.from({ length: n }, (): number => 0);
   for (let i = 0; i < n; i++) {
     const out = adjacency.outEdges[i] ?? [];
     let total = 0;
@@ -38,7 +38,7 @@ export function computePageRank(adjacency: Adjacency): number[] {
   }
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
-    const next = new Array<number>(n).fill((1 - DAMPING) / n);
+    const next: number[] = Array.from({ length: n }, () => (1 - DAMPING) / n);
 
     let danglingSum = 0;
     for (let i = 0; i < n; i++) {

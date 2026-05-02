@@ -48,7 +48,8 @@ export function extractImports(parsed: ParsedSource): ImportBinding[] {
     const moduleSpecifier = stmt.moduleSpecifier.text;
     const importClause = stmt.importClause;
     if (importClause === undefined) continue; // bare `import 'm'`
-    const declTypeOnly = importClause.isTypeOnly;
+    const declTypeOnly =
+      importClause.phaseModifier === ts.SyntaxKind.TypeKeyword;
 
     if (importClause.name !== undefined) {
       bindings.push({

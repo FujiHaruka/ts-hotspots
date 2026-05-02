@@ -4,7 +4,7 @@ import { ZERO_METRICS } from "../metrics/types.ts";
 import { score } from "./score.ts";
 
 function metrics(
-  entries: ReadonlyArray<[string, Partial<NodeMetrics>]>,
+  entries: readonly [string, Partial<NodeMetrics>][],
 ): MetricsRecord {
   return new Map(
     entries.map(([id, partial]) => [id, { ...ZERO_METRICS, ...partial }]),
@@ -19,10 +19,7 @@ describe("score — small-N gate", () => {
     // `high_fanout_component` weights (0.8 fan-out + 0.2 size) clear the
     // 0.85 threshold.
     const m = metrics([
-      [
-        "hub.ts::H::function",
-        { fanOutWeighted: 10, fanInUnweighted: 2 },
-      ],
+      ["hub.ts::H::function", { fanOutWeighted: 10, fanInUnweighted: 2 }],
       ["a.ts::A::function", { fanOutWeighted: 0 }],
       ["b.ts::B::function", { fanOutWeighted: 0 }],
       ["c.ts::C::function", { fanOutWeighted: 0 }],
@@ -177,10 +174,7 @@ describe("score — single-caller gate on bridge / fanout", () => {
     // 1.0 → composite 1.0). With fanInUnweighted=1 it is structurally
     // a single-caller pipeline entry, not a bridge.
     const m = metrics([
-      [
-        "src/a.ts::A::function",
-        { betweenness: 1, fanInUnweighted: 1 },
-      ],
+      ["src/a.ts::A::function", { betweenness: 1, fanInUnweighted: 1 }],
       ["src/b.ts::B::function", {}],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],
@@ -189,15 +183,14 @@ describe("score — single-caller gate on bridge / fanout", () => {
     const result = score(m);
     const a = result.find((c) => c.nodeId === "src/a.ts::A::function");
     expect(a?.primary.smellType).not.toBe("bridge_component");
-    expect(a?.secondary.find((s) => s.smellType === "bridge_component")).toBeUndefined();
+    expect(
+      a?.secondary.find((s) => s.smellType === "bridge_component"),
+    ).toBeUndefined();
   });
 
   it("fanIn <= 1 suppresses high_fanout_component even with high fanout", () => {
     const m = metrics([
-      [
-        "src/a.ts::A::function",
-        { fanOutWeighted: 100, fanInUnweighted: 1 },
-      ],
+      ["src/a.ts::A::function", { fanOutWeighted: 100, fanInUnweighted: 1 }],
       ["src/b.ts::B::function", {}],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],
@@ -220,10 +213,7 @@ describe("score — single-caller gate on bridge / fanout", () => {
 
   it("fanIn = 2 still allows high_fanout_component to fire (boundary)", () => {
     const m = metrics([
-      [
-        "src/a.ts::A::function",
-        { fanOutWeighted: 100, fanInUnweighted: 2 },
-      ],
+      ["src/a.ts::A::function", { fanOutWeighted: 100, fanInUnweighted: 2 }],
       ["src/b.ts::B::function", {}],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],
@@ -363,7 +353,7 @@ describe("score — zero-guard on percentile axes", () => {
     // percentile of the tied-zero block's top — close to 1.0 — and a
     // node with no signal at all would clear the threshold by inheriting
     // the inflated percentile through `0.6 * pct + 0.4 * pct`.
-    const entries: ReadonlyArray<[string, Partial<NodeMetrics>]> = [
+    const entries: readonly [string, Partial<NodeMetrics>][] = [
       [
         "src/a.ts::A::function",
         {
@@ -394,7 +384,7 @@ describe("score — zero-guard on percentile axes", () => {
   });
 
   it("a 0 raw value is reported with percentile 0 in the contributing breakdown", () => {
-    const entries: ReadonlyArray<[string, Partial<NodeMetrics>]> = [
+    const entries: readonly [string, Partial<NodeMetrics>][] = [
       ["src/a.ts::A::function", { fanOutWeighted: 100 }],
       ["src/b.ts::B::function", {}],
       ["src/c.ts::C::function", {}],
@@ -427,10 +417,7 @@ describe("score — zero-guard on percentile axes", () => {
 describe("score — flag axes", () => {
   it("suppress_flag uses the option lookup, defaults to 0", () => {
     const m = metrics([
-      [
-        "src/a.ts::A::function",
-        { fanInWeighted: 10, fanOutWeighted: 10 },
-      ],
+      ["src/a.ts::A::function", { fanInWeighted: 10, fanOutWeighted: 10 }],
       ["src/b.ts::B::function", {}],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],
@@ -450,9 +437,10 @@ describe("score — flag axes", () => {
     // over_shared_component: fan_in 0.35 + fan_out 0.25 + suppress 0.25
     // + size 0.15 = 1.0 with all axes maxed. The suppress hit + the
     // size axis push it over the 0.85 threshold.
-    const oversharedHit = a?.primary.smellType === "over_shared_component"
-      ? a.primary
-      : a?.secondary.find((s) => s.smellType === "over_shared_component");
+    const oversharedHit =
+      a?.primary.smellType === "over_shared_component"
+        ? a.primary
+        : a?.secondary.find((s) => s.smellType === "over_shared_component");
     expect(oversharedHit).toBeDefined();
     expect(oversharedHit?.composite).toBeCloseTo(1, 6);
   });
@@ -490,14 +478,8 @@ describe("score — excludedNodeIds", () => {
     // drop A from the result while leaving B's contributing percentile
     // at 1.0 — i.e. A still participates in the percentile distribution.
     const m = metrics([
-      [
-        "src/a.ts::A::function",
-        { fanOutWeighted: 100, fanInUnweighted: 2 },
-      ],
-      [
-        "src/b.ts::B::function",
-        { fanOutWeighted: 100, fanInUnweighted: 2 },
-      ],
+      ["src/a.ts::A::function", { fanOutWeighted: 100, fanInUnweighted: 2 }],
+      ["src/b.ts::B::function", { fanOutWeighted: 100, fanInUnweighted: 2 }],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],
       ["src/e.ts::E::function", {}],
@@ -550,15 +532,9 @@ describe("score — determinism", () => {
     // for outliers ≈ 2.0 (above the default 1.5 floor); zScore for
     // zeros ≈ -0.5 (below). Both outliers tie on composite = 1.0 →
     // must sort lex.
-    const entries: ReadonlyArray<[string, Partial<NodeMetrics>]> = [
-      [
-        "src/a.ts::A::function",
-        { fanOutWeighted: 100, fanInUnweighted: 2 },
-      ],
-      [
-        "src/b.ts::B::function",
-        { fanOutWeighted: 100, fanInUnweighted: 2 },
-      ],
+    const entries: readonly [string, Partial<NodeMetrics>][] = [
+      ["src/a.ts::A::function", { fanOutWeighted: 100, fanInUnweighted: 2 }],
+      ["src/b.ts::B::function", { fanOutWeighted: 100, fanInUnweighted: 2 }],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],
       ["src/e.ts::E::function", {}],
@@ -629,7 +605,10 @@ describe("score — size_pct axis", () => {
 
   it("contributes a size_pct entry to the primary smell's metric breakdown", () => {
     const entries: readonly [string, Partial<NodeMetrics>][] = [
-      ["src/a.ts::A::function", { fanInWeighted: 10, fanOutWeighted: 10, reverseClosure: 10 }],
+      [
+        "src/a.ts::A::function",
+        { fanInWeighted: 10, fanOutWeighted: 10, reverseClosure: 10 },
+      ],
       ["src/b.ts::B::function", {}],
       ["src/c.ts::C::function", {}],
       ["src/d.ts::D::function", {}],

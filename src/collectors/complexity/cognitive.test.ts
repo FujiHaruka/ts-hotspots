@@ -1,16 +1,16 @@
-import { describe, expect, test } from "vitest";
 import ts from "typescript";
+import { describe, expect, test } from "vitest";
 import { enumerateDeclarations } from "../enumerate-declarations.ts";
+import { mkSourceFiles } from "../internal/mkSourceFiles.test-helper.ts";
 import {
   parseAllFunctionLikes,
   parseFirstFunctionLike,
 } from "../internal/parseFirstFunctionLike.test-helper.ts";
-import { mkSourceFiles } from "../internal/mkSourceFiles.test-helper.ts";
 import { cognitiveCollector, computeCognitive } from "./cognitive.ts";
 
 function compute(src: string): number {
-  const { sourceFile, fn } = parseFirstFunctionLike(src);
-  return computeCognitive(fn, sourceFile);
+  const { fn } = parseFirstFunctionLike(src);
+  return computeCognitive(fn);
 }
 
 describe("computeCognitive", () => {
@@ -96,12 +96,12 @@ describe("computeCognitive", () => {
   });
 
   test("logical operators: single operator → 1", () => {
-    expect(compute("function f(a: boolean, b: boolean){ return a && b; }")).toBe(
-      1,
-    );
-    expect(compute("function f(a: boolean, b: boolean){ return a || b; }")).toBe(
-      1,
-    );
+    expect(
+      compute("function f(a: boolean, b: boolean){ return a && b; }"),
+    ).toBe(1);
+    expect(
+      compute("function f(a: boolean, b: boolean){ return a || b; }"),
+    ).toBe(1);
   });
 
   test("logical operators: `a && b && c` → 1 (single run of &&)", () => {
@@ -153,7 +153,7 @@ describe("computeCognitive", () => {
   });
 
   test("nested function does not affect outer score", () => {
-    const { sourceFile, fns } = parseAllFunctionLikes(
+    const { fns } = parseAllFunctionLikes(
       [
         "function outer(x: number){",
         "  function inner(y: number){ if (y) return 1; if (y < 0) return -1; return 0; }",
@@ -163,24 +163,26 @@ describe("computeCognitive", () => {
     );
     const outer = fns.find(
       (f): f is ts.FunctionDeclaration =>
-        f.kind === ts.SyntaxKind.FunctionDeclaration && f.name?.text === "outer",
+        f.kind === ts.SyntaxKind.FunctionDeclaration &&
+        f.name?.text === "outer",
     );
     const inner = fns.find(
       (f): f is ts.FunctionDeclaration =>
-        f.kind === ts.SyntaxKind.FunctionDeclaration && f.name?.text === "inner",
+        f.kind === ts.SyntaxKind.FunctionDeclaration &&
+        f.name?.text === "inner",
     );
     if (!outer || !inner) throw new Error("functions not found");
     // outer: no branches of its own, no recursion → 0
-    expect(computeCognitive(outer, sourceFile)).toBe(0);
+    expect(computeCognitive(outer)).toBe(0);
     // inner: two top-level ifs, each +1 at nesting 0 → 2
-    expect(computeCognitive(inner, sourceFile)).toBe(2);
+    expect(computeCognitive(inner)).toBe(2);
   });
 
   test("arrow with expression body containing ternary → 1", () => {
-    const { sourceFile, fn } = parseFirstFunctionLike(
+    const { fn } = parseFirstFunctionLike(
       "const f = (x: boolean) => x ? 1 : 0;",
     );
-    expect(computeCognitive(fn, sourceFile)).toBe(1);
+    expect(computeCognitive(fn)).toBe(1);
   });
 
   test("labeled `break` adds +1; plain `break` adds 0", () => {

@@ -60,8 +60,7 @@ export function computeMetrics(
   const instability = computeInstability(adjacency);
 
   const result = new Map<string, NodeMetrics>();
-  for (let i = 0; i < adjacency.nodeIds.length; i++) {
-    const id = adjacency.nodeIds[i] as string;
+  for (const [i, id] of adjacency.nodeIds.entries()) {
     const fan = computeFan(adjacency, i);
     const node: NodeMetrics = {
       fanInUnweighted: fan.fanInUnweighted,

@@ -51,8 +51,8 @@ export function buildPercentileLookup(
 
   // High-end rank table: value → 1-based rank of the *last* occurrence.
   const lastRankByValue = new Map<number, number>();
-  for (let i = 0; i < n; i++) {
-    lastRankByValue.set(sorted[i] as number, i + 1);
+  for (const [i, value] of sorted.entries()) {
+    lastRankByValue.set(value, i + 1);
   }
   const meanStd = computeMeanStd(sorted);
   // When every population value is identical there is no ranking

@@ -1,11 +1,8 @@
 import ts from "typescript";
 import { describe, expect, test } from "vitest";
+import { countMatches, makeCountingCollector } from "./countingCollector.ts";
 import { enumerateDeclarations } from "./enumerate-declarations.ts";
 import { mkSourceFiles } from "./internal/mkSourceFiles.test-helper.ts";
-import {
-  countMatches,
-  makeCountingCollector,
-} from "./countingCollector.ts";
 import { parseFirstFunctionLike } from "./internal/parseFirstFunctionLike.test-helper.ts";
 
 describe("countMatches", () => {
@@ -13,22 +10,22 @@ describe("countMatches", () => {
     const { fn } = parseFirstFunctionLike(
       "function f(){ a(); b(); c(); return 1; }",
     );
-    const n = countMatches(
+    const count = countMatches(
       fn,
-      (n) => n.kind === ts.SyntaxKind.CallExpression,
+      (node) => node.kind === ts.SyntaxKind.CallExpression,
     );
-    expect(n).toBe(3);
+    expect(count).toBe(3);
   });
 
   test("excludes hits inside nested functions", () => {
     const { fn } = parseFirstFunctionLike(
       "function f(){ const g = () => { a(); b(); }; return g; }",
     );
-    const n = countMatches(
+    const count = countMatches(
       fn,
-      (n) => n.kind === ts.SyntaxKind.CallExpression,
+      (node) => node.kind === ts.SyntaxKind.CallExpression,
     );
-    expect(n).toBe(0);
+    expect(count).toBe(0);
   });
 });
 
@@ -64,9 +61,9 @@ describe("makeCountingCollector", () => {
       "src/a.ts": "export function f(){ return 1; }",
     });
     const declarations = enumerateDeclarations(files);
-    expect(() =>
-      collector.collect({ rootDir: "/proj", declarations }),
-    ).toThrowError(/boomCollector failed at src\/a\.ts:1.*kaboom/);
+    expect(() => collector.collect({ rootDir: "/proj", declarations })).toThrow(
+      /boomCollector failed at src\/a\.ts:1.*kaboom/,
+    );
   });
 
   test("exposes a count function that uses the same predicate", () => {

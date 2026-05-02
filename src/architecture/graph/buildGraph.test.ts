@@ -26,10 +26,15 @@ function ids(graph: Graph): string[] {
 function edgesOf(
   graph: Graph,
   predicate?: (e: Edge) => boolean,
-): Array<Pick<Edge, "from" | "to" | "kind" | "uncertain">> {
+): Pick<Edge, "from" | "to" | "kind" | "uncertain">[] {
   return graph.edges
     .filter((e) => predicate?.(e) ?? true)
-    .map((e) => ({ from: e.from, to: e.to, kind: e.kind, uncertain: e.uncertain }));
+    .map((e) => ({
+      from: e.from,
+      to: e.to,
+      kind: e.kind,
+      uncertain: e.uncertain,
+    }));
 }
 
 describe("buildGraph — nodes", () => {
@@ -68,7 +73,10 @@ describe("buildGraph — edge kinds", () => {
   };
 
   it("class extends → 'extends'", () => {
-    const g = build(importer(`export class Sub extends Target {}`), targetClass);
+    const g = build(
+      importer(`export class Sub extends Target {}`),
+      targetClass,
+    );
     expect(edgesOf(g)).toEqual([
       {
         from: "src/a.ts::Sub::class",

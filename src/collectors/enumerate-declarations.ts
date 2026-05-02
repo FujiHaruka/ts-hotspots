@@ -96,21 +96,19 @@ function getDeclarationName(
       return "constructor";
     case ts.SyntaxKind.GetAccessor:
     case ts.SyntaxKind.SetAccessor:
-      return (
-        node as ts.GetAccessorDeclaration | ts.SetAccessorDeclaration
-      ).name.getText(sourceFile);
+      return node.name.getText(sourceFile);
     case ts.SyntaxKind.FunctionDeclaration: {
-      const named = (node as ts.FunctionDeclaration).name?.text;
+      const named = node.name?.text;
       if (named !== undefined && named !== "") return named;
       break;
     }
     case ts.SyntaxKind.MethodDeclaration: {
-      const named = (node as ts.MethodDeclaration).name.getText(sourceFile);
+      const named = node.name.getText(sourceFile);
       if (named !== "") return named;
       break;
     }
     case ts.SyntaxKind.FunctionExpression: {
-      const named = (node as ts.FunctionExpression).name?.text;
+      const named = node.name?.text;
       if (named !== undefined && named !== "") return named;
       break;
     }

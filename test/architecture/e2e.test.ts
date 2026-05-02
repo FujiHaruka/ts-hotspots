@@ -1,6 +1,21 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { main as archMain } from "../../src/architecture/cli/main.ts";
-import { createTempRepo, type TempRepo } from "../dedup/e2e/helpers/tempRepo.ts";
+import type {
+  ArchErrorReport,
+  ArchReport,
+} from "../../src/architecture/report/types.ts";
+import {
+  createTempRepo,
+  type TempRepo,
+} from "../dedup/e2e/helpers/tempRepo.ts";
+
+function parseReport(out: string): ArchReport {
+  return JSON.parse(out) as ArchReport;
+}
+
+function parseErrorReport(out: string): ArchErrorReport {
+  return JSON.parse(out) as ArchErrorReport;
+}
 
 describe("architecture e2e", () => {
   const repos: TempRepo[] = [];
@@ -76,16 +91,15 @@ describe("architecture e2e", () => {
     const code = await archMain(["--format", "json", r.path], io);
     expect(code).toBe(0);
 
-    const parsed = JSON.parse(io.out);
+    const parsed = parseReport(io.out);
     expect(parsed.tool.name).toBe("ts-hotspots");
     expect(Array.isArray(parsed.hotspots)).toBe(true);
-    const hub = parsed.hotspots.find(
-      (h: { ref: { location: string } }) =>
-        h.ref.location.startsWith("src/hub.ts:"),
+    const hub = parsed.hotspots.find((h) =>
+      h.ref.location.startsWith("src/hub.ts:"),
     );
     expect(hub).toBeDefined();
-    expect(hub.ref.name).toBe("hub");
-    expect(hub.dismissalId).toMatch(/^arch:[0-9a-f]{16}$/);
+    expect(hub?.ref.name).toBe("hub");
+    expect(hub?.dismissalId).toMatch(/^arch:[0-9a-f]{16}$/);
   });
 
   it("emits a Markdown report with the agent prelude + JSON fence", async () => {
@@ -106,7 +120,7 @@ describe("architecture e2e", () => {
       io,
     );
     expect(code).toBe(0);
-    const parsed = JSON.parse(io.out);
+    const parsed = parseReport(io.out);
     expect(parsed.hotspots.length).toBeLessThanOrEqual(1);
   });
 
@@ -132,15 +146,11 @@ describe("architecture e2e", () => {
     r.commit("late");
 
     const headIO = makeIO();
-    const codeHead = await archMain(
-      ["--format", "json", r.path],
-      headIO,
-    );
+    const codeHead = await archMain(["--format", "json", r.path], headIO);
     expect(codeHead).toBe(0);
-    const headReport = JSON.parse(headIO.out);
-    const headLate = headReport.hotspots.find(
-      (h: { ref: { location: string } }) =>
-        h.ref.location.startsWith("src/late.ts:"),
+    const headReport = parseReport(headIO.out);
+    const headLate = headReport.hotspots.find((h) =>
+      h.ref.location.startsWith("src/late.ts:"),
     );
     // 'late' may or may not be a hotspot, but the file count should
     // reflect HEAD's tree.
@@ -153,7 +163,7 @@ describe("architecture e2e", () => {
       baseIO,
     );
     expect(codeBase).toBe(0);
-    const baseReport = JSON.parse(baseIO.out);
+    const baseReport = parseReport(baseIO.out);
     expect(baseReport.project.sourceFileCount).toBe(9);
   });
 
@@ -177,10 +187,9 @@ describe("architecture e2e", () => {
     const io = makeIO();
     const code = await archMain(["--format", "json", r.path], io);
     expect(code).toBe(0);
-    const report = JSON.parse(io.out);
-    const hub = report.hotspots.find(
-      (h: { ref: { location: string } }) =>
-        h.ref.location.startsWith("src/hub.ts:"),
+    const report = parseReport(io.out);
+    const hub = report.hotspots.find((h) =>
+      h.ref.location.startsWith("src/hub.ts:"),
     );
     expect(hub).toBeUndefined();
   });
@@ -198,7 +207,7 @@ describe("architecture e2e", () => {
     const io = makeIO();
     const code = await archMain(["--format", "json", r.path], io);
     expect(code).toBe(1);
-    const parsed = JSON.parse(io.out);
+    const parsed = parseErrorReport(io.out);
     expect(parsed.status).toBe("error");
     expect(parsed.error.code).toBe("INVALID_CONFIG");
   });
@@ -222,7 +231,7 @@ describe("architecture e2e", () => {
       ioNoTypes,
     );
     expect(codeNo).toBe(0);
-    const reportNoTypes = JSON.parse(ioNoTypes.out);
+    const reportNoTypes = parseReport(ioNoTypes.out);
     // No runtime edges at all — no candidate should clear the small-N
     // gate (z-score against an all-zero distribution is 0).
     expect(reportNoTypes.hotspots.length).toBe(0);

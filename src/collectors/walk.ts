@@ -1,13 +1,11 @@
 import ts from "typescript";
 import type { FunctionLikeNode } from "./types.ts";
 
-export function getFunctionBody(
-  node: FunctionLikeNode,
-): ts.Node | undefined {
+export function getFunctionBody(node: FunctionLikeNode): ts.Node | undefined {
   if (node.kind === ts.SyntaxKind.ArrowFunction) {
-    return (node as ts.ArrowFunction).body;
+    return node.body;
   }
-  return (node as Exclude<FunctionLikeNode, ts.ArrowFunction>).body;
+  return node.body;
 }
 
 const NESTED_FUNCTION_KINDS = new Set<ts.SyntaxKind>([
