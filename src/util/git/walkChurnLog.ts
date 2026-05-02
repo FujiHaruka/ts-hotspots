@@ -28,8 +28,13 @@ export interface WalkChurnLogOptions {
 }
 
 export interface ChurnLogVisitor {
-  /** Invoked once per commit boundary (the `CMT` marker line). */
-  onCommit?(): void;
+  /**
+   * Invoked once per commit boundary (the `CMT` marker line). If the caller
+   * supplied `--format=tformat:CMT %h` (or similar with a token after the
+   * marker), the trailing token is forwarded as `sha`; with the SHA-less
+   * `--format=tformat:CMT` format it is `undefined`.
+   */
+  onCommit?(sha?: string): void;
   /** Invoked for each tracked file touched in the current commit. */
   onChange(canonicalPath: string): void;
 }
@@ -79,6 +84,10 @@ export function walkChurnLog(
     if (line === "") continue;
     if (line === COMMIT_MARKER) {
       visitor.onCommit?.();
+      continue;
+    }
+    if (line.startsWith(`${COMMIT_MARKER} `) && !line.includes("\t")) {
+      visitor.onCommit?.(line.slice(COMMIT_MARKER.length + 1));
       continue;
     }
     const tab = line.indexOf("\t");
