@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { parseFirstFunctionLike } from "../collectors/internal/parseFirstFunctionLike.test-helper.ts";
-import { computeBodyHash, hashText, membersToDupDismissalId } from "./hash.ts";
+import {
+  computeBodyHash,
+  hashText,
+  membersToDupDismissalId,
+  normalizeDismissalId,
+} from "./hash.ts";
 
 function hashOf(source: string): string {
   const { sourceFile, fn } = parseFirstFunctionLike(source);
@@ -88,5 +93,32 @@ describe("membersToDupDismissalId", () => {
       b.replace(/^sha256:/, ""),
     ]);
     expect(idPrefixed).toBe(idBare);
+  });
+});
+
+describe("normalizeDismissalId", () => {
+  test("passes through coch:<hex> unchanged", () => {
+    const id = "coch:0123456789abcdef";
+    expect(normalizeDismissalId(id)).toBe(id);
+  });
+
+  test("passes through arch:<hex> unchanged", () => {
+    const id = "arch:0123456789abcdef";
+    expect(normalizeDismissalId(id)).toBe(id);
+  });
+
+  test("passes through dup:<hex> unchanged", () => {
+    const id = `dup:${"a".repeat(64)}`;
+    expect(normalizeDismissalId(id)).toBe(id);
+  });
+
+  test("passes through comp:<hex> unchanged", () => {
+    const id = `comp:${"b".repeat(64)}`;
+    expect(normalizeDismissalId(id)).toBe(id);
+  });
+
+  test("legacy sha256:<hex> rewrites to comp: prefix", () => {
+    const id = `sha256:${"c".repeat(64)}`;
+    expect(normalizeDismissalId(id)).toBe(`comp:${"c".repeat(64)}`);
   });
 });

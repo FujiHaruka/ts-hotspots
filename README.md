@@ -2,13 +2,14 @@
 
 A CLI that statically analyzes a TypeScript project and points coding agents at the spots most worth reading first. It returns coordinates and metric facts as JSON (or a Markdown prompt wrap), and leaves the judgment of *what to do* to the agent or reviewer downstream.
 
-Three complementary readings of "worth reading first" are supported as subcommands of the same binary:
+Four complementary readings of "worth reading first" are supported as subcommands of the same binary:
 
 - `ts-hotspots complexity` (alias `comp`) — per-function metrics (cognitive complexity, sloc, parameters, churn, …) ranked into a small set of **hotspot candidates**. Best for "where in this codebase should I refactor?"
 - `ts-hotspots duplication` (alias `dup`) — Type-3 **duplication candidates** found across the tree or against a PR diff. Best for "is this change copy-pasting something we already have?"
 - `ts-hotspots architecture` (alias `arch`) — exported components ranked by **structural pressure** (fan-in / fan-out / centrality). Best for "which components are load-bearing in this codebase?"
+- `ts-hotspots cochange` (alias `coch`) — file pairs that change together in git history, ranked by **logical coupling** (support / conditional probability / lift). Best for "which files outside the static graph are entangled with this one?"
 
-All three commands operate on a directory inside a git repository and emit machine-readable output. None of them propose refactors themselves — they hand the agent coordinates and evidence.
+All four commands operate on a directory inside a git repository and emit machine-readable output. None of them propose refactors themselves — they hand the agent coordinates and evidence.
 
 ## Install
 
@@ -148,13 +149,46 @@ You can place a `.ts-hotspots.json` at the repo root to downweight edges that to
 
 `factor` is in `[0, 1]`. Edges where either endpoint matches a rule's glob have their weight multiplied; multiple matching rules compose multiplicatively.
 
+## Cochange hotspots: `ts-hotspots cochange`
+
+`cochange` ranks **file pairs that change together** in git history. Two files that are repeatedly touched in the same commit, even when no static import edge connects them, are logically coupled — editing one usually means the other needs a look. The walk is rename-tracked, so a refactor that moves `foo.ts` to `lib/foo.ts` does not split its history.
+
+By default it scans the repository at HEAD over the last 200 commits. Pairs are ranked by `confidenceMax` (the higher of `P(B | A)` and `P(A | B)`), with `support` (raw co-change count) and `lift` (above-chance multiplier) reported alongside.
+
+```
+ts-hotspots cochange                              # whole-repo over the last 200 commits at HEAD
+ts-hotspots cochange --file src/foo.ts            # single-anchor: rank co-change partners of foo.ts
+ts-hotspots cochange --diff origin/main...        # display only pairs touching files changed in the PR
+ts-hotspots coch --window 500 --min-support 5     # widen the window, raise the noise floor
+```
+
+`[path]` points at a directory inside a git repository; the repo root is discovered by walking up until a `.git` entry is found (defaults to the current directory).
+
+Each entry in `hotspots[]` has `kind: "cochange"`, the canonical-ordered file pair as `members[]` (and `anchor` in single-anchor mode), a `score` (`{ axis: "confidenceMax", value }` — the stronger conditional probability across the pair, in 0..1), an `evidence` block with `support`, both directional confidences, `lift`, and a `dismissalId` (`coch:<hex>`).
+
+Common options:
+
+- `--format markdown|json` output format (default: markdown)
+- `--exclude <glob>` extra path glob to drop (repeatable; built-in defaults already cover `node_modules`, `dist`, generated files, and tests — including tests would surface every source's own test as its #1 partner)
+- `--limit <N|all>` cap `hotspots[]` at the top N by `confidenceMax` (default: 20)
+- `--verbose` emit the rich schema (window stats, gate counts, full denominators, full SHA list)
+- `--diff <revrange>` display filter only — rankings are still computed against the full window
+- `--ref <ref>` endpoint of the history window (default: `HEAD`)
+- `--window <N>` number of commits in the window (default: 200)
+- `--min-support <N>` drop pairs with raw co-change count below N (default: 3) — protects against one-off coincidences
+- `--max-files-per-commit <N>` ignore commits touching more than N files (default: 50) — protects against mass renames, formatter passes, dependency bumps
+- `--file <path>` single-anchor mode: rank only the partners of `<path>`
+
+False positives can be filtered the same way as the other subcommands; see "Dismissing false positives" below.
+
 ## Dismissing false positives
 
-All three features are heuristics — some surfaces will be fine as-is (intentional state-machine dispatchers, generated code, copy-pasted config tables, deliberate parallel structures, load-bearing public APIs). To keep the agent from re-evaluating the same false positives every run, each reported entry carries a `dismissalId`:
+All four features are heuristics — some surfaces will be fine as-is (intentional state-machine dispatchers, generated code, copy-pasted config tables, deliberate parallel structures, load-bearing public APIs, file pairs that genuinely belong together). To keep the agent from re-evaluating the same false positives every run, each reported entry carries a `dismissalId`:
 
 - `comp:<hex>` for complexity hotspot candidates (one per function)
 - `dup:<hex>` for duplication hotspots (one per group, derived from the group's member set)
 - `arch:<hex>` for architecture hotspots (one per component, derived from the component id)
+- `coch:<hex>` for cochange hotspots (one per canonical-ordered file pair)
 
 Record a judgment with:
 
@@ -164,7 +198,7 @@ ts-hotspots dismiss <dismissalId> --reason "<why it's fine>"
 
 Entries are stored per machine under `~/.config/ts-hotspots/<projectKey>/dismissed.json` (honoring `XDG_CONFIG_HOME` if set). This is a personal cache — nothing is written into your repository, and dismissals are not shared across machines or teammates. Subsequent runs filter the entry from the report.
 
-Auto-expiry is intentional: the id is a hash of the underlying source (the function body for `comp:`, the group's member fingerprints for `dup:`, the canonical component id for `arch:`). Any meaningful edit invalidates the id, so a dismissal you made for a structure that has since changed is dropped and the candidate re-surfaces. Stale entries are pruned automatically on each run; you do not need to garbage-collect by hand.
+Auto-expiry is intentional: the id is a hash of the underlying source (the function body for `comp:`, the group's member fingerprints for `dup:`, the canonical component id for `arch:`, the canonical file-pair for `coch:`). Any meaningful edit invalidates the id, so a dismissal you made for a structure that has since changed is dropped and the candidate re-surfaces. Stale entries are pruned automatically on each run; you do not need to garbage-collect by hand.
 
 Supporting subcommands:
 
