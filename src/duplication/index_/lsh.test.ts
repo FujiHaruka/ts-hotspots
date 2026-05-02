@@ -8,6 +8,7 @@ const baseParams: LshParams = {
   seedCount: 1,
   seed: 1,
   maxBucketSize: 0,
+  minFeatures: 1,
 };
 
 function collect(

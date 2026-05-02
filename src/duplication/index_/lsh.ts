@@ -47,6 +47,14 @@ export interface LshParams {
    * Non-positive disables the cap.
    */
   maxBucketSize: number;
+  /**
+   * Minimum feature-set size required for a fragment to be inserted into
+   * the LSH index. Fragments below this floor are skipped on this axis
+   * (other axes still see them). `1` keeps the legacy behavior of
+   * dropping only empty inputs; higher values defend against the
+   * small-set MinHash degeneracy described in `buildLshIndex`.
+   */
+  minFeatures: number;
 }
 
 export interface LshIndex {
@@ -95,13 +103,32 @@ export function buildLshIndex(
     throw new Error(`seedCount must be >= 1 (got ${String(params.seedCount)})`);
   }
 
-  // For each pass, build (bands × buckets) where each bucket is the list of
-  // fragmentIds whose signature shares the same `rows`-tuple in that band.
-  // Bucket key = fnv1a32 of the row values, packed as u32 → string. We use
-  // a cheap string key so a single Map suffices. Hash collisions across
-  // distinct row-tuples are filtered out by the downstream re-scoring stage.
-  type Pass = Map<string, string[]>[];
+  // For each pass, build (bands × buckets) where each bucket is the list
+  // of fragment **indices** whose signature shares the same `rows`-tuple
+  // in that band. We intern fragmentIds to small integers so the per-band
+  // bucket arrays and the cross-band dedup Set use numeric keys rather
+  // than string allocations — at repo scale this is the difference
+  // between ~1M short-string keys and a single packed-int Set lookup.
+  // Bucket key = fnv1a32 of the row values, packed as u32 → string. We
+  // use a cheap string key so a single Map suffices. Hash collisions
+  // across distinct row-tuples are filtered out by the downstream
+  // re-scoring stage.
+  type Pass = Map<string, number[]>[];
   const passes: Pass[] = [];
+
+  // String-table for fragmentIds. Index → fragmentId; the inverse Map
+  // (`indexByFragmentId`) is used only during build so visitors see the
+  // original string id while bucket dedup operates on integers.
+  const fragmentIdByIndex: string[] = [];
+  const indexByFragmentId = new Map<string, number>();
+  const internFragmentId = (id: string): number => {
+    const existing = indexByFragmentId.get(id);
+    if (existing !== undefined) return existing;
+    const next = fragmentIdByIndex.length;
+    fragmentIdByIndex.push(id);
+    indexByFragmentId.set(id, next);
+    return next;
+  };
 
   let bucketCollisionPairs = 0;
   let totalBuckets = 0;
@@ -116,21 +143,24 @@ export function buildLshIndex(
       params.numHashes,
       mixSeed(params.seed, pass),
     );
-    const bands: Map<string, string[]>[] = [];
+    const bands: Map<string, number[]>[] = [];
     for (let b = 0; b < params.bands; b++) {
-      bands.push(new Map<string, string[]>());
+      bands.push(new Map<string, number[]>());
     }
 
+    // Skip fragments below the configured floor. The default of 1 keeps
+    // legacy behavior (drop empties only); higher values defend against
+    // the small-set MinHash degeneracy where a 1-3 element feature set
+    // produces a signature dominated by a handful of repeated hash
+    // values, which then collide all-vs-all across every band and
+    // pollute the candidate stream with O(k²) low-quality pairs.
+    const minFeatures = Math.max(1, params.minFeatures);
     for (const input of inputs) {
-      // Empty / near-empty token sets produce signatures dominated by the
-      // sentinel `UINT32_MAX`, which collide for every band and pollute
-      // every bucket. Skip them entirely — they're not useful LSH input,
-      // and the legacy inverted-index path also implicitly drops them
-      // (no postings → never a candidate).
       const featCount = sizeOf(input.features);
-      if (featCount === 0) continue;
+      if (featCount < minFeatures) continue;
       const sig = hasher.sign(input.features);
-      insertIntoBands(sig, input.fragmentId, bands, params.bands, params.rows);
+      const idx = internFragmentId(input.fragmentId);
+      insertIntoBands(sig, idx, bands, params.bands, params.rows);
     }
 
     // Gather telemetry.
@@ -163,7 +193,12 @@ export function buildLshIndex(
   };
 
   function forEachCandidatePair(visit: (a: string, b: string) => void): void {
-    const seen = new Set<string>();
+    // Pack (lo, hi) → one Number key. With < 4M interned ids the high
+    // half fits in 22 bits and the multiplied key stays under 2^44, well
+    // inside the Number-as-integer range. Avoids the per-pair string
+    // allocation the legacy `${a}|${b}` keying paid.
+    const stride = fragmentIdByIndex.length + 1;
+    const seen = new Set<number>();
     for (const pass of passes) {
       for (const band of pass) {
         for (const bucket of band.values()) {
@@ -173,12 +208,18 @@ export function buildLshIndex(
             const x = nonNull(bucket[i]);
             for (let j = i + 1; j < bucket.length; j++) {
               const y = nonNull(bucket[j]);
-              const a = x < y ? x : y;
-              const b = x < y ? y : x;
-              const key = `${a}|${b}`;
+              const lo = x < y ? x : y;
+              const hi = x < y ? y : x;
+              const key = lo * stride + hi;
               if (seen.has(key)) continue;
               seen.add(key);
-              visit(a, b);
+              // The numeric (lo, hi) is canonical for dedup, but the
+              // public contract emits the lex-smaller fragmentId first
+              // — preserving the legacy stable order across runs.
+              const idA = nonNull(fragmentIdByIndex[lo]);
+              const idB = nonNull(fragmentIdByIndex[hi]);
+              if (idA < idB) visit(idA, idB);
+              else visit(idB, idA);
             }
           }
         }
@@ -197,8 +238,8 @@ export function buildLshIndex(
 
 function insertIntoBands(
   sig: MinHashSignature,
-  fragmentId: string,
-  bands: Map<string, string[]>[],
+  fragmentIndex: number,
+  bands: Map<string, number[]>[],
   numBands: number,
   rows: number,
 ): void {
@@ -225,7 +266,7 @@ function insertIntoBands(
       bucket = [];
       band.set(key, bucket);
     }
-    bucket.push(fragmentId);
+    bucket.push(fragmentIndex);
   }
 }
 

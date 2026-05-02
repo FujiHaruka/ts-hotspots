@@ -31,6 +31,7 @@ export const defaultConfig: Config = {
         seedCount: 1,
         seed: 0xdeadbeef,
         maxBucketSize: 64,
+        minFeatures: 1,
       },
       call: {
         enabled: true,
@@ -50,6 +51,7 @@ export const defaultConfig: Config = {
         // structure (e.g. identical method bodies).
         seed: 0xcafebabe,
         maxBucketSize: 64,
+        minFeatures: 1,
       },
       statement: {
         enabled: true,
@@ -62,6 +64,7 @@ export const defaultConfig: Config = {
         seedCount: 1,
         seed: 0xfeedface,
         maxBucketSize: 64,
+        minFeatures: 1,
       },
     },
   },
