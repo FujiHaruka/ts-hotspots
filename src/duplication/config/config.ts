@@ -32,6 +32,19 @@ export interface LshAxisConfig {
    * Set to `0` or a non-positive value to disable the cap.
    */
   maxBucketSize: number;
+  /**
+   * Skip fragments whose feature-set size is below this floor when
+   * inserting into the LSH index. Fragments with very few features
+   * collapse to near-identical MinHash signatures (one shared feature key
+   * → identical hash family across all 128 slots), so they all-vs-all
+   * collide in every band and pollute the candidate stream with
+   * `O(k²)` low-quality pairs. The cross-axis OR-gate still picks up
+   * genuine clones via the other two axes.
+   *
+   * `1` keeps every fragment with ≥1 feature (legacy behavior); higher
+   * values skip small fragments on this axis only.
+   */
+  minFeatures: number;
 }
 
 export interface Config {
