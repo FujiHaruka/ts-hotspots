@@ -64,6 +64,7 @@ import { buildGraph } from "../graph/buildGraph.ts";
 import { computeMetrics, withBetweenness } from "../metrics/index.ts";
 import { serializeReport } from "../report/serializeReport.ts";
 import type { ArchHotspot, ArchReport, ArchTool } from "../report/types.ts";
+import { readTsconfigResolution } from "../resolve/tsconfigPaths.ts";
 import { score } from "../scoring/score.ts";
 import { buildLineCounts, collectSmallNodeIds } from "../scoring/sizeFloor.ts";
 import { collectTypeOnlyNodeIds } from "../scoring/typeOnlyNodes.ts";
@@ -207,7 +208,8 @@ export async function runPipeline(
       ref: args.ref,
       excludeGlobs: exclude,
     });
-    const graph = buildGraph({ sources });
+    const tsconfig = readTsconfigResolution(repoPath);
+    const graph = buildGraph({ sources, tsconfig });
 
     const { metrics: baseMetrics, adjacency } = computeMetrics(graph, {
       includeTypes: args.includeTypes,

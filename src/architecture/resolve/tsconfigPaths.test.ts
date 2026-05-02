@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { parseTsconfigResolution } from "./tsconfigPaths.ts";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  parseTsconfigResolution,
+  readTsconfigResolution,
+} from "./tsconfigPaths.ts";
 
 describe("parseTsconfigResolution", () => {
   it("falls back to baseUrl='.' when not set", () => {
@@ -50,6 +56,43 @@ describe("parseTsconfigResolution", () => {
 
   it("collapses missing compilerOptions to the empty resolution", () => {
     expect(parseTsconfigResolution({})).toEqual({
+      baseUrl: ".",
+      mappings: [],
+    });
+  });
+});
+
+describe("readTsconfigResolution", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "ts-hotspots-tsconfig-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("returns the empty resolution when tsconfig.json is absent", () => {
+    expect(readTsconfigResolution(dir)).toEqual({
+      baseUrl: ".",
+      mappings: [],
+    });
+  });
+
+  it("reads baseUrl + paths from tsconfig.json", () => {
+    writeFileSync(
+      join(dir, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: { baseUrl: ".", paths: { "@/*": ["src/*"] } },
+      }),
+    );
+    const got = readTsconfigResolution(dir);
+    expect(got.baseUrl).toBe(".");
+    expect(got.mappings.map((m) => m.pattern)).toEqual(["@/*"]);
+  });
+
+  it("collapses to empty resolution when tsconfig.json is invalid JSON", () => {
+    writeFileSync(join(dir, "tsconfig.json"), "{ not json");
+    expect(readTsconfigResolution(dir)).toEqual({
       baseUrl: ".",
       mappings: [],
     });
