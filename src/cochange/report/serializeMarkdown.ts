@@ -46,6 +46,11 @@ function renderHeader(
   opts: SerializeOptions,
 ): string[] {
   const lines: string[] = [];
+  if (input.diff !== undefined) {
+    lines.push(
+      `- diff: \`${input.diff.baseSha}\` -> \`${input.diff.headSha}\` (${String(input.diff.changedFiles)} files changed)`,
+    );
+  }
   lines.push(
     `- files analyzed: ${String(input.analyzedFileCount)}`,
     `- window: ${String(input.actualWindow)} of ${String(input.requestedWindow)} commits`,

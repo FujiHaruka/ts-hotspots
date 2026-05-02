@@ -44,8 +44,11 @@ import {
   renderMarkdownHead,
   renderStatsLine,
 } from "../../reporter/render.ts";
-import type { DismissedSummary, ReportTool } from "../../schema.ts";
+import type { DiffInfo, DismissedSummary, ReportTool } from "../../schema.ts";
 import { findGitRoot } from "../../util/git/findGitRoot.ts";
+import { listChangedFilePaths } from "../../util/git/listChangedFilePaths.ts";
+import type { RevRange } from "../../util/git/parseRevRange.ts";
+import { resolveDiffEndpoints } from "../../util/git/runner.ts";
 import { computeMetrics } from "../metrics/computeMetrics.ts";
 import { applyGate } from "../ranking/applyGate.ts";
 import {
@@ -102,13 +105,51 @@ export interface CochangeRunDeps {
   runGitLog: typeof runGitLog;
   runGitShowPrefix: typeof runGitShowPrefix;
   runGitIsShallow: typeof runGitIsShallow;
+  resolveDiffEndpoints: typeof resolveDiffEndpoints;
+  listChangedFilePaths: typeof listChangedFilePaths;
 }
 
 const DEFAULT_DEPS: CochangeRunDeps = {
   runGitLog,
   runGitShowPrefix,
   runGitIsShallow,
+  resolveDiffEndpoints,
+  listChangedFilePaths,
 };
+
+interface DiffScope {
+  baseSha: string;
+  headSha: string;
+  threeDot: boolean;
+  changedFiles: number;
+  isInScope: (filePath: string) => boolean;
+}
+
+async function resolveDiffScope(
+  rev: RevRange,
+  rootDir: string,
+  deps: CochangeRunDeps,
+): Promise<DiffScope> {
+  const { baseSha, headSha } = await deps.resolveDiffEndpoints(
+    rootDir,
+    rev.baseRef,
+    rev.headRef,
+    rev.threeDot,
+  );
+  const repoRelChanged = await deps.listChangedFilePaths(
+    rootDir,
+    baseSha,
+    headSha,
+  );
+  const scope = new Set<string>(repoRelChanged);
+  return {
+    baseSha,
+    headSha,
+    threeDot: rev.threeDot,
+    changedFiles: scope.size,
+    isInScope: (filePath) => scope.has(filePath),
+  };
+}
 
 function applyDismissalRegistry(
   rootDir: string,
@@ -215,8 +256,29 @@ export async function runPipeline(
 
     const fullReport = serializeReport(reportInput, { verbose: args.verbose });
 
+    let scope: DiffScope | undefined;
+    if (args.diff !== undefined) {
+      try {
+        scope = await resolveDiffScope(args.diff, repoPath, deps);
+      } catch (err) {
+        const { code, message } = classifyError(err);
+        const detail =
+          err instanceof Error ? (err.stack ?? err.message) : String(err);
+        errorWriter.post(io, args.format, code, message, detail);
+        return 1;
+      }
+    }
+
+    const hotspotsAfterDiff =
+      scope === undefined
+        ? fullReport.hotspots
+        : fullReport.hotspots.filter((h) => {
+            const inScope = scope.isInScope.bind(scope);
+            return h.members.some((m) => inScope(m.ref.location));
+          });
+
     const { hotspots: hotspotsAfterDismissal, summary: dismissed } =
-      applyDismissalRegistry(repoPath, fullReport.hotspots, io.stderr);
+      applyDismissalRegistry(repoPath, hotspotsAfterDiff, io.stderr);
 
     const finalHotspots = Number.isFinite(args.limit)
       ? hotspotsAfterDismissal.slice(0, args.limit)
@@ -226,6 +288,15 @@ export async function runPipeline(
       ...fullReport,
       hotspots: finalHotspots,
     };
+    if (scope !== undefined) {
+      const diffInfo: DiffInfo = {
+        baseSha: scope.baseSha,
+        headSha: scope.headSha,
+        threeDot: scope.threeDot,
+        changedFiles: scope.changedFiles,
+      };
+      outReport.diff = diffInfo;
+    }
     if (dismissed !== undefined) outReport.dismissed = dismissed;
 
     io.stdout.write(
@@ -237,7 +308,7 @@ export async function runPipeline(
     io.stderr.write(
       renderStatsLine(
         "cochange",
-        buildStatsPayload(reportInput, finalHotspots.length, dismissed),
+        buildStatsPayload(reportInput, finalHotspots.length, dismissed, scope),
       ),
     );
     return 0;
@@ -316,6 +387,7 @@ function buildStatsPayload(
   reportInput: ReturnType<typeof buildReportInput>,
   displayed: number,
   dismissed: DismissedSummary | undefined,
+  scope: DiffScope | undefined,
 ): string {
   let payload =
     `files=${String(reportInput.analyzedFileCount)}, ` +
@@ -325,6 +397,9 @@ function buildStatsPayload(
     `displayed=${String(displayed)}`;
   if (reportInput.commitsSkippedAsLargeChange > 0) {
     payload += `, skippedLarge=${String(reportInput.commitsSkippedAsLargeChange)}`;
+  }
+  if (scope !== undefined) {
+    payload += `, diff=${String(scope.changedFiles)} changed files`;
   }
   if (dismissed !== undefined && dismissed.active > 0) {
     payload += `, dismissed=${String(dismissed.active)}`;
