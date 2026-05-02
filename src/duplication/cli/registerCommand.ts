@@ -171,7 +171,7 @@ function buildParsedArgs(
   const format: ReportFormat = opts.format ?? DEFAULT_FORMAT;
   const limit = opts.limit ?? DEFAULT_LIMIT;
   const churn = {
-    enabled: opts.churn !== false,
+    enabled: opts.churn,
     window: opts.churnWindow,
     ref: opts.churnRef,
   };
@@ -316,9 +316,7 @@ function validateChurnRef(value: string): string {
  * This preserves the legacy parseArgs UX where the bare flag means
  * "summary" and any non-level following token stays a positional.
  */
-export function normalizePhaseTimingsArgv(
-  argv: readonly string[],
-): string[] {
+export function normalizePhaseTimingsArgv(argv: readonly string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];

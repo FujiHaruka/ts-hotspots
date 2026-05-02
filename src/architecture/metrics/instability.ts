@@ -32,10 +32,10 @@ export interface InstabilityResult {
 
 export function computeInstability(adjacency: Adjacency): InstabilityResult {
   const n = adjacency.nodeIds.length;
-  const instability = new Array<number>(n).fill(0);
-  const unstableEdgeCount = new Array<number>(n).fill(0);
-  const unstableEdgeRatio = new Array<number>(n).fill(0);
-  const instabilityDelta = new Array<number>(n).fill(0);
+  const instability = Array.from({ length: n }, (): number => 0);
+  const unstableEdgeCount = Array.from({ length: n }, (): number => 0);
+  const unstableEdgeRatio = Array.from({ length: n }, (): number => 0);
+  const instabilityDelta = Array.from({ length: n }, (): number => 0);
 
   for (let i = 0; i < n; i++) {
     const fanOut = (adjacency.outEdges[i] ?? []).length;

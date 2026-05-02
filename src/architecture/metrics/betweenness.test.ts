@@ -44,8 +44,11 @@ describe("computeBetweenness — bridge nodes", () => {
     );
     const adjacency = buildAdjacency(graph);
     const values = computeBetweenness(adjacency);
-    const idx = (name: string): number =>
-      adjacency.indexById.get(`${name}.ts::${name}::function`) as number;
+    const idx = (name: string): number => {
+      const found = adjacency.indexById.get(`${name}.ts::${name}::function`);
+      if (found === undefined) throw new Error(`unknown component: ${name}`);
+      return found;
+    };
     expect(values[idx("B")]).toBeCloseTo(0.5, 6);
     expect(values[idx("A")]).toBe(0);
     expect(values[idx("C")]).toBe(0);

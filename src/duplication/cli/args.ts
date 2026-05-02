@@ -111,8 +111,8 @@ export function parseCliArgs(argv: readonly string[]): ArgsResult {
   // Swallow commander's writes — the caller of parseCliArgs only wants
   // the parsed result or a thrown error, not free-form output.
   program.configureOutput({
-    writeOut: () => {},
-    writeErr: () => {},
+    writeOut: () => undefined,
+    writeErr: () => undefined,
   });
 
   addDuplicationCommand(program, (args) => {

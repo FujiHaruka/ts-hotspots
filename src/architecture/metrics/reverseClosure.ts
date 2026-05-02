@@ -1,3 +1,8 @@
+// oxlint-disable typescript/no-non-null-assertion
+//   -- BFS bounds the queue indices algorithmically; ! is the documented
+//   pattern. The conflicting `non-nullable-type-assertion-style` rule otherwise
+//   forces a contradictory `as number` cast.
+
 /**
  * Reverse closure size — for each node, the number of distinct
  * ancestors that can reach it via directed edges. This is the
@@ -20,11 +25,11 @@ import type { Adjacency } from "./adjacency.ts";
 
 export function computeReverseClosure(adjacency: Adjacency): number[] {
   const n = adjacency.nodeIds.length;
-  const result = new Array<number>(n).fill(0);
+  const result: number[] = Array.from({ length: n }, () => 0);
   if (n === 0) return result;
 
   const visited = new Uint8Array(n);
-  const queue = new Array<number>(n);
+  const queue: number[] = Array.from({ length: n }, () => 0);
 
   for (let start = 0; start < n; start++) {
     visited.fill(0);
@@ -34,7 +39,7 @@ export function computeReverseClosure(adjacency: Adjacency): number[] {
     queue[tail++] = start;
     let count = 0;
     while (head < tail) {
-      const v = queue[head++] as number;
+      const v = queue[head++]!;
       const inn = adjacency.inEdges[v] ?? [];
       for (const e of inn) {
         const u = e.targetIndex;

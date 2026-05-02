@@ -21,8 +21,8 @@
 
 import { componentIdToArchDismissalId } from "../../dismissal/hash.ts";
 import type { Component, Edge, Graph } from "../graph/types.ts";
-import type { ArchCandidate } from "../scoring/score.ts";
 import { SMELL_TYPES, type SmellType } from "../ranking/types.ts";
+import type { ArchCandidate } from "../scoring/score.ts";
 import type {
   ArchContributingMetric,
   ArchEdgeMix,
@@ -46,9 +46,7 @@ export function serializeReport(
 ): ArchReport {
   const componentById = new Map<string, Component>();
   for (const node of opts.graph.nodes) componentById.set(node.id, node);
-  const edgeMixByNode = opts.verbose
-    ? computeEdgeMix(opts.graph)
-    : undefined;
+  const edgeMixByNode = opts.verbose ? computeEdgeMix(opts.graph) : undefined;
 
   const hotspots = candidates.map((c) =>
     toHotspot(c, componentById, edgeMixByNode),
@@ -78,13 +76,14 @@ function toHotspot(
   edgeMixByNode: ReadonlyMap<string, ArchEdgeMix> | undefined,
 ): ArchHotspot {
   const node = componentById.get(candidate.nodeId);
-  const ref = node === undefined
-    ? { location: candidate.nodeId, kind: "unknown", name: "unknown" }
-    : {
-        location: `${node.filePath}:${String(node.line)}`,
-        kind: node.exportKind,
-        name: node.exportName,
-      };
+  const ref =
+    node === undefined
+      ? { location: candidate.nodeId, kind: "unknown", name: "unknown" }
+      : {
+          location: `${node.filePath}:${String(node.line)}`,
+          kind: node.exportKind,
+          name: node.exportName,
+        };
   const smells: SmellType[] = [
     candidate.primary.smellType,
     ...candidate.secondary.map((s) => s.smellType),
@@ -153,7 +152,11 @@ function buildSummary(
 }
 
 function computeEdgeMix(graph: Graph): Map<string, ArchEdgeMix> {
-  type MutableMix = { fanOut: number; fanIn: number; runtimeIncident: number };
+  interface MutableMix {
+    fanOut: number;
+    fanIn: number;
+    runtimeIncident: number;
+  }
   const mix = new Map<string, MutableMix>();
   for (const node of graph.nodes) {
     mix.set(node.id, { fanOut: 0, fanIn: 0, runtimeIncident: 0 });

@@ -77,9 +77,9 @@ export function computeMaxNestingDepth(node: FunctionLikeNode): number {
 
 function getBody(node: FunctionLikeNode): ts.Node | undefined {
   if (node.kind === ts.SyntaxKind.ArrowFunction) {
-    return (node as ts.ArrowFunction).body;
+    return node.body;
   }
-  return (node as Exclude<FunctionLikeNode, ts.ArrowFunction>).body;
+  return node.body;
 }
 
 export const maxNestingDepthCollector = makeCollector<MaxNestingDepthResult>({

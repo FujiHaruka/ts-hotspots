@@ -89,7 +89,7 @@ describe("serializeReport (slim default)", () => {
       summary: STUB_DIFF_SUMMARY,
     });
     const out = serializeReport(report, { verbose: false });
-    expect(out).toMatchObject({ hotspots: expect.any(Array) });
+    expect(out).toMatchObject({ hotspots: expect.any(Array) as unknown });
     const raw = out as unknown as Record<string, unknown>;
     expect(raw.groups).toBeUndefined();
     // Success reports omit `status`; only error envelopes keep it.

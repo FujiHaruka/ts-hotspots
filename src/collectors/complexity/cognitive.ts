@@ -22,10 +22,7 @@ const LOGICAL_OPERATOR_KINDS = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.QuestionQuestionToken,
 ]);
 
-export function computeCognitive(
-  node: FunctionLikeNode,
-  sourceFile: ts.SourceFile,
-): number {
+export function computeCognitive(node: FunctionLikeNode): number {
   const body = getBody(node);
   if (!body) return 0;
 
@@ -144,7 +141,9 @@ export function computeCognitive(
             (parent as ts.BinaryExpression).operatorToken.kind === opKind;
           if (!parentIsSameOp) score += 1;
         }
-        ts.forEachChild(n, (child) => visit(child, nesting));
+        ts.forEachChild(n, (child) => {
+          visit(child, nesting);
+        });
         return;
       }
 
@@ -158,12 +157,16 @@ export function computeCognitive(
             score += 1;
           }
         }
-        ts.forEachChild(n, (child) => visit(child, nesting));
+        ts.forEachChild(n, (child) => {
+          visit(child, nesting);
+        });
         return;
       }
 
       default: {
-        ts.forEachChild(n, (child) => visit(child, nesting));
+        ts.forEachChild(n, (child) => {
+          visit(child, nesting);
+        });
         return;
       }
     }
@@ -175,9 +178,9 @@ export function computeCognitive(
 
 function getBody(node: FunctionLikeNode): ts.Node | undefined {
   if (node.kind === ts.SyntaxKind.ArrowFunction) {
-    return (node as ts.ArrowFunction).body;
+    return node.body;
   }
-  return (node as Exclude<FunctionLikeNode, ts.ArrowFunction>).body;
+  return node.body;
 }
 
 function getOwnName(node: FunctionLikeNode): string | undefined {
@@ -195,6 +198,6 @@ function getOwnName(node: FunctionLikeNode): string | undefined {
 export const cognitiveCollector = makeCollector<CognitiveResult>({
   name: "cognitive",
   compute: (decl) => ({
-    cognitiveComplexity: computeCognitive(decl.node, decl.sourceFile),
+    cognitiveComplexity: computeCognitive(decl.node),
   }),
 });

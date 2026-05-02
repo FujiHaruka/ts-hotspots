@@ -176,7 +176,7 @@ function buildParsedArgs(
     limit,
     verbose: opts.verbose === true,
     includeTests: opts.includeTests === true,
-    includeTypes: opts.includeTypes !== false,
+    includeTypes: opts.includeTypes,
   };
 }
 
@@ -240,4 +240,3 @@ function parseLimitOption(value: string): number {
   }
   return n;
 }
-

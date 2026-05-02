@@ -68,9 +68,9 @@ function parseDownweight(raw: unknown, source: string): DownweightRule[] {
       `${source}: 'architecture.downweight' must be an array`,
     );
   }
+  const items = raw as readonly unknown[];
   const rules: DownweightRule[] = [];
-  for (let i = 0; i < raw.length; i++) {
-    const entry = raw[i];
+  for (const [i, entry] of items.entries()) {
     if (entry === null || typeof entry !== "object") {
       throw new ArchConfigError(
         `${source}: 'architecture.downweight[${String(i)}]' must be an object`,
