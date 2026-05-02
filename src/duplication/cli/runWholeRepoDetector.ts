@@ -1,5 +1,4 @@
 import { performance } from "node:perf_hooks";
-import type ts from "typescript";
 import { collectChurn } from "../../collectors/churn/commit-count.ts";
 import type { Config } from "../config/index.ts";
 import { resolveSha } from "../diff/gitRunner.ts";
@@ -9,17 +8,14 @@ import type {
   ReportTool,
   ScopeStats,
 } from "../domain/index.ts";
-import { buildFileFeatureContext, extractFeatures } from "../features/index.ts";
 import {
   buildInvertedIndex,
   buildLshIndex,
-  type IndexInput,
   type LshIndexInput,
 } from "../index_/index.ts";
-import { extractFragments, parseSource } from "../indexer/index.ts";
+import { buildBaseIndex } from "../indexer/index.ts";
 import { buildJsonReport, type ScoredPair } from "../report/index.ts";
 import {
-  buildFeatureSets,
   buildIntersectionsFromSets,
   type FragmentFeatureSets,
   meetsMinSize,
@@ -129,33 +125,20 @@ export async function runWholeRepoDetector(
 
   t0 = now();
   emitPhaseStart(perfLog, "baseIndex");
-  const entries: IndexInput[] = [];
-  const featureSetsById = new Map<string, FragmentFeatureSets>();
-  const sourceFileByPath = new Map<string, ts.SourceFile>();
-  const fragmentsByKind = { function: 0, block: 0, window: 0 };
-  const fragmentsPerFile: number[] = [];
-
-  for (const source of sources) {
-    const parsed = parseSource(source.path, source.text);
-    sourceFileByPath.set(source.path, parsed.sourceFile);
-    const fragments = extractFragments(parsed, config);
-    fragmentsPerFile.push(fragments.length);
-    // Build per-file context once and share across every fragment of this
-    // file — keeps `extractFeatures` from rebuilding type/regex ranges
-    // (full-AST walks) per fragment.
-    const fileCtx = buildFileFeatureContext(parsed.sourceFile);
-    for (const fragment of fragments) {
-      fragmentsByKind[fragment.kind] += 1;
-      const features = extractFeatures(
-        fragment,
-        parsed.sourceFile,
-        config,
-        fileCtx,
-      );
-      entries.push({ fragment, features });
-      featureSetsById.set(fragment.id, buildFeatureSets(features));
-    }
-  }
+  // Drive parse + fragment extraction + per-fragment feature work in a
+  // worker pool. The thin-wrapper judgement is computed alongside since
+  // the worker already has the `ts.SourceFile` in scope — that lets the
+  // main thread skip persisting `sourceFileByPath` entirely.
+  const baseIndexResult = await buildBaseIndex(sources, config, {
+    thinWrapperEnabled: config.report.thinWrapper.enabled,
+  });
+  const {
+    entries,
+    featureSetsById,
+    thinWrapperByFragmentId,
+    fragmentsByKind,
+    fragmentsPerFile,
+  } = baseIndexResult;
 
   // The inverted index is only consumed by the legacy candidate generator.
   // Skip the build (and the per-key Map allocations) when LSH is in charge.
@@ -404,7 +387,7 @@ export async function runWholeRepoDetector(
         },
       },
       includeCode,
-      getSourceFile: (filePath) => sourceFileByPath.get(filePath),
+      isThinFragmentById: thinWrapperByFragmentId,
       churnByFile,
     },
     perfLog,
