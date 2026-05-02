@@ -1,5 +1,12 @@
 import { Command, CommanderError } from "commander";
 import pkg from "../../../package.json" with { type: "json" };
+import {
+  buildErrorWriters,
+  type CliIO,
+  type CliWritable,
+  classifyGenericError,
+  sniffFormat,
+} from "../../cli/streaming.ts";
 import { TOOL_NAME } from "../../cli-defaults.ts";
 import {
   loadRegistry,
@@ -11,9 +18,7 @@ import {
 import {
   renderJson,
   renderMarkdownBody,
-  renderMarkdownErrorBody,
   renderMarkdownHead,
-  renderMarkdownPreError,
   renderStatsLine,
 } from "../../reporter/render.ts";
 import { findGitRoot } from "../../util/git/findGitRoot.ts";
@@ -21,7 +26,6 @@ import { defaultConfig } from "../config/index.ts";
 import type {
   CloneCandidateReport,
   DismissedSummary,
-  DuplicationErrorReport,
   ReportTool,
 } from "../domain/index.ts";
 import { serializeReport } from "../report/serializeReport.ts";
@@ -35,82 +39,7 @@ import { runDetector } from "./runDetector.ts";
 import { runWholeRepoDetector } from "./runWholeRepoDetector.ts";
 
 const TOOL: ReportTool = { name: TOOL_NAME, version: pkg.version };
-
-/**
- * Build the error JSON envelope. Mirrors `comp`'s shape so an agent
- * branching on `status` handles both subcommands the same way.
- */
-function buildErrorReport(
-  code: string,
-  message: string,
-): DuplicationErrorReport {
-  return {
-    status: "error",
-    tool: TOOL,
-    error: { code, message },
-  };
-}
-
-/**
- * Write a fatal error before any streaming has begun. JSON mode emits
- * the error envelope to stdout; Markdown mode emits the agent-first
- * pre-error block (heading + message), since no head has been flushed
- * yet so there is no JSON fence to close.
- */
-function writePreStreamError(
-  io: MainIO,
-  format: "markdown" | "json",
-  code: string,
-  message: string,
-  humanDetail: string,
-): void {
-  const report = buildErrorReport(code, message);
-  io.stdout.write(
-    format === "json"
-      ? renderJson(report)
-      : renderMarkdownPreError("duplication", message),
-  );
-  io.stderr.write(`ts-hotspots duplication: ${humanDetail}\n`);
-}
-
-/**
- * Write a fatal error after the Markdown head has been flushed. JSON
- * mode never streams a head, so JSON callers should use
- * `writePreStreamError` exclusively; this branch is markdown-only and
- * closes the open JSON fence with the error envelope as its body.
- */
-function writePostStreamError(
-  io: MainIO,
-  format: "markdown" | "json",
-  code: string,
-  message: string,
-  humanDetail: string,
-): void {
-  const report = buildErrorReport(code, message);
-  io.stdout.write(
-    format === "json" ? renderJson(report) : renderMarkdownErrorBody(report),
-  );
-  io.stderr.write(`ts-hotspots duplication: ${humanDetail}\n`);
-}
-
-/**
- * Best-effort `--format` extraction for the case where commander throws
- * before we have a `ParsedArgs`. We still want a `--format json` caller
- * to receive a JSON envelope on its arg-parse failure.
- */
-function sniffFormat(argv: readonly string[]): "markdown" | "json" {
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--format=json") return "json";
-    if (a === "--format=markdown") return "markdown";
-    if (a === "--format") {
-      const next = argv[i + 1];
-      if (next === "json") return "json";
-      if (next === "markdown") return "markdown";
-    }
-  }
-  return "markdown";
-}
+const errorWriter = buildErrorWriters("duplication", TOOL);
 
 /**
  * Format an arg-parse failure surfaced by commander at the root CLI
@@ -127,35 +56,22 @@ export function writeDuplicationParseError(
   err: unknown,
 ): void {
   const message = err instanceof Error ? err.message : String(err);
-  writePreStreamError(io, sniffFormat(argv), "INVALID_ARGS", message, message);
+  errorWriter.pre(io, sniffFormat(argv), "INVALID_ARGS", message, message);
 }
 
 function classifyError(err: unknown): { code: string; message: string } {
   if (err instanceof ArgParseError) {
     return { code: "INVALID_ARGS", message: err.message };
   }
-  const message = err instanceof Error ? err.message : String(err);
-  // Heuristic mapping: detector failures bubble up `git`-flavoured
-  // messages most of the time. A more exhaustive vocabulary lands when
-  // M5 introduces dismissal-side error codes.
-  if (message.startsWith("not in a git repository")) {
-    return { code: "NOT_A_GIT_REPO", message };
-  }
-  if (/git/i.test(message) || /spawn/i.test(message)) {
-    return { code: "GIT_FAILED", message };
-  }
-  return { code: "UNKNOWN_ERROR", message };
+  return classifyGenericError(err);
 }
 
-export interface DuplicationWritable {
-  write: (chunk: string) => unknown;
-}
-
-export interface MainIO {
-  stdout: DuplicationWritable;
-  stderr: DuplicationWritable;
-  cwd: () => string;
-}
+/**
+ * Re-exported under the dup-domain name so `src/duplication/cli/index.ts`
+ * and the dup test suite can keep referring to `MainIO`. Structurally
+ * identical to arch's IO — the shared `CliIO` is the single source.
+ */
+export type MainIO = CliIO;
 
 const REAL_IO: MainIO = {
   stdout: process.stdout,
@@ -204,7 +120,7 @@ function buildStatsPayload(
 function applyDismissalRegistry(
   rootDir: string,
   report: CloneCandidateReport,
-  stderr: DuplicationWritable,
+  stderr: CliWritable,
 ): DismissedSummary | undefined {
   const original = loadRegistry(rootDir, {
     onWarning: (msg) => {
@@ -266,7 +182,7 @@ export async function runPipeline(
     repoPath = findGitRoot(args.path ?? io.cwd());
   } catch (err) {
     const { code, message } = classifyError(err);
-    writePreStreamError(io, args.format, code, message, message);
+    errorWriter.pre(io, args.format, code, message, message);
     return 1;
   }
 
@@ -292,8 +208,7 @@ export async function runPipeline(
   const churnRunOpts = args.churn.enabled
     ? {
         window: args.churn.window,
-        ref:
-          args.churn.ref ?? (args.mode === "diff" ? args.headRef : args.ref),
+        ref: args.churn.ref ?? (args.mode === "diff" ? args.headRef : args.ref),
         onWarning: (msg: string) => {
           io.stderr.write(`${msg}\n`);
         },
@@ -344,7 +259,7 @@ export async function runPipeline(
     const { code, message } = classifyError(err);
     const humanDetail =
       err instanceof Error ? (err.stack ?? err.message) : String(err);
-    writePostStreamError(io, args.format, code, message, humanDetail);
+    errorWriter.post(io, args.format, code, message, humanDetail);
     return 1;
   }
 }
@@ -402,11 +317,11 @@ export async function main(
     if (err instanceof CommanderError) {
       if (err.code === "commander.helpDisplayed") return 0;
       const message = err.message;
-      writePreStreamError(io, sniffFormat(argv), "INVALID_ARGS", message, message);
+      errorWriter.pre(io, sniffFormat(argv), "INVALID_ARGS", message, message);
       return 1;
     }
     if (err instanceof ArgParseError) {
-      writePreStreamError(
+      errorWriter.pre(
         io,
         sniffFormat(argv),
         "INVALID_ARGS",
