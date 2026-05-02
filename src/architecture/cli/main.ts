@@ -68,6 +68,9 @@ import { readTsconfigResolution } from "../resolve/tsconfigPaths.ts";
 import { score } from "../scoring/score.ts";
 import { buildLineCounts, collectSmallNodeIds } from "../scoring/sizeFloor.ts";
 import { collectTypeOnlyNodeIds } from "../scoring/typeOnlyNodes.ts";
+import { buildPackageMap } from "../workspace/buildPackageMap.ts";
+import { discoverWorkspace } from "../workspace/discoverWorkspace.ts";
+import type { PackageMap } from "../workspace/types.ts";
 import { type ArchParsedArgs, ArgParseError } from "./args.ts";
 import { loadArchSources } from "./loadSources.ts";
 import { addArchitectureCommand } from "./registerCommand.ts";
@@ -209,7 +212,11 @@ export async function runPipeline(
       excludeGlobs: exclude,
     });
     const tsconfig = readTsconfigResolution(repoPath);
-    const graph = buildGraph({ sources, tsconfig });
+    const packageMap = discoverAndBuildPackageMap(repoPath, io.stderr);
+    const graph = buildGraph({
+      sources,
+      resolveCtx: { tsconfig, packageMap },
+    });
 
     const { metrics: baseMetrics, adjacency } = computeMetrics(graph, {
       includeTypes: args.includeTypes,
@@ -309,6 +316,25 @@ export async function runPipeline(
 function splitFile(location: string): string {
   const idx = location.lastIndexOf(":");
   return idx === -1 ? location : location.slice(0, idx);
+}
+
+function discoverAndBuildPackageMap(
+  repoPath: string,
+  stderr: CliWritable,
+): PackageMap | undefined {
+  const ws = discoverWorkspace(repoPath);
+  if (ws === null) return undefined;
+  const map = buildPackageMap({
+    repoRoot: repoPath,
+    packageRoots: ws.packageRoots,
+  });
+  stderr.write(
+    renderStatsLine(
+      "architecture",
+      `discovered ${String(map.packages.length)} workspace packages (mode: ${ws.mode})`,
+    ),
+  );
+  return map;
 }
 
 function buildStatsPayload(

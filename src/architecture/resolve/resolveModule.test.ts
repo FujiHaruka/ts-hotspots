@@ -1,9 +1,43 @@
 import { describe, expect, it } from "vitest";
+import { parseExportsField } from "../workspace/exportsMap.ts";
+import type { PackageInfo, PackageMap } from "../workspace/types.ts";
 import { resolveModule } from "./resolveModule.ts";
 import { parseTsconfigResolution } from "./tsconfigPaths.ts";
 
 function fromFiles(...paths: string[]): ReadonlySet<string> {
   return new Set(paths);
+}
+
+function pkg(
+  name: string,
+  root: string,
+  opts: {
+    exports?: unknown;
+    main?: string;
+  } = {},
+): PackageInfo {
+  return {
+    name,
+    root,
+    exportsMap:
+      opts.exports === undefined ? null : parseExportsField(opts.exports),
+    mainTarget: opts.main ?? null,
+    tsconfigPath: null,
+  };
+}
+
+function makePackageMap(...packages: PackageInfo[]): PackageMap {
+  const byName = new Map<string, PackageInfo>();
+  for (const p of packages) byName.set(p.name, p);
+  const sorted = [...packages].sort((a, b) => b.root.length - a.root.length);
+  const byFile = (file: string): PackageInfo | undefined => {
+    for (const p of sorted) {
+      if (file === p.root) return p;
+      if (file.startsWith(`${p.root}/`)) return p;
+    }
+    return undefined;
+  };
+  return { byName, byFile, packages: [...packages] };
 }
 
 describe("resolveModule — relative imports", () => {
@@ -70,9 +104,9 @@ describe("resolveModule — bare specifiers", () => {
     expect(resolveModule("react", "src/a.ts", { knownFiles: known })).toBe(
       null,
     );
-    expect(
-      resolveModule("@scope/pkg", "src/a.ts", { knownFiles: known }),
-    ).toBe(null);
+    expect(resolveModule("@scope/pkg", "src/a.ts", { knownFiles: known })).toBe(
+      null,
+    );
   });
 });
 
@@ -154,6 +188,181 @@ describe("resolveModule — tsconfig paths", () => {
     const known = fromFiles("src/a.ts");
     expect(
       resolveModule("@/foo", "src/a.ts", { knownFiles: known, tsconfig }),
+    ).toBe(null);
+  });
+});
+
+describe("resolveModule — workspace package", () => {
+  it("resolves @scope/foo (subpath empty → '.') via exports map", () => {
+    const packageMap = makePackageMap(
+      pkg("@scope/foo", "packages/foo", {
+        exports: { ".": "./src/index.ts" },
+      }),
+    );
+    const known = fromFiles("packages/foo/src/index.ts", "src/a.ts");
+    expect(
+      resolveModule("@scope/foo", "src/a.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
+    ).toBe("packages/foo/src/index.ts");
+  });
+
+  it("resolves @scope/foo/client via explicit subpath in exports", () => {
+    const packageMap = makePackageMap(
+      pkg("@scope/foo", "packages/foo", {
+        exports: { "./client": "./src/client.ts" },
+      }),
+    );
+    const known = fromFiles("packages/foo/src/client.ts", "src/a.ts");
+    expect(
+      resolveModule("@scope/foo/client", "src/a.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
+    ).toBe("packages/foo/src/client.ts");
+  });
+
+  it("resolves wildcard exports (single * substitution)", () => {
+    const packageMap = makePackageMap(
+      pkg("@scope/foo", "packages/foo", {
+        exports: { "./sub/*": "./src/sub/*.ts" },
+      }),
+    );
+    const known = fromFiles("packages/foo/src/sub/x.ts", "src/a.ts");
+    expect(
+      resolveModule("@scope/foo/sub/x", "src/a.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
+    ).toBe("packages/foo/src/sub/x.ts");
+  });
+
+  it("returns null when exports is declared but subpath is unmatched (E12)", () => {
+    const packageMap = makePackageMap(
+      pkg("@scope/foo", "packages/foo", {
+        exports: { "./client": "./src/client.ts" },
+      }),
+    );
+    const known = fromFiles(
+      "packages/foo/src/client.ts",
+      "packages/foo/src/missing.ts",
+      "src/a.ts",
+    );
+    expect(
+      resolveModule("@scope/foo/missing", "src/a.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
+    ).toBe(null);
+  });
+
+  it("falls back to package.json#main when exports is absent (subpath empty)", () => {
+    const packageMap = makePackageMap(
+      pkg("@scope/foo", "packages/foo", {
+        main: "packages/foo/src/index.ts",
+      }),
+    );
+    const known = fromFiles("packages/foo/src/index.ts", "src/a.ts");
+    expect(
+      resolveModule("@scope/foo", "src/a.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
+    ).toBe("packages/foo/src/index.ts");
+  });
+
+  it("legacy-probes <root>/<subpath>.ts when exports is absent", () => {
+    const packageMap = makePackageMap(pkg("@scope/foo", "packages/foo"));
+    const known = fromFiles("packages/foo/util.ts", "src/a.ts");
+    expect(
+      resolveModule("@scope/foo/util", "src/a.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
+    ).toBe("packages/foo/util.ts");
+  });
+
+  it("legacy probing returns null when no extension/index variant exists", () => {
+    const packageMap = makePackageMap(pkg("@scope/foo", "packages/foo"));
+    const known = fromFiles("packages/foo/util.ts", "src/a.ts");
+    expect(
+      resolveModule("@scope/foo/missing", "src/a.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
+    ).toBe(null);
+  });
+
+  it("self-referential import resolves through the same package's exports", () => {
+    const packageMap = makePackageMap(
+      pkg("@scope/foo", "packages/foo", {
+        exports: { "./util": "./src/util.ts" },
+      }),
+    );
+    const known = fromFiles(
+      "packages/foo/src/util.ts",
+      "packages/foo/src/x.ts",
+    );
+    expect(
+      resolveModule("@scope/foo/util", "packages/foo/src/x.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
+    ).toBe("packages/foo/src/util.ts");
+  });
+
+  it("tsconfig.paths overrides workspace package matches with the same prefix", () => {
+    const packageMap = makePackageMap(
+      pkg("@scope/foo", "packages/foo", {
+        exports: { ".": "./src/index.ts" },
+      }),
+    );
+    const tsconfig = parseTsconfigResolution({
+      compilerOptions: { paths: { "@scope/foo": ["src/local-override.ts"] } },
+    });
+    const known = fromFiles(
+      "packages/foo/src/index.ts",
+      "src/local-override.ts",
+      "src/a.ts",
+    );
+    expect(
+      resolveModule("@scope/foo", "src/a.ts", {
+        knownFiles: known,
+        tsconfig,
+        packageMap,
+      }),
+    ).toBe("src/local-override.ts");
+  });
+
+  it("falls through to workspace resolution when paths matched but targets miss", () => {
+    // tsconfig.paths is a soft override — when the matched pattern's
+    // targets don't hit a known file, resolution continues to the
+    // workspace branch. This mirrors TS's Bundler resolver, which
+    // doesn't lock in a matched paths pattern to a hard miss.
+    const packageMap = makePackageMap(
+      pkg("@scope/foo", "packages/foo", {
+        exports: { ".": "./src/index.ts" },
+      }),
+    );
+    const tsconfig = parseTsconfigResolution({
+      compilerOptions: { paths: { "@scope/foo": ["src/missing.ts"] } },
+    });
+    const known = fromFiles("packages/foo/src/index.ts", "src/a.ts");
+    expect(
+      resolveModule("@scope/foo", "src/a.ts", {
+        knownFiles: known,
+        tsconfig,
+        packageMap,
+      }),
+    ).toBe("packages/foo/src/index.ts");
+  });
+
+  it("non-package specifier (e.g. node_modules-only) returns null", () => {
+    const packageMap = makePackageMap(pkg("@scope/foo", "packages/foo"));
+    const known = fromFiles("packages/foo/src/index.ts", "src/a.ts");
+    expect(
+      resolveModule("react", "src/a.ts", { knownFiles: known, packageMap }),
     ).toBe(null);
   });
 });
