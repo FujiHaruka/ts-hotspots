@@ -30,6 +30,12 @@ import {
   type ReportFormat,
   TOOL_NAME,
 } from "./cli-defaults.ts";
+import type { CochangeParsedArgs } from "./cochange/cli/args.ts";
+import {
+  runPipeline as runCochangePipeline,
+  writeCochangeParseError,
+} from "./cochange/cli/main.ts";
+import { addCochangeCommand } from "./cochange/cli/registerCommand.ts";
 import { collectChurn } from "./collectors/churn/commit-count.ts";
 import { enumerateDeclarations } from "./collectors/enumerate-declarations.ts";
 import { DEFAULT_EXCLUDE_GLOBS } from "./defaults.ts";
@@ -227,6 +233,21 @@ function findArchitectureCommandIndex(argv: readonly string[]): number {
   return -1;
 }
 
+function isCochangeContext(argv: readonly string[]): boolean {
+  return findCochangeCommandIndex(argv) !== -1;
+}
+
+function findCochangeCommandIndex(argv: readonly string[]): number {
+  for (let i = 2; i < argv.length; i++) {
+    const tok = argv[i];
+    if (tok === undefined) continue;
+    if (tok.startsWith("-")) continue;
+    if (tok === "cochange" || tok === "coch") return i;
+    return -1;
+  }
+  return -1;
+}
+
 /**
  * Rewrite the trailing portion of argv so commander's optional-value
  * `[level]` for `--phase-timings` does not greedily consume a following
@@ -272,6 +293,10 @@ type PendingInvocation =
   | {
       kind: "architecture";
       parsedArgs: ArchParsedArgs;
+    }
+  | {
+      kind: "cochange";
+      parsedArgs: CochangeParsedArgs;
     };
 
 const ROOT_LONG_DESCRIPTION = `ts-hotspots is a static analyzer that hands a coding agent a "where should
@@ -296,12 +321,17 @@ Pick a subcommand by the question you have:
                over-shared — from fan-in / fan-out / reverse closure /
                PageRank / betweenness / instability.
 
-All three write a ${DEFAULT_FORMAT} report to stdout by default; pass --format json
+  cochange     "Which file pairs change together in git history?"
+               Logical coupling between TypeScript files: file pairs
+               that are touched in the same commits more often than
+               chance, even when no static import edge connects them.
+
+All four write a ${DEFAULT_FORMAT} report to stdout by default; pass --format json
 for machine-readable output. Each candidate carries a 'dismissalId' you
 can hand to 'ts-hotspots dismiss' to filter known false positives from
 future runs (auto-expires when the underlying code changes).
 
-All three require [path] (default: cwd) to be inside a git repository.`;
+All four require [path] (default: cwd) to be inside a git repository.`;
 
 const ROOT_HELP_AFTER = `
 Examples:
@@ -357,7 +387,7 @@ const DISMISS_HELP_AFTER = `
 Typical flow:
   1. Run an analysis:                ts-hotspots comp
   2. Pick a candidate's dismissalId from the report (comp:<hex>, dup:<hex>,
-     or arch:<hex>) and dismiss it:  ts-hotspots dismiss comp:abc123 --reason "intentional dispatch table"
+     arch:<hex>, or coch:<hex>) and dismiss it:  ts-hotspots dismiss comp:abc123 --reason "intentional dispatch table"
   3. Future runs filter that id and report a 'dismissed' summary.
 
 Dismissals auto-expire when the underlying code changes (function body
@@ -439,6 +469,10 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
 
   addArchitectureCommand(program, (parsedArgs) => {
     onInvoke({ kind: "architecture", parsedArgs });
+  });
+
+  addCochangeCommand(program, (parsedArgs) => {
+    onInvoke({ kind: "cochange", parsedArgs });
   });
 
   program
@@ -1110,6 +1144,14 @@ export async function run(
       );
       return 1;
     }
+    if (isCochangeContext(argv)) {
+      writeCochangeParseError(
+        { stdout, stderr, cwd: () => process.cwd() },
+        argv,
+        err,
+      );
+      return 1;
+    }
     const message = err instanceof Error ? err.message : String(err);
     stderr.write(`${message}\n`);
     return 1;
@@ -1142,6 +1184,14 @@ export async function run(
     });
   }
 
+  if (invocation.kind === "cochange") {
+    return await runCochangePipeline(invocation.parsedArgs, {
+      stdout,
+      stderr,
+      cwd: () => process.cwd(),
+    });
+  }
+
   try {
     if (invocation.kind === "dismiss" || invocation.kind === "undismiss") {
       if (invocation.id.startsWith("dup:")) {
@@ -1155,6 +1205,14 @@ export async function run(
       if (invocation.id.startsWith("arch:")) {
         return await runFeatureDismissalCommand(
           "arch",
+          invocation,
+          stdout,
+          stderr,
+        );
+      }
+      if (invocation.id.startsWith("coch:")) {
+        return await runFeatureDismissalCommand(
+          "coch",
           invocation,
           stdout,
           stderr,
@@ -1191,13 +1249,13 @@ export async function run(
 }
 
 /**
- * Route `dup:<hex>` and `arch:<hex>` ids to the git-root registry. Both
- * features resolve "the project" via `findGitRoot`, so the registry key
- * has to match — otherwise a dup/arch run would never see entries
- * written by `dismiss`.
+ * Route `dup:<hex>`, `arch:<hex>`, and `coch:<hex>` ids to the git-root
+ * registry. All three features resolve "the project" via `findGitRoot`,
+ * so the registry key has to match — otherwise a feature run would never
+ * see entries written by `dismiss`.
  */
 async function runFeatureDismissalCommand(
-  feature: "arch" | "dup",
+  feature: "arch" | "coch" | "dup",
   invocation:
     | { kind: "dismiss"; id: string; reason: string; path: string | undefined }
     | { kind: "undismiss"; id: string; path: string | undefined },
