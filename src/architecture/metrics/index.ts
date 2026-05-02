@@ -4,15 +4,11 @@ export {
   type BuildAdjacencyOptions,
   buildAdjacency,
 } from "./adjacency.ts";
-export {
-  type ComputeBetweennessOptions,
-  computeBetweenness,
-  withBetweenness,
-} from "./betweenness.ts";
+export { computeBetweenness, withBetweenness } from "./betweenness.ts";
 export {
   type ComputeMetricsOptions,
-  type MetricsBundle,
   computeMetrics,
+  type MetricsBundle,
 } from "./computeMetrics.ts";
 export { computeFan, type FanResult } from "./fanInOut.ts";
 export { computeInstability, type InstabilityResult } from "./instability.ts";

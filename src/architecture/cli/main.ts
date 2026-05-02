@@ -43,7 +43,6 @@ import {
   saveRegistry,
   withProjectPath,
 } from "../../dismissal/store.ts";
-import { normalizePhaseTimingsArgv } from "../../duplication/cli/registerCommand.ts";
 import {
   renderJson,
   renderMarkdownBody,
@@ -378,12 +377,7 @@ export async function main(
   });
 
   try {
-    await program.parseAsync([
-      "node",
-      TOOL_NAME,
-      "architecture",
-      ...normalizePhaseTimingsArgv(argv),
-    ]);
+    await program.parseAsync(["node", TOOL_NAME, "architecture", ...argv]);
   } catch (err) {
     if (err instanceof CommanderError) {
       if (err.code === "commander.helpDisplayed") return 0;

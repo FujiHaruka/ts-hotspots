@@ -95,7 +95,13 @@ this proposal makes for `arch`. Anything not aligned is called out.
 | Flag                | dup behavior                              | arch (proposed)                     |
 | ------------------- | ----------------------------------------- | ----------------------------------- |
 | `--ref <ref>`       | scan a specific commit (default HEAD)     | build the graph at `<ref>` (default working tree) |
-| `--phase-timings [level]` | `summary` (default), `verbose`      | same shape; reuses `normalizePhaseTimingsArgv` |
+
+`--phase-timings` was originally mirrored from dup but dropped before
+v1 ship — the arch pipeline never wired the level into a `JsonlPerfLogger`,
+and the runtime is fast enough on real repos that the diagnostic was not
+worth the surface area. If a future repo blows past budget, fold
+instrumentation back in alongside the betweenness-sampling follow-up
+plan (see "Out of milestones") rather than reviving an unwired flag.
 
 ### arch-specific (justified asymmetries; will need a CLAUDE.md note on landing)
 
@@ -159,7 +165,6 @@ ts-hotspots architecture [path]
     --diff <revrange>          display filter — show only candidates in changed
                                files. Same display-filter semantics as comp.
     --ref <ref>                build the graph at <ref> (default: working tree)
-    --phase-timings [level]    pipeline diagnostics; 'summary' or 'verbose'
     --include-tests            include test files in the graph (default: off)
     --include-types[=false]    include type-only edges (default: on, downweighted)
 ```
@@ -318,9 +323,6 @@ src/architecture/
   arch's `addArchitectureCommand(parent, onParsed)` mirrors this exactly,
   including the help-text shape (`addHelpText("before", LONG_DESCRIPTION)`,
   `addHelpText("after", HELP_AFTER)`).
-- Argv preprocessor: `normalizePhaseTimingsArgv` already handles the
-  optional-value parsing for `--phase-timings`. arch's command must be
-  added to its allow-list.
 - Strip-only check: `tools/check-strip-only.ts` already imports
   `src/cli.ts`, so registering `arch` there transitively covers strip-only
   validation.
@@ -417,7 +419,6 @@ the most likely to need future sampling. Isolating it makes the
 performance budget visible.
 
 - Exact Brandes algorithm. No sampling (deferred).
-- `--phase-timings verbose` instrumentation on this stage specifically.
 - Unit tests: small graphs with known betweenness values.
 
 Exit: betweenness slots into the metric record from M2 without changing
@@ -478,8 +479,7 @@ Goal: wire everything to `ts-hotspots architecture` / alias `arch`.
   - `--ref` — graph built at the given commit (mirrors dup's `--ref`).
   - `--diff` — display filter, mirroring comp (orthogonal to `--ref`;
     both can be passed).
-  - `--include-tests`, `--include-types[=false]`,
-    `--phase-timings [level]`.
+  - `--include-tests`, `--include-types[=false]`.
 - Integration tests: end-to-end CLI invocations against a fixture repo,
   asserting against the same golden snapshots from M5.
 
@@ -509,7 +509,9 @@ their own plans.
 
 - Documentation: README updates land alongside M6 (CLI surface visible)
   and M7 (final tuning), not as a separate milestone.
-- Performance budget: no dedicated milestone. M3 surfaces betweenness
-  cost via `--phase-timings`; if a real repo blows past budget in M7,
-  betweenness sampling becomes its own follow-up plan rather than
-  inflating v1.
+- Performance budget: no dedicated milestone. The arch pipeline ships
+  without `--phase-timings` instrumentation — runtime is fast enough on
+  real repos that the diagnostic was not worth the surface area. If a
+  future repo blows past budget, betweenness sampling becomes its own
+  follow-up plan, and any required instrumentation lands alongside it
+  rather than as a no-op flag.
