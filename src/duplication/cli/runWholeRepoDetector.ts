@@ -32,7 +32,6 @@ import {
   searchCandidates,
 } from "../search/index.ts";
 import { countLines, listBaseSources } from "./listBaseSources.ts";
-import type { ChurnRunOptions } from "./runDetector.ts";
 import type { PerfLogger } from "./perfLog.ts";
 import {
   emitDecideSummary,
@@ -49,6 +48,7 @@ import {
   type PerHitTracker,
   recordPassReasons,
 } from "./perfLogEvents.ts";
+import type { ChurnRunOptions } from "./runDetector.ts";
 
 export interface WholeRepoOptions {
   repoPath: string;
@@ -130,7 +130,6 @@ export async function runWholeRepoDetector(
   t0 = now();
   emitPhaseStart(perfLog, "baseIndex");
   const entries: IndexInput[] = [];
-  const fragmentById = new Map<string, Fragment>();
   const featureSetsById = new Map<string, FragmentFeatureSets>();
   const sourceFileByPath = new Map<string, ts.SourceFile>();
   const fragmentsByKind = { function: 0, block: 0, window: 0 };
@@ -154,7 +153,6 @@ export async function runWholeRepoDetector(
         fileCtx,
       );
       entries.push({ fragment, features });
-      fragmentById.set(fragment.id, fragment);
       featureSetsById.set(fragment.id, buildFeatureSets(features));
     }
   }
@@ -179,25 +177,37 @@ export async function runWholeRepoDetector(
   t0 = now();
   emitPhaseStart(perfLog, "headSearch");
   const tracker = newPerHitTracker();
-  const seenPairs = new Set<string>();
   const scoredPairs: ScoredPair[] = [];
 
+  // Intern fragmentIds to integer indices so the cross-axis dedup Set
+  // and the per-pair lookups in `scoreOne` operate on integers rather
+  // than strings. At repo scale (~4k fragments × ~50k unique pairs)
+  // this saves tens of thousands of `${a}|${b}` string allocations
+  // and Map<string, ...> hash lookups.
+  const fragmentIndexById = new Map<string, number>();
+  interface FragmentInfo {
+    readonly fragment: Fragment;
+    readonly sets: FragmentFeatureSets;
+  }
+  const infoByIndex: FragmentInfo[] = [];
+  for (const { fragment } of entries) {
+    const sets = featureSetsById.get(fragment.id);
+    if (sets === undefined) continue;
+    fragmentIndexById.set(fragment.id, infoByIndex.length);
+    infoByIndex.push({ fragment, sets });
+  }
+  const fragmentIndexCount = infoByIndex.length;
+  const stride = fragmentIndexCount + 1;
+  const seenPairIds = new Set<number>();
+
   /** Score one candidate pair and, if it passes, push it into `scoredPairs`. */
-  const scoreOne = (aId: string, bId: string): void => {
-    const aFragment = fragmentById.get(aId);
-    const bFragment = fragmentById.get(bId);
-    const aSets = featureSetsById.get(aId);
-    const bSets = featureSetsById.get(bId);
+  const scoreOneByInfo = (aInfo: FragmentInfo, bInfo: FragmentInfo): void => {
     if (
-      aFragment === undefined ||
-      bFragment === undefined ||
-      aSets === undefined ||
-      bSets === undefined
-    ) {
-      return;
-    }
-    if (
-      !meetsMinSize(aFragment, bFragment, config.scoring.thresholds.minLines)
+      !meetsMinSize(
+        aInfo.fragment,
+        bInfo.fragment,
+        config.scoring.thresholds.minLines,
+      )
     ) {
       return;
     }
@@ -206,17 +216,17 @@ export async function runWholeRepoDetector(
     const score = scoreCandidateFromSets(
       {
         candidate: {
-          changedFragmentId: aId,
-          baseFragmentId: bId,
+          changedFragmentId: aInfo.fragment.id,
+          baseFragmentId: bInfo.fragment.id,
           // hitCounts is an internal ranking signal used only by the
           // inverted-index candidate sort. Downstream scoring / decide /
           // report don't read it, so zero-fill in the LSH path.
           hitCounts: { token: 0, statement: 0, call: 0 },
         },
-        changedFragment: aFragment,
-        baseFragment: bFragment,
-        changedFeatureSets: aSets,
-        baseFeatureSets: bSets,
+        changedFragment: aInfo.fragment,
+        baseFragment: bInfo.fragment,
+        changedFeatureSets: aInfo.sets,
+        baseFeatureSets: bInfo.sets,
       },
       config,
     );
@@ -249,7 +259,7 @@ export async function runWholeRepoDetector(
     }
 
     if (!ok) return;
-    const intersections = buildIntersectionsFromSets(aSets, bSets);
+    const intersections = buildIntersectionsFromSets(aInfo.sets, bInfo.sets);
     if (perfLog !== undefined) {
       tracker.intersectionTokens.push(intersections.tokens.length);
       tracker.intersectionStatements.push(intersections.statements.length);
@@ -257,10 +267,24 @@ export async function runWholeRepoDetector(
     }
     scoredPairs.push({
       score,
-      changedFragment: aFragment,
-      baseFragment: bFragment,
+      changedFragment: aInfo.fragment,
+      baseFragment: bInfo.fragment,
       intersections,
     });
+  };
+
+  /**
+   * String-id facade over `scoreOneByInfo` for the legacy inverted-index
+   * candidate path, which still hands out string id pairs.
+   */
+  const scoreOneByIds = (aId: string, bId: string): void => {
+    const aIdx = fragmentIndexById.get(aId);
+    const bIdx = fragmentIndexById.get(bId);
+    if (aIdx === undefined || bIdx === undefined) return;
+    const aInfo = infoByIndex[aIdx];
+    const bInfo = infoByIndex[bIdx];
+    if (aInfo === undefined || bInfo === undefined) return;
+    scoreOneByInfo(aInfo, bInfo);
   };
 
   let candidatePairs = 0;
@@ -268,14 +292,15 @@ export async function runWholeRepoDetector(
   if (useLsh) {
     candidatePairs = runLshCandidateGeneration(
       entries,
-      fragmentById,
-      featureSetsById,
+      fragmentIndexById,
+      infoByIndex,
+      stride,
+      seenPairIds,
       config,
       perfLog,
       now,
       tracker,
-      scoreOne,
-      seenPairs,
+      scoreOneByInfo,
     );
   } else {
     if (invertedIndex === null) {
@@ -314,10 +339,15 @@ export async function runWholeRepoDetector(
         const otherId = candidate.baseFragmentId;
         const aId = fragment.id < otherId ? fragment.id : otherId;
         const bId = fragment.id < otherId ? otherId : fragment.id;
-        const key = `${aId}|${bId}`;
-        if (seenPairs.has(key)) continue;
-        seenPairs.add(key);
-        scoreOne(aId, bId);
+        const aIdx = fragmentIndexById.get(aId);
+        const bIdx = fragmentIndexById.get(bId);
+        if (aIdx === undefined || bIdx === undefined) continue;
+        const lo = aIdx < bIdx ? aIdx : bIdx;
+        const hi = aIdx < bIdx ? bIdx : aIdx;
+        const key = lo * stride + hi;
+        if (seenPairIds.has(key)) continue;
+        seenPairIds.add(key);
+        scoreOneByIds(aId, bId);
       }
     }
   }
@@ -334,11 +364,11 @@ export async function runWholeRepoDetector(
       tracker.atCapCount,
     );
   }
-  // Both paths dedup pairs via `seenPairs` — legacy at canonical-key
-  // construction, LSH at axis-union time. `candidatePairs` is the
-  // **post-dedup** count for LSH mode (unionPairs) and the **pre-dedup**
-  // raw count for legacy mode.
-  const uniquePairs = seenPairs.size;
+  // Both paths dedup pairs via `seenPairIds` (numeric packed (lo, hi)
+  // index keys) — legacy at canonical-key construction, LSH at
+  // axis-union time. `candidatePairs` is the **post-dedup** count for
+  // LSH mode (unionPairs) and the **pre-dedup** raw count for legacy.
+  const uniquePairs = seenPairIds.size;
   emitScoringSummary(perfLog, candidatePairs, uniquePairs, tracker);
   emitDecideSummary(perfLog, tracker);
   emitPairsDedup(perfLog, candidatePairs, uniquePairs);
@@ -386,24 +416,28 @@ export async function runWholeRepoDetector(
  *   2. Build an LSH index using that axis's params.
  *   3. Iterate the index's candidate pairs.
  *
- * Pairs are unioned across axes via the runner-level `seenPairs` Set —
- * `forEachCandidatePair` only dedups within a single index, so a pair
- * that collides on both token and call axes would otherwise be scored
- * twice. The first axis to surface a pair "wins" (drives the scoring
- * call); later axes that collide on the same pair are no-ops.
+ * Pairs are unioned across axes via the runner-level `seenPairIds` Set
+ * (numeric packed (lo, hi) index key) — `forEachCandidatePair` only
+ * dedups within a single index, so a pair that collides on both token
+ * and call axes would otherwise be scored twice. The first axis to
+ * surface a pair "wins" (drives the scoring call); later axes that
+ * collide on the same pair are no-ops.
  *
  * Returns the **union** candidate-pair count for downstream stats.
  */
-function runLshCandidateGeneration(
+function runLshCandidateGeneration<
+  TInfo extends { fragment: Fragment; sets: FragmentFeatureSets },
+>(
   entries: readonly IndexInput[],
-  fragmentById: ReadonlyMap<string, Fragment>,
-  featureSetsById: ReadonlyMap<string, FragmentFeatureSets>,
+  fragmentIndexById: ReadonlyMap<string, number>,
+  infoByIndex: readonly TInfo[],
+  stride: number,
+  seenPairIds: Set<number>,
   config: Config,
   perfLog: PerfLogger | undefined,
   now: () => number,
   tracker: PerHitTracker,
-  scoreOne: (aId: string, bId: string) => void,
-  seenPairs: Set<string>,
+  scoreOneByInfo: (a: TInfo, b: TInfo) => void,
 ): number {
   interface Axis {
     name: "token" | "call" | "statement";
@@ -424,12 +458,10 @@ function runLshCandidateGeneration(
     if (!axisCfg.enabled) continue;
 
     const lshInputs: LshIndexInput[] = [];
-    for (const { fragment } of entries) {
-      const sets = featureSetsById.get(fragment.id);
-      if (sets === undefined) continue;
+    for (const info of infoByIndex) {
       lshInputs.push({
-        fragmentId: fragment.id,
-        features: axis.pickFeatures(sets),
+        fragmentId: info.fragment.id,
+        features: axis.pickFeatures(info.sets),
       });
     }
 
@@ -444,23 +476,24 @@ function runLshCandidateGeneration(
       // Drop same-file sliding-window siblings at search time, mirroring
       // the inverted-index path (`candidateSearch.ts#tally`). The LSH
       // index itself is keyed only by feature sets, so file/line
-      // information lives in `fragmentById` — look both fragments up here
-      // and skip overlapping pairs before they reach scoring or counts.
-      const aFragment = fragmentById.get(a);
-      const bFragment = fragmentById.get(b);
-      if (
-        aFragment !== undefined &&
-        bFragment !== undefined &&
-        isSameFileOverlap(aFragment, bFragment)
-      ) {
-        return;
-      }
+      // information lives in the runner's `infoByIndex` — translate
+      // both fragmentIds to integer indices first and short-circuit on
+      // overlap before scoring or counts.
+      const aIdx = fragmentIndexById.get(a);
+      const bIdx = fragmentIndexById.get(b);
+      if (aIdx === undefined || bIdx === undefined) return;
+      const aInfo = infoByIndex[aIdx];
+      const bInfo = infoByIndex[bIdx];
+      if (aInfo === undefined || bInfo === undefined) return;
+      if (isSameFileOverlap(aInfo.fragment, bInfo.fragment)) return;
       axisCount += 1;
-      const key = `${a}|${b}`;
-      if (seenPairs.has(key)) return;
-      seenPairs.add(key);
+      const lo = aIdx < bIdx ? aIdx : bIdx;
+      const hi = aIdx < bIdx ? bIdx : aIdx;
+      const key = lo * stride + hi;
+      if (seenPairIds.has(key)) return;
+      seenPairIds.add(key);
       unionPairs += 1;
-      scoreOne(a, b);
+      scoreOneByInfo(aInfo, bInfo);
     });
     axisPairCounts[axis.name] = axisCount;
 
