@@ -89,5 +89,6 @@ export function readPackage(
     exportsMap,
     mainTarget,
     tsconfigPath,
+    tsconfig: null,
   };
 }

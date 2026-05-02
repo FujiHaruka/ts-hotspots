@@ -208,6 +208,128 @@ describe("architecture pipeline composition — workspace mode", () => {
   });
 });
 
+describe("architecture pipeline composition — per-package tsconfig (M3)", () => {
+  const repos: TempRepo[] = [];
+  afterEach(() => {
+    while (repos.length > 0) repos.pop()?.cleanup();
+  });
+
+  function newRepo(): TempRepo {
+    const r = createTempRepo("ts-hotspots-arch-m3-");
+    repos.push(r);
+    return r;
+  }
+
+  it("resolves per-package alias and respects extends through a workspace base", async () => {
+    const r = newRepo();
+    r.write(
+      "pnpm-workspace.yaml",
+      `packages:\n  - "apps/*"\n  - "tooling/*"\n`,
+    );
+    r.write(
+      "package.json",
+      JSON.stringify({ name: "monorepo", private: true }),
+    );
+
+    // Workspace-shared base config (no node_modules — relies on the
+    // ParseConfigHost rewrite).
+    r.write(
+      "tooling/typescript/package.json",
+      JSON.stringify({ name: "@scope/tsconfig" }),
+    );
+    r.write(
+      "tooling/typescript/tsconfig.base.json",
+      JSON.stringify({
+        compilerOptions: { baseUrl: ".", paths: { "@base/*": ["src/*"] } },
+      }),
+    );
+
+    // App that extends the shared base and adds its own alias.
+    r.write("apps/web/package.json", JSON.stringify({ name: "@scope/web" }));
+    r.write(
+      "apps/web/tsconfig.json",
+      JSON.stringify({
+        extends: "@scope/tsconfig/tsconfig.base.json",
+        compilerOptions: {
+          baseUrl: ".",
+          paths: { "~/*": ["src/*"] },
+        },
+      }),
+    );
+    r.write("apps/web/src/util.ts", "export function util() { return 1; }\n");
+    r.write(
+      "apps/web/src/main.ts",
+      `import { util } from "~/util";\nexport const start = () => util();\n`,
+    );
+
+    r.commit("setup");
+
+    const sources = await loadArchSources({
+      rootDir: r.path,
+      ref: undefined,
+      excludeGlobs: [],
+    });
+    const packageMap = (
+      await import("../workspace/buildPackageMap.ts")
+    ).buildPackageMap({
+      repoRoot: r.path,
+      packageRoots: ["apps/web", "tooling/typescript"],
+    });
+    const tsconfig = readTsconfigResolution(r.path, { packageMap });
+    const graph = buildGraph({
+      sources,
+      resolveCtx: { tsconfig, packageMap },
+    });
+
+    expect(
+      graph.edges.find(
+        (e) =>
+          e.from === "apps/web/src/main.ts::start::const" &&
+          e.to === "apps/web/src/util.ts::util::function",
+      ),
+    ).toBeDefined();
+
+    // Verify the per-package tsconfig was loaded and includes the
+    // inherited alias from the workspace-shared base.
+    const webPkg = packageMap.byName.get("@scope/web");
+    expect(webPkg?.tsconfig).not.toBeNull();
+    expect(webPkg?.tsconfig?.mappings.map((m) => m.pattern)).toContain("~/*");
+  });
+
+  it("does not crash main() on an extends chain through the workspace", async () => {
+    const r = newRepo();
+    r.write(
+      "pnpm-workspace.yaml",
+      `packages:\n  - "apps/*"\n  - "tooling/*"\n`,
+    );
+    r.write(
+      "package.json",
+      JSON.stringify({ name: "monorepo", private: true }),
+    );
+    r.write(
+      "tooling/typescript/package.json",
+      JSON.stringify({ name: "@scope/tsconfig" }),
+    );
+    r.write(
+      "tooling/typescript/tsconfig.base.json",
+      JSON.stringify({ compilerOptions: { baseUrl: "." } }),
+    );
+    r.write("apps/web/package.json", JSON.stringify({ name: "@scope/web" }));
+    r.write(
+      "apps/web/tsconfig.json",
+      JSON.stringify({
+        extends: "@scope/tsconfig/tsconfig.base.json",
+      }),
+    );
+    r.write("apps/web/src/x.ts", "export const x = 1;\n");
+    r.commit("setup");
+
+    const cap = captureIO(r.path);
+    const code = await main([r.path, "--format", "json"], cap.io);
+    expect(code).toBe(0);
+  });
+});
+
 describe("architecture main — smoke", () => {
   const repos: TempRepo[] = [];
   afterEach(() => {

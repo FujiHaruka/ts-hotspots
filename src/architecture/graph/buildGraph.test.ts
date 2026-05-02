@@ -27,6 +27,7 @@ function pkg(name: string, root: string, exportsField?: unknown): PackageInfo {
       exportsField === undefined ? null : parseExportsField(exportsField),
     mainTarget: null,
     tsconfigPath: null,
+    tsconfig: null,
   };
 }
 

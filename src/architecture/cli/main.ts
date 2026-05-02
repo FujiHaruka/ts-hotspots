@@ -211,8 +211,8 @@ export async function runPipeline(
       ref: args.ref,
       excludeGlobs: exclude,
     });
-    const tsconfig = readTsconfigResolution(repoPath);
     const packageMap = discoverAndBuildPackageMap(repoPath, io.stderr);
+    const tsconfig = readTsconfigResolution(repoPath, { packageMap });
     const graph = buildGraph({
       sources,
       resolveCtx: { tsconfig, packageMap },

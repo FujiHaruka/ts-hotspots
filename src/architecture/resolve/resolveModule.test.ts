@@ -23,6 +23,7 @@ function pkg(
       opts.exports === undefined ? null : parseExportsField(opts.exports),
     mainTarget: opts.main ?? null,
     tsconfigPath: null,
+    tsconfig: null,
   };
 }
 
@@ -363,6 +364,101 @@ describe("resolveModule — workspace package", () => {
     const known = fromFiles("packages/foo/src/index.ts", "src/a.ts");
     expect(
       resolveModule("react", "src/a.ts", { knownFiles: known, packageMap }),
+    ).toBe(null);
+  });
+});
+
+describe("resolveModule — per-package tsconfig (M3)", () => {
+  function pkgWithTsconfig(
+    name: string,
+    root: string,
+    paths: Record<string, string[]>,
+  ): PackageInfo {
+    return {
+      name,
+      root,
+      exportsMap: null,
+      mainTarget: null,
+      tsconfigPath: `${root}/tsconfig.json`,
+      tsconfig: parseTsconfigResolution({
+        compilerOptions: { baseUrl: ".", paths },
+      }),
+    };
+  }
+
+  it("uses the importing file's package tsconfig for `paths`", () => {
+    const fooPkg = pkgWithTsconfig("@scope/foo", "packages/foo", {
+      "~/*": ["packages/foo/src/*"],
+    });
+    const packageMap = makePackageMap(fooPkg);
+    const known = fromFiles(
+      "packages/foo/src/x.ts",
+      "packages/foo/src/util.ts",
+    );
+    expect(
+      resolveModule("~/util", "packages/foo/src/x.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
+    ).toBe("packages/foo/src/util.ts");
+  });
+
+  it("does not leak one package's `~/*` alias into another package", () => {
+    const fooPkg = pkgWithTsconfig("@scope/foo", "packages/foo", {
+      "~/*": ["packages/foo/src/*"],
+    });
+    const barPkg: PackageInfo = {
+      name: "@scope/bar",
+      root: "packages/bar",
+      exportsMap: null,
+      mainTarget: null,
+      tsconfigPath: null,
+      tsconfig: null,
+    };
+    const packageMap = makePackageMap(fooPkg, barPkg);
+    const known = fromFiles(
+      "packages/foo/src/util.ts",
+      "packages/bar/src/x.ts",
+    );
+    // Importer is in @scope/bar — its tsconfig is null, root tsconfig
+    // is also undefined → no path mapping fires, `~/util` returns null.
+    expect(
+      resolveModule("~/util", "packages/bar/src/x.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
+    ).toBe(null);
+  });
+
+  it("falls back to root tsconfig when the file is outside any package", () => {
+    const rootTsconfig = parseTsconfigResolution({
+      compilerOptions: { baseUrl: ".", paths: { "@/*": ["src/*"] } },
+    });
+    const packageMap = makePackageMap(
+      pkgWithTsconfig("@scope/foo", "packages/foo", {
+        "~/*": ["packages/foo/src/*"],
+      }),
+    );
+    const known = fromFiles("src/util.ts", "scripts/release.ts");
+    // `scripts/release.ts` doesn't belong to any package → root tsconfig
+    // applies.
+    expect(
+      resolveModule("@/util", "scripts/release.ts", {
+        knownFiles: known,
+        tsconfig: rootTsconfig,
+        packageMap,
+      }),
+    ).toBe("src/util.ts");
+  });
+
+  it("yields no mappings when neither package nor root tsconfig has any", () => {
+    const packageMap = makePackageMap(pkg("@scope/foo", "packages/foo"));
+    const known = fromFiles("packages/foo/src/x.ts", "packages/foo/src/y.ts");
+    expect(
+      resolveModule("@/y", "packages/foo/src/x.ts", {
+        knownFiles: known,
+        packageMap,
+      }),
     ).toBe(null);
   });
 });
