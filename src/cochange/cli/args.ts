@@ -5,10 +5,6 @@
  * registrar and the in-process `main(argv, io)` entry point share one
  * value type. Anything user-tunable lives here; the orchestrator in
  * `./main.ts` is read-only against this object.
- *
- * `--file` is M7 work and is not present here. The shape is left
- * future-friendly: when it lands, add `file?: string` and the registrar
- * fans the new option into it.
  */
 
 import type { ReportFormat } from "../../cli-defaults.ts";
@@ -40,6 +36,13 @@ export interface CochangeParsedArgs {
   maxFilesPerCommit: number;
   limit: number;
   verbose: boolean;
+  /**
+   * Optional `--file <path>` single-anchor mode. When set, the orchestrator
+   * normalises the value to a repo-root-relative POSIX path, validates it
+   * is in the analysed file-set, filters candidates to pairs containing
+   * the anchor, and switches sort + schema to the single-anchor shape.
+   */
+  file: string | undefined;
 }
 
 export class ArgParseError extends Error {

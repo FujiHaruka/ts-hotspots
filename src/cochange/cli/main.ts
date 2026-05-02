@@ -19,7 +19,7 @@
  * `hotspots[]`, mirroring comp's churn graceful-skip shape.
  */
 
-import { resolve as resolvePath } from "node:path";
+import { sep as pathSep, resolve as resolvePath } from "node:path";
 import { Command, CommanderError } from "commander";
 import pkg from "../../../package.json" with { type: "json" };
 import {
@@ -56,6 +56,8 @@ import {
   LIFT_FLOOR,
 } from "../ranking/defaults.ts";
 import { sortCandidates } from "../ranking/sort.ts";
+import { sortCandidatesByAnchor } from "../ranking/sortByAnchor.ts";
+import type { Candidate } from "../ranking/types.ts";
 import type {
   SerializedCochangeReport,
   SlimCochangeHotspot,
@@ -223,6 +225,17 @@ export async function runPipeline(
     });
     const fileSet = new Set(filePaths);
 
+    let anchor: string | undefined;
+    if (args.file !== undefined) {
+      const normalized = toRepoRelativePosix(repoPath, args.file);
+      if (!fileSet.has(normalized)) {
+        throw new ArgParseError(
+          `--file ${args.file} is not in the analyzed file-set`,
+        );
+      }
+      anchor = normalized;
+    }
+
     const ref = args.ref ?? "HEAD";
     const prefixRaw = deps.runGitShowPrefix(repoPath);
     const prefix =
@@ -242,6 +255,7 @@ export async function runPipeline(
       fileSet,
       prefix,
       analyzedFileCount: filePaths.length,
+      anchor,
     });
 
     if (rawLog === undefined) {
@@ -274,6 +288,9 @@ export async function runPipeline(
         ? fullReport.hotspots
         : fullReport.hotspots.filter((h) => {
             const inScope = scope.isInScope.bind(scope);
+            if (h.anchor !== undefined && inScope(h.anchor.ref.location)) {
+              return true;
+            }
             return h.members.some((m) => inScope(m.ref.location));
           });
 
@@ -327,6 +344,14 @@ interface BuildReportInputArgs {
   fileSet: ReadonlySet<string>;
   prefix: string;
   analyzedFileCount: number;
+  /**
+   * Single-anchor mode pivot. When set, the gated candidate list is filtered
+   * to pairs containing the anchor, each surviving candidate carries
+   * `anchor` so the serializer emits the schema-shifted shape, and sort
+   * keys flip to `confidence(anchor -> partner)`. `--limit` is applied
+   * to the anchored sort the same way as in default mode.
+   */
+  anchor?: string;
 }
 
 function buildReportInput(input: BuildReportInputArgs): {
@@ -341,7 +366,7 @@ function buildReportInput(input: BuildReportInputArgs): {
   actualWindow: number;
   tool: ReportTool;
 } {
-  const { args, rawLog, fileSet, prefix, analyzedFileCount } = input;
+  const { args, rawLog, fileSet, prefix, analyzedFileCount, anchor } = input;
   if (rawLog === undefined) {
     return {
       candidates: [],
@@ -368,7 +393,12 @@ function buildReportInput(input: BuildReportInputArgs): {
     liftFloor: LIFT_FLOOR,
   });
   const pairsAfterGate = gated.length;
-  const sorted = sortCandidates(gated, { limit: args.limit });
+  const sorted =
+    anchor === undefined
+      ? sortCandidates(gated, { limit: args.limit })
+      : sortCandidatesByAnchor(reorientForAnchor(gated, anchor), {
+          limit: args.limit,
+        });
   return {
     candidates: sorted,
     perFileChanges: walkResult.perFileChanges,
@@ -381,6 +411,33 @@ function buildReportInput(input: BuildReportInputArgs): {
     actualWindow: walkResult.actualWindow,
     tool: TOOL,
   };
+}
+
+function reorientForAnchor(
+  candidates: readonly Candidate[],
+  anchor: string,
+): Candidate[] {
+  const out: Candidate[] = [];
+  for (const c of candidates) {
+    if (c.pathA !== anchor && c.pathB !== anchor) continue;
+    out.push({ ...c, anchor });
+  }
+  return out;
+}
+
+function toRepoRelativePosix(rootDir: string, input: string): string {
+  const abs = resolvePath(rootDir, input);
+  const root = resolvePath(rootDir);
+  const rootWithSep = root.endsWith(pathSep) ? root : root + pathSep;
+  let rel: string;
+  if (abs === root) {
+    rel = "";
+  } else if (abs.startsWith(rootWithSep)) {
+    rel = abs.slice(rootWithSep.length);
+  } else {
+    rel = abs;
+  }
+  return pathSep === "/" ? rel : rel.split(pathSep).join("/");
 }
 
 function buildStatsPayload(
