@@ -134,6 +134,15 @@ describe("serializeReport (slim)", () => {
     ]);
   });
 
+  test("slim caps recentCommits at 5 even when the walker kept more", () => {
+    const recent = ["s0", "s1", "s2", "s3", "s4", "s5", "s6"];
+    const c = candidate("src/a.ts", "src/b.ts", metric(7, 0.5, 2.0), recent);
+    const out = serializeReport(baseInput([c]), { verbose: false });
+    const h = out.hotspots[0];
+    if (h === undefined) throw new Error("expected hotspot");
+    expect(h.evidence.recentCommits).toEqual(["s0", "s1", "s2", "s3", "s4"]);
+  });
+
   test("score.value is monotonically non-increasing along hotspots[] (matches sort key)", () => {
     // Candidates fed in sort order — `score.value` must mirror that order
     // so JSON readers see the same monotonicity as the ranking.
@@ -224,6 +233,21 @@ describe("serializeReport (verbose)", () => {
     if (h === undefined) throw new Error("expected hotspot");
     expect(h.metrics.changesOfA).toBe(0);
     expect(h.metrics.changesOfB).toBe(0);
+  });
+
+  test("verbose: allCoChangeCommits.length === metrics.support; recentCommits stays capped at 5", () => {
+    const recent = ["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7"];
+    const c = candidate("src/a.ts", "src/b.ts", metric(8, 0.5, 2.0), recent);
+    const out = asVerbose(serializeReport(baseInput([c]), { verbose: true }));
+    const h = out.hotspots[0];
+    if (h === undefined) throw new Error("expected hotspot");
+    expect(h.evidence.allCoChangeCommits).toEqual(recent);
+    expect(h.evidence.allCoChangeCommits.length).toBe(h.metrics.support);
+    expect(h.evidence.recentCommits).toEqual(["s0", "s1", "s2", "s3", "s4"]);
+    expect(h.evidence.coChangeWindow).toEqual({
+      firstSha: "s0",
+      lastSha: "s7",
+    });
   });
 
   test("verbose determinism: two runs produce bit-identical JSON", () => {

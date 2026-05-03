@@ -15,6 +15,9 @@ import type { Candidate } from "../ranking/types.ts";
 import { computeCochangePairDismissalId } from "./dismissalId.ts";
 import type { CochangeReportInput, SerializeOptions } from "./serializeJson.ts";
 
+/** Mirrors the JSON serializer's slim cap on `recentCommits`. */
+const RECENT_DISPLAY_CAP = 5;
+
 export function serializeMarkdown(
   input: CochangeReportInput,
   opts: SerializeOptions,
@@ -95,15 +98,17 @@ function renderCard(
   if (c.recent.length === 0) {
     lines.push("- recent commits: (none recorded)");
   } else {
-    const shown = c.recent.map((sha) => `\`${sha}\``).join(", ");
-    lines.push(`- recent commits: ${shown}`);
+    const recentDisplay = c.recent.slice(0, RECENT_DISPLAY_CAP);
+    const shownRecent = recentDisplay.map((sha) => `\`${sha}\``).join(", ");
+    lines.push(`- recent commits: ${shownRecent}`);
     if (opts.verbose) {
       const first = c.recent[0];
       const last = c.recent[c.recent.length - 1];
       if (first !== undefined && last !== undefined) {
         lines.push(`- co-change window: \`${first}\` -> \`${last}\``);
       }
-      lines.push(`- all co-change commits: ${shown}`);
+      const shownAll = c.recent.map((sha) => `\`${sha}\``).join(", ");
+      lines.push(`- all co-change commits: ${shownAll}`);
     }
   }
   lines.push(

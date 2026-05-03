@@ -98,7 +98,9 @@ describe("walkCochange", () => {
     expect(r.actualWindow).toBe(3);
   });
 
-  test("recent SHAs are capped at 5, keeping the newest (first walked)", () => {
+  test("recent[] retains every co-change SHA (length === support, walk order preserved)", () => {
+    // The walker is responsible for keeping the full list; the slim
+    // 5-SHA display cap lives in the serializer, not here.
     const lines: string[] = [];
     for (let i = 0; i < 7; i++) {
       const sha = `sha000${String(i)}`;
@@ -119,7 +121,10 @@ describe("walkCochange", () => {
       "sha0002",
       "sha0003",
       "sha0004",
+      "sha0005",
+      "sha0006",
     ]);
+    expect(evidence?.recent.length).toBe(evidence?.support);
   });
 
   test("skips commits exceeding maxFilesPerCommit (post-filter count)", () => {

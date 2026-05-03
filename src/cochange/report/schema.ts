@@ -50,23 +50,22 @@ export interface VerboseCochangePairMetrics extends SlimCochangePairMetrics {
 
 export interface SlimCochangeEvidence {
   /**
-   * Up to the 5 most recent commits (short SHAs) where both files were
-   * touched. The walker caps this at 5 — agents wanting more should
-   * re-derive from the full window.
+   * Up to the 5 most recent commits (short SHAs, newest → oldest) where
+   * both files were touched. This is a display cap, not a walker cap —
+   * agents wanting the full list should pass `--verbose` and read
+   * `allCoChangeCommits`.
    */
   recentCommits: string[];
 }
 
 export interface VerboseCochangeEvidence extends SlimCochangeEvidence {
   /**
-   * Full SHA list for the pair. M2's walker only retains the first 5
-   * recent SHAs, so today this aliases `recentCommits`. If a future
-   * milestone teaches the walker to keep the full list, this field is
-   * the place to surface it.
+   * Every commit (short SHA, newest → oldest) where both files were
+   * touched. Length matches `metrics.support`.
    */
   allCoChangeCommits: string[];
   /**
-   * First and last SHA in the surviving (capped-at-5) co-change list.
+   * First and last SHA in the full co-change list (newest and oldest).
    * Lets the agent re-derive the metric without re-walking the entire
    * window. Absent when the pair has zero recorded commits.
    */

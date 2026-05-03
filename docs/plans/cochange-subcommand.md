@@ -272,7 +272,7 @@ Each `hotspots[]` entry carries (shape mirrors `SlimDupHotspot` in
 - `anchor?: { ref: HotspotRef }` — present only in single-anchor mode (`--file <X>`); omitted in whole-repo and `--diff` modes (cochange's `--diff` is a display filter, **not** an anchor-defining mode like dup's). When present, `anchor.ref.location === <X>`.
 - `members: { ref: HotspotRef }[]` — the other file(s) in the pair. Length 2 when `anchor` is omitted (whole-repo / `--diff`), length 1 when `anchor` is set (`--file` mode). `HotspotRef = { location, kind: "file" }`; `location` is the repo-root-relative POSIX path with no line range.
 - `metrics` — the five raw values listed above.
-- `evidence` — `{ recentCommits: string[] }` — short SHAs (7-char) of up to the 5 most recent commits that touched both files. Lets the agent run `git show <sha>` to confirm the coupling pattern without re-deriving it.
+- `evidence` — `{ recentCommits: string[] }` — short SHAs (7-char) of up to the 5 most recent commits that touched both files. Display-only cap at the serializer boundary; the walker keeps the full list and `--verbose` exposes it as `allCoChangeCommits`. Lets the agent run `git show <sha>` to confirm the coupling pattern without re-deriving it.
 - `dismissalId` — `coch:<hex>` (see "Dismissal ID prefix" above).
 
 Mode-by-mode shape (parallel to dup's whole-repo-vs-diff schema variation):
@@ -307,7 +307,8 @@ the tool's responsibility, decision-making is downstream. This matches
 3. For each surviving commit `C`, let `F_C` = the canonical paths of
    the touched-and-tracked files. Emit each unordered pair from
    `F_C` into a `Map<pairKey, { support: number; recent: string[] }>`,
-   appending the short SHA to `recent` (cap at 5 most recent).
+   appending the short SHA to `recent` (full list — the slim 5-SHA
+   display cap is applied later at the serializer boundary).
 4. Compute per-file `changesOf(X)` from the same walk (same map, free
    side-product).
 5. For each pair, compute `confidenceAtoB`, `confidenceBtoA`, `lift`
@@ -468,7 +469,8 @@ and per-file change counts. No gate, no output, no CLI.
 - New module `src/cochange/walk/walkCochange.ts` that uses the M1
   shared walker and emits a `Map<canonicalPath, number>` (per-file
   changes) plus a `Map<pairKey, { support: number; recent: string[] }>`
-  (pair counts + capped 5-most-recent SHA list).
+  (pair counts + full SHA list; the 5-SHA slim-display cap lives in
+  the serializer).
 - `--max-files-per-commit` skip applied (count canonical-and-tracked
   files only; configured threshold injected as an option, hardcoded
   to 50 by callers in this milestone).

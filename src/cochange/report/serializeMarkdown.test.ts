@@ -109,6 +109,20 @@ describe("serializeMarkdown", () => {
     expect(md).toContain("displayed: 1");
   });
 
+  test("slim caps `recent commits` line at 5; verbose `all co-change commits` keeps every SHA", () => {
+    const recent = ["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7"];
+    const c = candidate("src/a.ts", "src/b.ts", metric(8, 0.5, 2.0), recent);
+    const slim = serializeMarkdown(baseInput([c]), { verbose: false });
+    expect(slim).toContain("recent commits: `s0`, `s1`, `s2`, `s3`, `s4`");
+    expect(slim).not.toContain("`s5`");
+    const verbose = serializeMarkdown(baseInput([c]), { verbose: true });
+    expect(verbose).toContain("recent commits: `s0`, `s1`, `s2`, `s3`, `s4`");
+    expect(verbose).toContain(
+      "all co-change commits: `s0`, `s1`, `s2`, `s3`, `s4`, `s5`, `s6`, `s7`",
+    );
+    expect(verbose).toContain("co-change window: `s0` -> `s7`");
+  });
+
   test("renders empty-recent state without crashing", () => {
     const c = candidate("src/a.ts", "src/b.ts", metric(5, 0.5, 2.0), []);
     const md = serializeMarkdown(baseInput([c]), { verbose: true });

@@ -5,9 +5,9 @@
  *
  * Slim by default (mirrors dup's two-tier shape). Verbose re-attaches the
  * confidence denominators (`changesOfA` / `changesOfB`), the full SHA list
- * (currently aliasing `recentCommits` because M2's walker caps at 5), the
- * first/last SHA of the surviving window, and a project-level `summary`
- * with the window stats and gate pair counts.
+ * in `allCoChangeCommits` (length === `metrics.support`), the first/last
+ * SHA of the full window, and a project-level `summary` with the window
+ * stats and gate pair counts.
  */
 
 import type { DiffInfo, ReportTool } from "../../schema.ts";
@@ -42,6 +42,13 @@ export interface CochangeReportInput {
 export interface SerializeOptions {
   verbose: boolean;
 }
+
+/**
+ * Slim/verbose boundary for the recent-commit display. The walker keeps
+ * the full list internally; this cap is purely an output decision so the
+ * default report stays small for an agent's attention budget.
+ */
+const RECENT_DISPLAY_CAP = 5;
 
 export function serializeReport(
   input: CochangeReportInput,
@@ -95,7 +102,9 @@ function toSlimHotspot(candidate: Candidate): SlimCochangeHotspot {
       confidenceMax: candidate.metrics.confidenceMax,
       lift: candidate.metrics.lift,
     },
-    evidence: { recentCommits: [...candidate.recent] },
+    evidence: {
+      recentCommits: candidate.recent.slice(0, RECENT_DISPLAY_CAP),
+    },
     dismissalId: computeCochangePairDismissalId(
       candidate.pathA,
       candidate.pathB,

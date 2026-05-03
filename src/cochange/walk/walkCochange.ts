@@ -12,6 +12,11 @@ import { walkChurnLog } from "../../util/git/walkChurnLog.ts";
 
 export interface PairEvidence {
   support: number;
+  /**
+   * All short SHAs where the pair was co-touched (newest → oldest, walk
+   * order). Length matches `support`; the serializer is responsible for
+   * truncating to the 5-SHA slim display cap when needed.
+   */
   recent: string[];
 }
 
@@ -37,8 +42,6 @@ export interface WalkCochangeResult {
   actualWindow: number;
   commitsSkippedAsLargeChange: number;
 }
-
-const RECENT_CAP = 5;
 
 export function walkCochange(
   rawLog: string,
@@ -77,7 +80,7 @@ export function walkCochange(
             pairs.set(key, entry);
           }
           entry.support++;
-          if (sha !== undefined && entry.recent.length < RECENT_CAP) {
+          if (sha !== undefined) {
             entry.recent.push(sha);
           }
         }
