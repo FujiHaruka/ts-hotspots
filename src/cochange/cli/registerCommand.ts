@@ -47,6 +47,11 @@ commits. Pass --ref to choose a different endpoint, --window to widen
 or narrow the walk. Output is written to stdout; redirect it to a file
 if you want to keep it.
 
+The walk uses \`git log --first-parent\`, so PRs that landed via merge
+commits count as a single step. Repos with merge-heavy history will
+report \`actualWindow < requestedWindow\`; that is shape, not a shallow
+clone.
+
 [path] points at a directory inside a git repository. The repo root is
 discovered by walking up from [path] until a .git entry is found
 (default: cwd).`;

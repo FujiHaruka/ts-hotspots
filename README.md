@@ -153,7 +153,7 @@ You can place a `.ts-hotspots.json` at the repo root to downweight edges that to
 
 `cochange` ranks **file pairs that change together** in git history. Two files that are repeatedly touched in the same commit, even when no static import edge connects them, are logically coupled — editing one usually means the other needs a look. The walk is rename-tracked, so a refactor that moves `foo.ts` to `lib/foo.ts` does not split its history.
 
-By default it scans the repository at HEAD over the last 200 commits. Pairs are ranked by `confidenceMax` (the higher of `P(B | A)` and `P(A | B)`), with `support` (raw co-change count) and `lift` (above-chance multiplier) reported alongside.
+By default it scans the repository at HEAD over the last 200 commits. Pairs are ranked by `support × confidenceMax` — raw co-change count weighted by the stronger directional confidence (`max(P(B | A), P(A | B))`) — with `support`, both directional confidences, and `lift` (above-chance multiplier) reported alongside. The walk uses `git log --first-parent`, so PRs that landed via merge commits count as a single step; merge-heavy histories will report `actualWindow < requestedWindow` even on a full clone.
 
 ```
 ts-hotspots cochange                              # whole-repo over the last 200 commits at HEAD
@@ -164,13 +164,13 @@ ts-hotspots coch --window 500 --min-support 5     # widen the window, raise the 
 
 `[path]` points at a directory inside a git repository; the repo root is discovered by walking up until a `.git` entry is found (defaults to the current directory).
 
-Each entry in `hotspots[]` has `kind: "cochange"`, the canonical-ordered file pair as `members[]` (and `anchor` in single-anchor mode), a `score` (`{ axis: "confidenceMax", value }` — the stronger conditional probability across the pair, in 0..1), an `evidence` block with `support`, both directional confidences, `lift`, and a `dismissalId` (`coch:<hex>`).
+Each entry in `hotspots[]` has `kind: "cochange"`, the canonical-ordered file pair as `members[]` (and `anchor` in single-anchor mode), a `score` (`{ axis: "supportConfidence", value }` — the same `support × confidenceMax` composite the ranking uses, so JSON ordering and `score.value` ordering agree), a `metrics` block with `support`, both directional confidences, `confidenceMax`, and `lift`, and a `dismissalId` (`coch:<hex>`).
 
 Common options:
 
 - `--format markdown|json` output format (default: markdown)
 - `--exclude <glob>` extra path glob to drop (repeatable; built-in defaults already cover `node_modules`, `dist`, generated files, and tests — including tests would surface every source's own test as its #1 partner)
-- `--limit <N|all>` cap `hotspots[]` at the top N by `confidenceMax` (default: 20)
+- `--limit <N|all>` cap `hotspots[]` at the top N by `support × confidenceMax` (default: 20)
 - `--verbose` emit the rich schema (window stats, gate counts, full denominators, full SHA list)
 - `--diff <revrange>` display filter only — rankings are still computed against the full window
 - `--ref <ref>` endpoint of the history window (default: `HEAD`)

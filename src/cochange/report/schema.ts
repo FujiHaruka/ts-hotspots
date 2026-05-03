@@ -104,7 +104,12 @@ export interface CochangeProject {
 export interface CochangeSummary {
   /** Window size requested via `--window`. */
   requestedWindow: number;
-  /** Commits the walk actually saw (may be < `requestedWindow` on shallow clones). */
+  /**
+   * Commits the walk actually saw. May be < `requestedWindow` because
+   * (a) shallow clone, or (b) merge-heavy history collapses under
+   * `git log --first-parent` (PRs that landed as merge commits count
+   * as one step). The latter is the common case.
+   */
   actualWindow: number;
   /** Commits dropped by `--max-files-per-commit`. */
   commitsSkippedAsLargeChange: number;
