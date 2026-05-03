@@ -22,7 +22,14 @@ export interface CochangeHotspotRef {
 }
 
 export interface CochangeScore {
-  axis: "confidenceMax";
+  /**
+   * Sort key surfaced as the headline score. Equals
+   * `support × confidenceMax` — the same composite
+   * `src/cochange/ranking/sort.ts` orders candidates by, so JSON ordering
+   * and `score.value` ordering agree. The component metrics live in
+   * `metrics.support` / `metrics.confidenceMax`.
+   */
+  axis: "supportConfidence";
   value: number;
 }
 

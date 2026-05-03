@@ -268,7 +268,7 @@ Each `hotspots[]` entry carries (shape mirrors `SlimDupHotspot` in
 
 - `kind: "cochange"` — discriminator for agents that consume multiple subcommands.
 - `size: 2` — total files in the pair, computed `(anchor ? 1 : 0) + members.length`, identical formula to dup.
-- `score` — `{ axis: "confidenceMax", value: 0..1 }` — single representative axis. `confidenceMax` is chosen because it is bounded `[0, 1]`, comparable across pairs / windows / repos, and answers the agent's actionable question directly ("if I touch one of these, how likely is the other to need attention?"). The integer evidence count (`support`) and the above-chance multiplier (`lift`) live in the `metrics` block alongside it for agents that want to re-rank.
+- `score` — `{ axis: "supportConfidence", value: number }` — the same composite the ranking sort key uses (`support × confidenceMax`), surfaced verbatim so JSON ordering and `score.value` ordering agree. The component metrics live in the `metrics` block (`metrics.support`, `metrics.confidenceMax`); `lift` is alongside them for agents that want to re-rank.
 - `anchor?: { ref: HotspotRef }` — present only in single-anchor mode (`--file <X>`); omitted in whole-repo and `--diff` modes (cochange's `--diff` is a display filter, **not** an anchor-defining mode like dup's). When present, `anchor.ref.location === <X>`.
 - `members: { ref: HotspotRef }[]` — the other file(s) in the pair. Length 2 when `anchor` is omitted (whole-repo / `--diff`), length 1 when `anchor` is set (`--file` mode). `HotspotRef = { location, kind: "file" }`; `location` is the repo-root-relative POSIX path with no line range.
 - `metrics` — the five raw values listed above.
@@ -391,11 +391,13 @@ in one place rather than spread across commit messages.
 - **`confidenceMax >= 0.30` floor**: kept. Adds a directional
   guardrail orthogonal to the lift gate ("the actionable read
   exceeds 1-in-3"). Worth dogfooding before locking in v2.
-- **Pair score axis**: `confidenceMax` (changed from earlier draft's
-  `support`). Bounded `[0, 1]`, comparable across pairs / repos /
-  windows, and aligns with the agent's actionable question. Evidence
-  weight (`support`) and chance multiplier (`lift`) remain in the
-  `metrics` block.
+- **Pair score axis**: `supportConfidence` (= `support × confidenceMax`,
+  the same composite the sort key uses). Earlier drafts emitted
+  `confidenceMax` here for its `[0, 1]` bound, but that left JSON
+  ordering and `score.value` ordering disagreeing — JSON readers saw
+  a row with `score 0.857` above one with `score 1.0`. Surfacing the
+  sort key directly fixes the honesty bug; the `[0, 1]`-bounded
+  reading is still available as `metrics.confidenceMax`.
 - **`--include-non-ts`**: deferred to v2. v1 stays TS-only with no
   flag. Adding it later is a mechanical change (drop the file-set
   filter in step 1 of the algorithm sketch). Default exclude globs

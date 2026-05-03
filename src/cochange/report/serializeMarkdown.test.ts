@@ -66,7 +66,7 @@ describe("serializeMarkdown", () => {
     ]);
     const md = serializeMarkdown(baseInput([c]), { verbose: false });
     expect(md).toContain("## #1 src/a.ts <-> src/b.ts");
-    expect(md).toContain("score: confidenceMax = 0.500");
+    expect(md).toContain("score: supportConfidence = 2.500");
     expect(md).toContain("support: 5");
     expect(md).toContain("confidenceAtoB: 0.500");
     expect(md).toContain("confidenceBtoA: 0.400");

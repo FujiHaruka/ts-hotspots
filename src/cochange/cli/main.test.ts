@@ -222,7 +222,7 @@ describe("cochange CLI: runPipeline", () => {
     if (h === undefined) throw new Error("expected one hotspot");
     expect(h.kind).toBe("cochange");
     expect(h.size).toBe(2);
-    expect(h.score.axis).toBe("confidenceMax");
+    expect(h.score.axis).toBe("supportConfidence");
     expect(h.members.map((m) => m.ref.location).sort()).toEqual([
       "src/a.ts",
       "src/b.ts",
@@ -438,8 +438,8 @@ describe("cochange CLI: runPipeline", () => {
     expect(h.anchor?.ref.kind).toBe("file");
     expect(h.members).toHaveLength(1);
     expect(h.members[0]?.ref.location).toBe("src/b.ts");
-    // Score axis stays confidenceMax even though sort key is directional.
-    expect(h.score.axis).toBe("confidenceMax");
+    // Score axis stays supportConfidence even though the partner sort is directional.
+    expect(h.score.axis).toBe("supportConfidence");
   });
 
   test("--file sorts by directional confidence(anchor -> partner) desc", async () => {

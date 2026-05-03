@@ -73,7 +73,7 @@ describe("serializeReport (slim)", () => {
     expect(out.dismissed).toBeUndefined();
   });
 
-  test("single pair: members are lex-ordered, anchor omitted, score is confidenceMax", () => {
+  test("single pair: members are lex-ordered, anchor omitted, score is supportConfidence", () => {
     const c = candidate("src/a.ts", "src/b.ts", metric(5, 0.5, 2.0, 0.5, 0.4), [
       "abc1234",
       "def5678",
@@ -89,7 +89,7 @@ describe("serializeReport (slim)", () => {
       { ref: { location: "src/a.ts", kind: "file" } },
       { ref: { location: "src/b.ts", kind: "file" } },
     ]);
-    expect(h.score).toEqual({ axis: "confidenceMax", value: 0.5 });
+    expect(h.score).toEqual({ axis: "supportConfidence", value: 5 * 0.5 });
     expect(h.metrics).toEqual({
       support: 5,
       confidenceAtoB: 0.5,
@@ -132,6 +132,24 @@ describe("serializeReport (slim)", () => {
       "src/c.ts",
       "src/e.ts",
     ]);
+  });
+
+  test("score.value is monotonically non-increasing along hotspots[] (matches sort key)", () => {
+    // Candidates fed in sort order — `score.value` must mirror that order
+    // so JSON readers see the same monotonicity as the ranking.
+    const candidates = [
+      candidate("src/a.ts", "src/b.ts", metric(10, 0.8, 3.0), ["c1"]),
+      candidate("src/c.ts", "src/d.ts", metric(5, 0.5, 1.5), ["c2"]),
+      candidate("src/e.ts", "src/f.ts", metric(3, 0.3, 1.1), []),
+    ];
+    const out = serializeReport(baseInput(candidates), { verbose: false });
+    expect(
+      out.hotspots.every(
+        (h, i) =>
+          i === 0 ||
+          h.score.value <= (out.hotspots[i - 1]?.score.value ?? Infinity),
+      ),
+    ).toBe(true);
   });
 
   test("determinism: two runs over identical input produce bit-identical JSON", () => {

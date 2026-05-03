@@ -78,9 +78,8 @@ function renderCard(
     lines.push(`## #${String(rank)} ${c.pathA} <-> ${c.pathB}`);
   }
   lines.push("");
-  lines.push(
-    `- score: confidenceMax = ${formatRatio(c.metrics.confidenceMax)}`,
-  );
+  const score = c.metrics.support * c.metrics.confidenceMax;
+  lines.push(`- score: supportConfidence = ${formatScore(score)}`);
   lines.push(`- support: ${String(c.metrics.support)}`);
   lines.push(
     `- confidenceAtoB: ${formatRatio(c.metrics.confidenceAtoB)} (P(B | A))`,
@@ -121,4 +120,9 @@ function formatRatio(v: number): string {
 function formatLift(v: number): string {
   if (!Number.isFinite(v)) return String(v);
   return v.toFixed(2);
+}
+
+function formatScore(v: number): string {
+  if (!Number.isFinite(v)) return String(v);
+  return v.toFixed(3);
 }

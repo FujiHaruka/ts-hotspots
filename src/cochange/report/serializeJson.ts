@@ -83,7 +83,10 @@ function toSlimHotspot(candidate: Candidate): SlimCochangeHotspot {
   const hotspot: SlimCochangeHotspot = {
     kind: "cochange",
     size: 2,
-    score: { axis: "confidenceMax", value: candidate.metrics.confidenceMax },
+    score: {
+      axis: "supportConfidence",
+      value: candidate.metrics.support * candidate.metrics.confidenceMax,
+    },
     members: anchoredMembers(candidate),
     metrics: {
       support: candidate.metrics.support,
