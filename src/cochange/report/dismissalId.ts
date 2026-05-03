@@ -18,3 +18,24 @@ export function computeCochangePairDismissalId(
   const hex = createHash("sha256").update(`${a}\n${b}`).digest("hex");
   return `coch:${hex.slice(0, 16)}`;
 }
+
+/**
+ * `coch:<hex>` dismissal id for a cochange cluster row. Hashes the
+ * lex-sorted member set so the id is stable as long as the cluster
+ * keeps the same files (the order in which `collapseClusters` discovered
+ * the constituent pairs is irrelevant). Same `coch:` prefix and 16-hex
+ * width as pair ids.
+ *
+ * The hashed input is prefixed with `cluster\n` so the cluster and pair
+ * input spaces never overlap — without this, a hypothetical 2-member
+ * cluster would hash to the same id as the corresponding pair.
+ */
+export function computeCochangeClusterDismissalId(
+  members: readonly string[],
+): string {
+  const sorted = [...members].sort();
+  const hex = createHash("sha256")
+    .update(`cluster\n${sorted.join("\n")}`)
+    .digest("hex");
+  return `coch:${hex.slice(0, 16)}`;
+}

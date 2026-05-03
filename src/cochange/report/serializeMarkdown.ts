@@ -12,7 +12,15 @@
  */
 
 import type { Candidate } from "../ranking/types.ts";
-import { computeCochangePairDismissalId } from "./dismissalId.ts";
+import {
+  type ClusterCandidate,
+  type ClusterRow,
+  collapseClusters,
+} from "./collapseClusters.ts";
+import {
+  computeCochangeClusterDismissalId,
+  computeCochangePairDismissalId,
+} from "./dismissalId.ts";
 import type { CochangeReportInput, SerializeOptions } from "./serializeJson.ts";
 
 /** Mirrors the JSON serializer's slim cap on `recentCommits`. */
@@ -25,19 +33,27 @@ export function serializeMarkdown(
   const lines: string[] = [];
   lines.push("# ts-hotspots cochange");
   lines.push("");
-  lines.push(...renderHeader(input, opts));
+
+  // Match the JSON serializer's collapse rule so the two outputs agree
+  // on row count and identity. Anchor mode is pair-only by design.
+  const isAnchorMode = input.candidates.some((c) => c.anchor !== undefined);
+  const rows: ClusterRow[] = isAnchorMode
+    ? input.candidates.map((c) => ({ kind: "pair", candidate: c }))
+    : collapseClusters(input.candidates);
+
+  lines.push(...renderHeader(input, opts, rows.length));
   lines.push("");
 
-  if (input.candidates.length === 0) {
+  if (rows.length === 0) {
     lines.push("No cochange candidates found.");
     lines.push("");
     return lines.join("\n");
   }
 
-  for (let i = 0; i < input.candidates.length; i++) {
-    const c = input.candidates[i];
-    if (c === undefined) continue;
-    lines.push(...renderCard(i + 1, c, input, opts));
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (row === undefined) continue;
+    lines.push(...renderRow(i + 1, row, input, opts));
     lines.push("");
   }
 
@@ -47,6 +63,7 @@ export function serializeMarkdown(
 function renderHeader(
   input: CochangeReportInput,
   opts: SerializeOptions,
+  displayedCount: number,
 ): string[] {
   const lines: string[] = [];
   if (input.diff !== undefined) {
@@ -62,9 +79,20 @@ function renderHeader(
     `- commits skipped (large-change): ${String(input.commitsSkippedAsLargeChange)}`,
   );
   if (opts.verbose) {
-    lines.push(`- displayed: ${String(input.candidates.length)}`);
+    lines.push(`- displayed: ${String(displayedCount)}`);
   }
   return lines;
+}
+
+function renderRow(
+  rank: number,
+  row: ClusterRow,
+  input: CochangeReportInput,
+  opts: SerializeOptions,
+): string[] {
+  return row.kind === "pair"
+    ? renderCard(rank, row.candidate, input, opts)
+    : renderClusterCard(rank, row.cluster, opts);
 }
 
 function renderCard(
@@ -113,6 +141,52 @@ function renderCard(
   }
   lines.push(
     `- dismissalId: \`${computeCochangePairDismissalId(c.pathA, c.pathB)}\``,
+  );
+  return lines;
+}
+
+function renderClusterCard(
+  rank: number,
+  cluster: ClusterCandidate,
+  opts: SerializeOptions,
+): string[] {
+  const lines: string[] = [];
+  lines.push(
+    `## #${String(rank)} Cluster (${String(cluster.members.length)} files)`,
+  );
+  lines.push("");
+  lines.push(`- score: supportConfidence = ${formatScore(cluster.scoreMax)}`);
+  lines.push(
+    `- support (median across ${String(cluster.pairs.length)} pairs): ${formatScore(cluster.supportMedian)}`,
+  );
+  lines.push(
+    `- confidenceMax (max across pairs): ${formatRatio(cluster.confidenceMaxOverall)}`,
+  );
+  lines.push(`- lift (median across pairs): ${formatLift(cluster.liftMedian)}`);
+  lines.push("- members:");
+  for (const m of cluster.members) {
+    lines.push(`  - ${m}`);
+  }
+  if (cluster.recentUnion.length === 0) {
+    lines.push("- recent commits: (none recorded)");
+  } else {
+    const recentDisplay = cluster.recentUnion.slice(0, RECENT_DISPLAY_CAP);
+    const shownRecent = recentDisplay.map((sha) => `\`${sha}\``).join(", ");
+    lines.push(`- recent commits (union across pairs): ${shownRecent}`);
+    if (opts.verbose) {
+      const first = cluster.recentUnion[0];
+      const last = cluster.recentUnion[cluster.recentUnion.length - 1];
+      if (first !== undefined && last !== undefined) {
+        lines.push(`- co-change window: \`${first}\` -> \`${last}\``);
+      }
+      const shownAll = cluster.recentUnion
+        .map((sha) => `\`${sha}\``)
+        .join(", ");
+      lines.push(`- all co-change commits: ${shownAll}`);
+    }
+  }
+  lines.push(
+    `- dismissalId: \`${computeCochangeClusterDismissalId(cluster.members)}\``,
   );
   return lines;
 }

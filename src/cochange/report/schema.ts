@@ -34,18 +34,38 @@ export interface CochangeScore {
 }
 
 export interface SlimCochangePairMetrics {
+  /**
+   * For pair rows: raw co-change count.
+   * For cluster rows: median of the constituent pairs' supports.
+   */
   support: number;
+  /** Pair rows only; cluster rows leave this at 0 (semantic does not transfer). */
   confidenceAtoB: number;
+  /** Pair rows only; cluster rows leave this at 0 (semantic does not transfer). */
   confidenceBtoA: number;
+  /**
+   * For pair rows: `max(confidenceAtoB, confidenceBtoA)`.
+   * For cluster rows: max of the constituent pairs' `confidenceMax`.
+   */
   confidenceMax: number;
+  /**
+   * For pair rows: above-chance multiplier for the pair.
+   * For cluster rows: median of the constituent pairs' lifts.
+   */
   lift: number;
 }
 
 export interface VerboseCochangePairMetrics extends SlimCochangePairMetrics {
-  /** Total commits touching A in the window (denominator for confidenceAtoB). */
-  changesOfA: number;
-  /** Total commits touching B in the window (denominator for confidenceBtoA). */
-  changesOfB: number;
+  /**
+   * Total commits touching A in the window (denominator for confidenceAtoB).
+   * Pair rows only; cluster rows omit this (no canonical A/B side).
+   */
+  changesOfA?: number;
+  /**
+   * Total commits touching B in the window (denominator for confidenceBtoA).
+   * Pair rows only; cluster rows omit this (no canonical A/B side).
+   */
+  changesOfB?: number;
 }
 
 export interface SlimCochangeEvidence {
@@ -74,16 +94,33 @@ export interface VerboseCochangeEvidence extends SlimCochangeEvidence {
 
 export interface SlimCochangeHotspot {
   kind: "cochange";
-  /** `(anchor ? 1 : 0) + members.length`. Always `2` for a pair. */
-  size: 2;
+  /**
+   * `(anchor ? 1 : 0) + members.length`. `2` for a pair (default and
+   * `--file` mode). `>= 3` for a cluster row produced by
+   * `collapseClusters` — a dense connected component (density >= 0.5)
+   * of co-changing files presented as one row instead of `C(N, 2)`
+   * pair rows. Consumers that need to branch on row shape should test
+   * `size === 2`.
+   */
+  size: number;
   score: CochangeScore;
   /** Single-anchor mode only (`--file <path>`); omitted in whole-repo / `--diff`. */
   anchor?: { ref: CochangeHotspotRef };
-  /** Length 2 when `anchor` is omitted, length 1 when `anchor` is set. */
+  /**
+   * `2` files when this is a pair row (length 1 in single-anchor mode,
+   * length 2 otherwise). `>= 3` files when this is a cluster row, lex
+   * sorted; the metrics block then aggregates across the constituent
+   * pairs (median support / max confidence / median lift) and
+   * `dismissalId` is derived from the lex-sorted member set.
+   */
   members: { ref: CochangeHotspotRef }[];
   metrics: SlimCochangePairMetrics;
   evidence: SlimCochangeEvidence;
-  /** `coch:<hex>` — see `computeCochangePairDismissalId`. */
+  /**
+   * `coch:<hex>` — `computeCochangePairDismissalId` for pair rows,
+   * `computeCochangeClusterDismissalId` for cluster rows. Both share the
+   * `coch:` prefix and 16-hex width.
+   */
   dismissalId: string;
 }
 

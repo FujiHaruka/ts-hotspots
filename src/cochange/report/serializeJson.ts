@@ -12,7 +12,15 @@
 
 import type { DiffInfo, ReportTool } from "../../schema.ts";
 import type { Candidate } from "../ranking/types.ts";
-import { computeCochangePairDismissalId } from "./dismissalId.ts";
+import {
+  type ClusterCandidate,
+  type ClusterRow,
+  collapseClusters,
+} from "./collapseClusters.ts";
+import {
+  computeCochangeClusterDismissalId,
+  computeCochangePairDismissalId,
+} from "./dismissalId.ts";
 import type {
   CochangeHotspotRef,
   SerializedCochangeReport,
@@ -62,11 +70,19 @@ export function serializeReport(
     project.pairCandidateCountBeforeGate = input.pairCandidateCountBeforeGate;
   }
 
+  // Cluster rollup is whole-repo only. In single-anchor mode (`--file`)
+  // the user has explicitly asked for a pair-centric view per partner,
+  // and aggregating across partners would obscure per-partner metrics.
+  const isAnchorMode = input.candidates.some((c) => c.anchor !== undefined);
+  const rows: ClusterRow[] = isAnchorMode
+    ? input.candidates.map((c) => ({ kind: "pair", candidate: c }))
+    : collapseClusters(input.candidates);
+
   if (opts.verbose) {
     const out: SerializedCochangeReportVerbose = {
       tool: input.tool,
       project,
-      hotspots: input.candidates.map((c) => toVerboseHotspot(c, input)),
+      hotspots: rows.map((row) => toVerboseHotspotRow(row, input)),
       summary: {
         requestedWindow: input.requestedWindow,
         actualWindow: input.actualWindow,
@@ -81,9 +97,24 @@ export function serializeReport(
   const out: SerializedCochangeReport = {
     tool: input.tool,
     project,
-    hotspots: input.candidates.map(toSlimHotspot),
+    hotspots: rows.map(toSlimHotspotRow),
   };
   return out;
+}
+
+function toSlimHotspotRow(row: ClusterRow): SlimCochangeHotspot {
+  return row.kind === "pair"
+    ? toSlimHotspot(row.candidate)
+    : toSlimClusterHotspot(row.cluster);
+}
+
+function toVerboseHotspotRow(
+  row: ClusterRow,
+  input: CochangeReportInput,
+): VerboseCochangeHotspot {
+  return row.kind === "pair"
+    ? toVerboseHotspot(row.candidate, input)
+    : toVerboseClusterHotspot(row.cluster);
 }
 
 function toSlimHotspot(candidate: Candidate): SlimCochangeHotspot {
@@ -146,6 +177,56 @@ function toVerboseHotspot(
   if (recent.length > 0) {
     const first = recent[0];
     const last = recent[recent.length - 1];
+    if (first !== undefined && last !== undefined) {
+      verbose.evidence.coChangeWindow = { firstSha: first, lastSha: last };
+    }
+  }
+  return verbose;
+}
+
+function toSlimClusterHotspot(cluster: ClusterCandidate): SlimCochangeHotspot {
+  return {
+    kind: "cochange",
+    size: cluster.members.length,
+    score: {
+      axis: "supportConfidence",
+      value: cluster.scoreMax,
+    },
+    members: cluster.members.map((m) => ({ ref: toRef(m) })),
+    metrics: {
+      support: cluster.supportMedian,
+      // Pairwise confidence has no meaning at the cluster level; surface
+      // the strongest constituent confidenceMax and leave the directional
+      // sides at 0 (the schema documents the shift).
+      confidenceAtoB: 0,
+      confidenceBtoA: 0,
+      confidenceMax: cluster.confidenceMaxOverall,
+      lift: cluster.liftMedian,
+    },
+    evidence: {
+      recentCommits: cluster.recentUnion.slice(0, RECENT_DISPLAY_CAP),
+    },
+    dismissalId: computeCochangeClusterDismissalId(cluster.members),
+  };
+}
+
+function toVerboseClusterHotspot(
+  cluster: ClusterCandidate,
+): VerboseCochangeHotspot {
+  const slim = toSlimClusterHotspot(cluster);
+  const verbose: VerboseCochangeHotspot = {
+    ...slim,
+    // Cluster rows omit changesOfA/changesOfB — there is no canonical
+    // A/B side. The schema marks both as optional for this case.
+    metrics: { ...slim.metrics },
+    evidence: {
+      recentCommits: slim.evidence.recentCommits,
+      allCoChangeCommits: [...cluster.recentUnion],
+    },
+  };
+  if (cluster.recentUnion.length > 0) {
+    const first = cluster.recentUnion[0];
+    const last = cluster.recentUnion[cluster.recentUnion.length - 1];
     if (first !== undefined && last !== undefined) {
       verbose.evidence.coChangeWindow = { firstSha: first, lastSha: last };
     }

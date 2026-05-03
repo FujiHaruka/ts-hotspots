@@ -143,4 +143,79 @@ describe("serializeMarkdown", () => {
       serializeMarkdown(input, { verbose: true }),
     );
   });
+
+  test("triangle of pairs renders as one cluster card with aggregated metrics annotated", () => {
+    const candidates = [
+      candidate("src/a.ts", "src/b.ts", metric(6, 0.8, 3.0), ["sha1"]),
+      candidate("src/b.ts", "src/c.ts", metric(4, 0.6, 2.0), ["sha2"]),
+      candidate("src/a.ts", "src/c.ts", metric(3, 1.0, 1.5), ["sha3"]),
+    ];
+    const md = serializeMarkdown(baseInput(candidates), { verbose: false });
+    // Single ranked entry, header reflects file count.
+    expect(md).toContain("## #1 Cluster (3 files)");
+    expect(md).not.toContain("## #2");
+    // Aggregated metrics labelled with their aggregation method.
+    expect(md).toContain("support (median across 3 pairs): 4");
+    expect(md).toContain("confidenceMax (max across pairs): 1.000");
+    expect(md).toContain("lift (median across pairs): 2.00");
+    // All three members listed.
+    expect(md).toContain("- members:");
+    expect(md).toContain("  - src/a.ts");
+    expect(md).toContain("  - src/b.ts");
+    expect(md).toContain("  - src/c.ts");
+    // SHA union annotated.
+    expect(md).toContain(
+      "recent commits (union across pairs): `sha1`, `sha2`, `sha3`",
+    );
+    expect(md).toContain("dismissalId: `coch:");
+    // Pair-only labels must not leak in.
+    expect(md).not.toContain("confidenceAtoB");
+    expect(md).not.toContain("confidenceBtoA");
+  });
+
+  test("cluster verbose card adds full SHA list and window endpoints", () => {
+    const candidates = [
+      candidate("src/a.ts", "src/b.ts", metric(4, 0.8, 3.0), [
+        "sha1",
+        "shared",
+      ]),
+      candidate("src/b.ts", "src/c.ts", metric(3, 0.6, 2.0), [
+        "shared",
+        "sha2",
+      ]),
+      candidate("src/a.ts", "src/c.ts", metric(3, 1.0, 1.5), ["sha3"]),
+    ];
+    const md = serializeMarkdown(baseInput(candidates), { verbose: true });
+    expect(md).toContain("## #1 Cluster (3 files)");
+    // SHA union deduped, window endpoints derived from the union.
+    expect(md).toContain("co-change window: `sha1` -> `sha3`");
+    expect(md).toContain(
+      "all co-change commits: `sha1`, `shared`, `sha2`, `sha3`",
+    );
+  });
+
+  test("anchor-mode pair next to non-anchor cluster: anchor mode preserves pair shape", () => {
+    // All three pairs share the anchor; without the anchor-mode bypass
+    // they would have density 3/3=1 and collapse. With the bypass each
+    // anchor-pair stays a separate card.
+    const candidates = [
+      {
+        ...candidate("src/anchor.ts", "src/a.ts", metric(5, 0.8, 2.0)),
+        anchor: "src/anchor.ts",
+      },
+      {
+        ...candidate("src/anchor.ts", "src/b.ts", metric(4, 0.7, 1.8)),
+        anchor: "src/anchor.ts",
+      },
+      {
+        ...candidate("src/anchor.ts", "src/c.ts", metric(3, 0.6, 1.5)),
+        anchor: "src/anchor.ts",
+      },
+    ];
+    const md = serializeMarkdown(baseInput(candidates), { verbose: false });
+    expect(md).toContain("## #1 src/anchor.ts -> src/a.ts");
+    expect(md).toContain("## #2 src/anchor.ts -> src/b.ts");
+    expect(md).toContain("## #3 src/anchor.ts -> src/c.ts");
+    expect(md).not.toContain("Cluster (");
+  });
 });
