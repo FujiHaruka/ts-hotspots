@@ -322,6 +322,24 @@ export async function runPipeline(
         : renderMarkdownBody(outReport),
     );
 
+    if (finalHotspots.length === 0 && reportInput.pairsAfterGate > 0) {
+      const cause = describeEmptyDisplayCause({
+        diffApplied: scope !== undefined,
+        anchorApplied: anchor !== undefined,
+        dismissalFiltered:
+          dismissed !== undefined && dismissed.filteredThisRun > 0,
+        limitZero: args.limit === 0,
+      });
+      io.stderr.write(
+        renderStatsLine(
+          "cochange",
+          `no displayed pairs (pairsAfterGate=${String(
+            reportInput.pairsAfterGate,
+          )}; ${cause})`,
+        ),
+      );
+    }
+
     io.stderr.write(
       renderStatsLine(
         "cochange",
@@ -438,6 +456,29 @@ function toRepoRelativePosix(rootDir: string, input: string): string {
     rel = abs;
   }
   return pathSep === "/" ? rel : rel.split(pathSep).join("/");
+}
+
+interface EmptyDisplayCauseInput {
+  diffApplied: boolean;
+  anchorApplied: boolean;
+  dismissalFiltered: boolean;
+  limitZero: boolean;
+}
+
+/**
+ * Describe why `finalHotspots` is empty even though pairs survived the gate.
+ * Listed in the order the filters run; "+" joins multiple active causes.
+ * Falls back to a neutral phrase when none of the known filters fired
+ * (pairs were trimmed by some path that doesn't expose itself here).
+ */
+function describeEmptyDisplayCause(input: EmptyDisplayCauseInput): string {
+  const causes: string[] = [];
+  if (input.diffApplied) causes.push("--diff filter");
+  if (input.anchorApplied) causes.push("--file anchor");
+  if (input.dismissalFiltered) causes.push("dismissal registry");
+  if (input.limitZero) causes.push("--limit 0");
+  if (causes.length === 0) return "no active display filter";
+  return `trimmed by ${causes.join(" + ")}`;
 }
 
 function buildStatsPayload(

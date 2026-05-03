@@ -605,6 +605,120 @@ describe("cochange CLI: runPipeline", () => {
     expect(out.hotspots[0]?.members[0]?.ref.location).toBe("src/b.ts");
   });
 
+  test("empty display + pairsAfterGate>0 emits a soft hint naming --diff as the cause", async () => {
+    const repo = createFixtureRepo([
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+      "src/d.ts",
+    ]);
+    cleanups.push(repo.cleanup);
+    const cap = captureIO(repo.path);
+    // (a, b) and (c, d) both clear the gate; --diff scopes to a file
+    // touched by NEITHER pair, zeroing the displayed list.
+    const rawLog = [
+      withSha("aaa1111"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("aaa2222"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("aaa3333"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("ccc1111"),
+      "M\tsrc/c.ts",
+      "M\tsrc/d.ts",
+      withSha("ccc2222"),
+      "M\tsrc/c.ts",
+      "M\tsrc/d.ts",
+      withSha("ccc3333"),
+      "M\tsrc/c.ts",
+      "M\tsrc/d.ts",
+    ].join("\n");
+    const diffStub = {
+      baseSha: "0".repeat(40),
+      headSha: "1".repeat(40),
+      changedFiles: ["src/unrelated.ts"],
+    };
+    const code = await runPipeline(
+      makeArgs({
+        path: repo.path,
+        diff: { baseRef: "origin/main", headRef: "HEAD", threeDot: true },
+      }),
+      cap.io,
+      makeDeps(rawLog, false, diffStub),
+    );
+    expect(code).toBe(0);
+    const out = JSON.parse(cap.stdout()) as { hotspots: unknown[] };
+    expect(out.hotspots).toEqual([]);
+    const stderr = cap.stderr();
+    expect(stderr).toContain("no displayed pairs");
+    expect(stderr).toMatch(/pairsAfterGate=2\b/);
+    expect(stderr).toContain("--diff filter");
+    // The standard stats line is still emitted alongside.
+    expect(stderr).toContain("displayed=0");
+  });
+
+  test("empty display soft hint NOT emitted when pairsAfterGate is zero", async () => {
+    const repo = createFixtureRepo(["src/a.ts", "src/b.ts"]);
+    cleanups.push(repo.cleanup);
+    const cap = captureIO(repo.path);
+    // Only one co-change, below the default min-support of 3 → gate zeroes.
+    const rawLog = [withSha("aaaaaaa"), "M\tsrc/a.ts", "M\tsrc/b.ts"].join(
+      "\n",
+    );
+    const code = await runPipeline(
+      makeArgs({ path: repo.path }),
+      cap.io,
+      makeDeps(rawLog),
+    );
+    expect(code).toBe(0);
+    const out = JSON.parse(cap.stdout()) as { hotspots: unknown[] };
+    expect(out.hotspots).toEqual([]);
+    const stderr = cap.stderr();
+    expect(stderr).not.toContain("no displayed pairs");
+  });
+
+  test("empty display soft hint names --file when anchor pivot drops every pair", async () => {
+    const repo = createFixtureRepo([
+      "src/anchor.ts",
+      "src/a.ts",
+      "src/b.ts",
+      "src/c.ts",
+    ]);
+    cleanups.push(repo.cleanup);
+    const cap = captureIO(repo.path);
+    // (a, b) clears the gate but does not include the anchor; --file
+    // src/anchor.ts pivots onto a file that has no surviving pairs.
+    const rawLog = [
+      withSha("aaa1111"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("aaa2222"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("aaa3333"),
+      "M\tsrc/a.ts",
+      "M\tsrc/b.ts",
+      withSha("padddd1"),
+      "M\tsrc/c.ts",
+      withSha("padddd2"),
+      "M\tsrc/c.ts",
+    ].join("\n");
+    const code = await runPipeline(
+      makeArgs({ path: repo.path, file: "src/anchor.ts" }),
+      cap.io,
+      makeDeps(rawLog),
+    );
+    expect(code).toBe(0);
+    const out = JSON.parse(cap.stdout()) as { hotspots: unknown[] };
+    expect(out.hotspots).toEqual([]);
+    const stderr = cap.stderr();
+    expect(stderr).toContain("no displayed pairs");
+    expect(stderr).toContain("--file anchor");
+  });
+
   test("--ref and --diff are orthogonal: both can be passed simultaneously", async () => {
     const repo = createFixtureRepo(["src/a.ts", "src/b.ts", "src/c.ts"]);
     cleanups.push(repo.cleanup);
