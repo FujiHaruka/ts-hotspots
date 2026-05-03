@@ -56,6 +56,22 @@ You are working inside the ts-hotspots repo. ts-hotspots is a CLI that staticall
 
 ts-hotspots hands an agent **coordinates and evidence for "where reading yields the most hotspots"**. The evaluation axis is always the same: **does the output actually concentrate true refactor-starting signal for this project?** Some false positives are tolerable (the agent can read the raw code and decide). What is fatal is **true signal drowning in noise or failing to surface at all** — prioritize finding those patterns.
 
+### Subcommand-specific false-positive categories
+
+The Step 2 categories above (Structural / Idiomatic / Boundary / Barrel-or-shared-types high fan-in) were named while dogfooding `comp` and apply directly to it. Other subcommands have their own recurring false-positive shapes, recorded below as a stable vocabulary so successive sessions classify against the same names instead of re-deriving them. When you observe a fresh pattern that does not fit any of these, name and record it in the observation notes — and consider whether it deserves a permanent slot here.
+
+#### `comp`
+- Structural FP / Idiomatic FP / Boundary FP / Barrel or shared-types high fan-in (defined inline in Step 2 above).
+
+#### `coch`
+- **Same-dir sibling lockstep**: files in the same directory that import each other and naturally co-evolve. True coupling but trivially derivable from the import graph; surfacing it does little to accelerate exploration.
+- **Central-file amplification**: a hub file (DB schema, root tRPC router, top-level `index.ts`) appears in N displayed pairs with N different partners. Each pair is individually defensible; collectively the agent learns the same fact N times.
+- **Cluster-as-pairs**: when M files mutually co-change, the C(M, 2) pairs compete for top-N display slots, so one logical insight occupies multiple rows. The display layer collapses dense clusters into a single row, but residual pair-only fragments still surface as the long tail.
+- **Floor-of-window lift inflation**: pairs at `support === minSupport` whose constituent files barely change at all (`min(changesOfA, changesOfB) === support`) produce mathematically-correct but evidence-thin lift values that look impressive in isolation. The score sort already deprioritises them; this is a reader-side caveat, not a ranking bug.
+
+#### `arch` / `dup`
+None recorded yet. Add as future dogfooding sessions surface stable patterns.
+
 ### Out of scope
 
 - Actual refactor / fix proposals for the target project.
