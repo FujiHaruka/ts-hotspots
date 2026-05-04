@@ -1,6 +1,6 @@
 # ts-hotspots
 
-Static analysis that tells AI coding agents where to read first in your TypeScript repo.
+Static analysis that tells AI coding agents where to read first when refactoring or reviewing your TypeScript repo.
 
 > Status: under active development. Output schemas may change between minor versions.
 
