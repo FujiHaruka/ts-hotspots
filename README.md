@@ -6,7 +6,7 @@ Static analysis that points AI coding agents at the hotspots worth refactoring o
 
 ## Why
 
-AI coding agents have no bird's-eye view of a large repository. They can grep and read, and everything else they have to discover one call at a time. Asked to refactor or review an unfamiliar TypeScript codebase, they gravitate toward conspicuously-named files or recently-touched ones — and miss the real hotspots.
+AI coding agents explore a repository by reading what looks salient — conspicuous filenames, recently-touched files, the first hits from grep. None of that ranks a codebase by where the work concentrates. Asked to refactor or review an unfamiliar TypeScript codebase, agents start confidently in the wrong place and miss the real hotspots.
 
 `ts-hotspots` gives the agent a starting point: coordinates (`file:line`) and metric facts pointing at the spots most worth reading first. No rewrite plans, no judgments — the agent reads from there and decides what to do.
 
