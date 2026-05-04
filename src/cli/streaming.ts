@@ -9,9 +9,9 @@
  * `src/architecture/cli/main.ts`; this module is the single owner.
  *
  * Per-subcommand pieces that legitimately differ — each subcommand's
- * own `ArgParseError` class, arch's `ArchConfigError` branch — stay at
- * the call site and prepend their checks before delegating to
- * `classifyGenericError` for the shared tail.
+ * own `ArgParseError` class — stay at the call site and prepend their
+ * checks before delegating to `classifyGenericError` for the shared
+ * tail.
  */
 
 import type { ReportFormat } from "../cli-defaults.ts";
@@ -120,8 +120,7 @@ export function sniffFormat(argv: readonly string[]): ReportFormat {
 /**
  * Classify the git/spawn/unknown tail that's identical across
  * subcommands. Per-subcommand wrappers handle their own `ArgParseError`
- * (different class per subcommand) and any subcommand-specific branches
- * (e.g. arch's `ArchConfigError`) before delegating here.
+ * (different class per subcommand) before delegating here.
  *
  * Heuristic mapping: detector failures bubble up `git`-flavoured
  * messages most of the time.

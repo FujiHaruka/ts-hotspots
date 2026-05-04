@@ -13,7 +13,7 @@
  * where betweenness is overkill.
  */
 
-import type { Edge, Graph } from "../graph/types.ts";
+import type { Graph } from "../graph/types.ts";
 import { type Adjacency, buildAdjacency } from "./adjacency.ts";
 import { computeFan } from "./fanInOut.ts";
 import { computeInstability } from "./instability.ts";
@@ -24,19 +24,6 @@ import type { MetricsRecord, NodeMetrics } from "./types.ts";
 export interface ComputeMetricsOptions {
   /** Default `true`. Mirrors `--include-types[=false]`. */
   readonly includeTypes?: boolean;
-  /**
-   * Optional per-edge weight hook. When set, `buildAdjacency` calls
-   * this per surviving edge with `{fromFile, toFile, baseWeight, kind}`
-   * and uses the return value as the edge weight (replaces
-   * `EDGE_WEIGHTS[kind]`). Used by `arch`'s downweight config block —
-   * absent hook = base weights only.
-   */
-  readonly edgeWeight?: (params: {
-    readonly fromFile: string;
-    readonly toFile: string;
-    readonly baseWeight: number;
-    readonly kind: Edge["kind"];
-  }) => number;
 }
 
 export interface MetricsBundle {
@@ -51,7 +38,6 @@ export function computeMetrics(
 ): MetricsBundle {
   const adjacency = buildAdjacency(graph, {
     includeTypes: options.includeTypes,
-    edgeWeight: options.edgeWeight,
   });
 
   const reverseClosure = computeReverseClosure(adjacency);

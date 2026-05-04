@@ -3,10 +3,6 @@
  * to ~1.0 so the composite score lives in `[0, 1]`. Mirrors the
  * "Default composite weights" section of
  * `docs/plans/architecture-subcommand.md`.
- *
- * Weights are exported as plain readonly records so M7's downweight
- * config block can override individual axes without editing this
- * file (the loader merges over the defaults).
  */
 
 import type { AxisId, SmellType } from "../ranking/types.ts";

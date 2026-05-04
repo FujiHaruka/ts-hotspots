@@ -54,11 +54,6 @@ import { findGitRoot } from "../../util/git/findGitRoot.ts";
 import { listChangedFilePaths } from "../../util/git/listChangedFilePaths.ts";
 import { parseRevRange, type RevRange } from "../../util/git/parseRevRange.ts";
 import { resolveDiffEndpoints } from "../../util/git/runner.ts";
-import {
-  ArchConfigError,
-  buildEdgeWeightHook,
-  loadArchConfig,
-} from "../config/index.ts";
 import { buildGraph } from "../graph/buildGraph.ts";
 import { computeMetrics, withBetweenness } from "../metrics/index.ts";
 import { serializeReport } from "../report/serializeReport.ts";
@@ -95,9 +90,6 @@ export function writeArchitectureParseError(
 function classifyError(err: unknown): { code: string; message: string } {
   if (err instanceof ArgParseError) {
     return { code: "INVALID_ARGS", message: err.message };
-  }
-  if (err instanceof ArchConfigError) {
-    return { code: "INVALID_CONFIG", message: err.message };
   }
   return classifyGenericError(err);
 }
@@ -204,7 +196,6 @@ export async function runPipeline(
 
   try {
     const exclude = effectiveExcludeGlobs(args);
-    const config = loadArchConfig(repoPath);
     const sources = await loadArchSources({
       rootDir: repoPath,
       ref: args.ref,
@@ -219,7 +210,6 @@ export async function runPipeline(
 
     const { metrics: baseMetrics, adjacency } = computeMetrics(graph, {
       includeTypes: args.includeTypes,
-      edgeWeight: buildEdgeWeightHook(config.downweight),
     });
     const metrics = withBetweenness(baseMetrics, adjacency);
 

@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { main as archMain } from "../../src/architecture/cli/main.ts";
-import type {
-  ArchErrorReport,
-  ArchReport,
-} from "../../src/architecture/report/types.ts";
+import type { ArchReport } from "../../src/architecture/report/types.ts";
 import {
   createTempRepo,
   type TempRepo,
@@ -11,10 +8,6 @@ import {
 
 function parseReport(out: string): ArchReport {
   return JSON.parse(out) as ArchReport;
-}
-
-function parseErrorReport(out: string): ArchErrorReport {
-  return JSON.parse(out) as ArchErrorReport;
 }
 
 describe("architecture e2e", () => {
@@ -165,51 +158,6 @@ describe("architecture e2e", () => {
     expect(codeBase).toBe(0);
     const baseReport = parseReport(baseIO.out);
     expect(baseReport.project.sourceFileCount).toBe(9);
-  });
-
-  it("downweight config drops a hub off the candidate list", async () => {
-    const r = makeHubRepo();
-    // Drop hub.ts to weight 0 — every edge involving it disappears.
-    r.write(
-      ".ts-hotspots.json",
-      JSON.stringify(
-        {
-          architecture: {
-            downweight: [{ glob: "src/hub.ts", factor: 0 }],
-          },
-        },
-        null,
-        2,
-      ),
-    );
-    r.commit("downweight-config");
-
-    const io = makeIO();
-    const code = await archMain(["--format", "json", r.path], io);
-    expect(code).toBe(0);
-    const report = parseReport(io.out);
-    const hub = report.hotspots.find((h) =>
-      h.ref.location.startsWith("src/hub.ts:"),
-    );
-    expect(hub).toBeUndefined();
-  });
-
-  it("malformed config produces an INVALID_CONFIG error", async () => {
-    const r = makeHubRepo();
-    r.write(
-      ".ts-hotspots.json",
-      JSON.stringify({
-        architecture: { downweight: [{ glob: "x", factor: 2 }] },
-      }),
-    );
-    r.commit("bad-config");
-
-    const io = makeIO();
-    const code = await archMain(["--format", "json", r.path], io);
-    expect(code).toBe(1);
-    const parsed = parseErrorReport(io.out);
-    expect(parsed.status).toBe("error");
-    expect(parsed.error.code).toBe("INVALID_CONFIG");
   });
 
   it("--no-include-types drops type-only edges", async () => {

@@ -40,18 +40,6 @@ export interface BuildAdjacencyOptions {
    * Default `true`; mirrors the CLI flag `--include-types[=false]`.
    */
   readonly includeTypes?: boolean;
-  /**
-   * Optional per-edge weight multiplier. Called once per surviving
-   * edge with the source/target file paths and the base weight; the
-   * returned value replaces the base weight. Used by the downweight
-   * config block — absent callback means base weights only.
-   */
-  readonly edgeWeight?: (params: {
-    readonly fromFile: string;
-    readonly toFile: string;
-    readonly baseWeight: number;
-    readonly kind: Edge["kind"];
-  }) => number;
 }
 
 export function buildAdjacency(
@@ -59,16 +47,13 @@ export function buildAdjacency(
   options: BuildAdjacencyOptions = {},
 ): Adjacency {
   const includeTypes = options.includeTypes ?? true;
-  const weightHook = options.edgeWeight;
 
   const nodeIds = graph.nodes.map((n) => n.id);
   const indexById = new Map<string, number>();
-  const fileById = new Map<string, string>();
   for (let i = 0; i < nodeIds.length; i++) {
     const node = graph.nodes[i];
     if (node === undefined) continue;
     indexById.set(node.id, i);
-    fileById.set(node.id, node.filePath);
   }
 
   const outEdges: AdjacencyEntry[][] = nodeIds.map(() => []);
@@ -79,13 +64,7 @@ export function buildAdjacency(
     const fromIdx = indexById.get(edge.from);
     const toIdx = indexById.get(edge.to);
     if (fromIdx === undefined || toIdx === undefined) continue;
-    const baseWeight = EDGE_WEIGHTS[edge.kind];
-    let weight = baseWeight;
-    if (weightHook !== undefined) {
-      const fromFile = fileById.get(edge.from) ?? "";
-      const toFile = fileById.get(edge.to) ?? "";
-      weight = weightHook({ fromFile, toFile, baseWeight, kind: edge.kind });
-    }
+    const weight = EDGE_WEIGHTS[edge.kind];
     if (weight <= 0) continue;
     const out = outEdges[fromIdx];
     const inn = inEdges[toIdx];

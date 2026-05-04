@@ -4,8 +4,6 @@
  *
  * Inputs:
  *  - `metrics`: M2/M3 output, keyed by component id.
- *  - `options.suppressFlag`: optional `id → boolean` lookup mirroring
- *    M7's downweight config; absent → all-zeros.
  *  - `options.weights`: per-smell weight overrides merged over
  *    `DEFAULT_WEIGHTS`.
  *  - threshold + small-N parameters from the requirements doc:

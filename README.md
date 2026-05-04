@@ -137,23 +137,6 @@ These work across all four subcommands:
 
 Run `ts-hotspots <subcommand> --help` for the full list, including subcommand-specific flags.
 
-## Configuration
-
-A `.ts-hotspots.json` at the repo root can downweight edges that touch glob-matched files. Use it for legacy areas you do not want to surface yet, or for barrel files whose fan-out is structurally inevitable:
-
-```json
-{
-  "architecture": {
-    "downweight": [
-      { "glob": "src/legacy/**", "factor": 0.5 },
-      { "glob": "**/*.barrel.ts", "factor": 0.3 }
-    ]
-  }
-}
-```
-
-`factor` is in `[0, 1]`. Edges where either endpoint matches a rule's glob have their weight multiplied; multiple matching rules compose multiplicatively.
-
 ## Dismissing false positives
 
 All four features are heuristics — some surfaces will be fine as-is (intentional state-machine dispatchers, generated code, deliberate parallel structures, load-bearing public APIs, file pairs that genuinely belong together). To keep the agent from re-evaluating the same false positives every run, each reported entry carries a `dismissalId`. Record a judgment with:
