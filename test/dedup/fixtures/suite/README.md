@@ -40,5 +40,3 @@ repo, then runs `runDetector` with `baseRef=commit1`, `headRef=commit2`.
 | 023 | neg-tiny-fragments | negative, function, small |
 | 024 | neg-different-async-styles | negative, function, async |
 | 025 | neg-trivial-getters | negative, function, small |
-
-See `docs/plans/m8-fixture-suite.md` for the design rationale.

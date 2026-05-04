@@ -16,7 +16,7 @@ import type { ScoredPair } from "./jsonReport.ts";
  * - `tokenOverlap` at or above `TOKEN_FLOOR`.
  *
  * A pair missing both compensations is the FP class observed in
- * `docs/plans/tuning-tokenNgramSizes.md`: `combined ≈ 0.4` carried entirely
+ * `docs/dedup/plans/tuning-tokenNgramSizes.md`: `combined ≈ 0.4` carried entirely
  * by `statementKindSimilarity = 1.0` while `tokenOverlap < 0.2` and
  * `callOverlap = 0`. These survived the previous combined-only floor.
  */

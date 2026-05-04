@@ -61,7 +61,7 @@ describe("dropLowSemanticEvidence", () => {
   });
 
   it("drops pairs with no semantic evidence and weak token overlap even when combined meets the floor", () => {
-    // FP pattern from docs/plans/tuning-tokenNgramSizes.md: combined~0.4
+    // FP pattern from docs/dedup/plans/tuning-tokenNgramSizes.md: combined~0.4
     // carried by statementKindSimilarity alone while token<0.2 and callOverlap=0.
     const p = pair(0.45, [], "a", "b", 0.15);
     expect(dropLowSemanticEvidence([p])).toEqual([]);

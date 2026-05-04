@@ -20,7 +20,7 @@ import type { ScoredPair } from "./jsonReport.ts";
  * distribution observed on this repo's HEAD~10..HEAD output: 79% of
  * fragments appeared in ≤ 2 pairs (typical legit clone clusters), with a
  * sharp transition into a noise-dominated tail at ≥ 5. See
- * `docs/plans/tuning-tokenNgramSizes.md`.
+ * `docs/dedup/plans/tuning-tokenNgramSizes.md`.
  */
 const MAX_PAIRS_PER_FRAGMENT = 3;
 
