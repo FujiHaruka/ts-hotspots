@@ -19,13 +19,22 @@ export function hashText(raw: string): string {
 }
 
 /**
+ * All dismissal ids share the same `<feature>:<hex>` shape, with the hex
+ * portion truncated to 16 chars (8 bytes) — wide enough to avoid collisions
+ * across realistic repo sizes, narrow enough to round-trip through a CLI
+ * argument cleanly. See CLAUDE.md "Dismissal ID prefixes" for the convention.
+ */
+const DISMISSAL_ID_HEX_LENGTH = 16;
+
+/**
  * Convert a `bodyHash` (`sha256:<hex>`) into the user-facing `comp:<hex>`
  * `dismissalId` form used in reports and the registry. The two formats
  * exist so the registry can later route on a `<feature>:` prefix without
  * losing the hash algorithm tag inside the body hash itself.
  */
 export function bodyHashToCompDismissalId(bodyHash: string): string {
-  return `comp:${stripSha256Prefix(bodyHash)}`;
+  const hex = stripSha256Prefix(bodyHash).slice(0, DISMISSAL_ID_HEX_LENGTH);
+  return `comp:${hex}`;
 }
 
 /**
@@ -44,7 +53,10 @@ export function membersToDupDismissalId(
 ): string {
   const normalized = memberBodyHashes.map(stripSha256Prefix).sort();
   const joined = normalized.join("\n");
-  const hex = createHash("sha256").update(joined).digest("hex");
+  const hex = createHash("sha256")
+    .update(joined)
+    .digest("hex")
+    .slice(0, DISMISSAL_ID_HEX_LENGTH);
   return `dup:${hex}`;
 }
 
@@ -69,9 +81,7 @@ export function normalizeDismissalId(rawId: string): string {
 
 /**
  * Compute an `arch:<hex>` dismissal id from a component id of the form
- * `<filePath>::<exportName>::<exportKind>`. Truncated to 16 hex chars
- * (8 bytes) — wide enough to avoid collisions across realistic repo
- * sizes, narrow enough to round-trip through a CLI argument cleanly.
+ * `<filePath>::<exportName>::<exportKind>`.
  *
  * Bias: stable across code edits inside the component as long as its
  * file path, export name, and export kind don't change. v1 does not
@@ -80,8 +90,11 @@ export function normalizeDismissalId(rawId: string): string {
  * preferred over false persistence.
  */
 export function componentIdToArchDismissalId(componentId: string): string {
-  const hex = createHash("sha256").update(componentId).digest("hex");
-  return `arch:${hex.slice(0, 16)}`;
+  const hex = createHash("sha256")
+    .update(componentId)
+    .digest("hex")
+    .slice(0, DISMISSAL_ID_HEX_LENGTH);
+  return `arch:${hex}`;
 }
 
 function stripSha256Prefix(hash: string): string {

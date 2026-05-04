@@ -422,8 +422,7 @@ describe("main", () => {
       const report = await runDup(r.path);
       expect(report.hotspots.length).toBeGreaterThan(0);
       for (const g of report.hotspots) {
-        expect(g.dismissalId.startsWith("dup:")).toBe(true);
-        expect(g.dismissalId.length).toBe("dup:".length + 64);
+        expect(g.dismissalId).toMatch(/^dup:[0-9a-f]{16}$/);
       }
       expect(report.dismissed).toBeUndefined();
     });

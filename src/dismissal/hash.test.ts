@@ -60,10 +60,11 @@ describe("computeBodyHash", () => {
 });
 
 describe("membersToDupDismissalId", () => {
-  test("returns dup:<sha256> form", () => {
+  test("returns dup:<hex> form with 16 hex chars", () => {
     const id = membersToDupDismissalId([hashText("a"), hashText("b")]);
     expect(id.startsWith("dup:")).toBe(true);
-    expect(id.length).toBe("dup:".length + 64);
+    expect(id.length).toBe("dup:".length + 16);
+    expect(id.slice("dup:".length)).toMatch(/^[0-9a-f]{16}$/);
   });
 
   test("is invariant under member reordering", () => {
@@ -108,16 +109,19 @@ describe("normalizeDismissalId", () => {
   });
 
   test("passes through dup:<hex> unchanged", () => {
-    const id = `dup:${"a".repeat(64)}`;
+    const id = `dup:${"a".repeat(16)}`;
     expect(normalizeDismissalId(id)).toBe(id);
   });
 
   test("passes through comp:<hex> unchanged", () => {
-    const id = `comp:${"b".repeat(64)}`;
+    const id = `comp:${"b".repeat(16)}`;
     expect(normalizeDismissalId(id)).toBe(id);
   });
 
-  test("legacy sha256:<hex> rewrites to comp: prefix", () => {
+  test("legacy sha256:<hex> rewrites to comp: prefix without truncating", () => {
+    // Legacy ids predate the 16-hex convention. Normalize is hex-length
+    // agnostic so a legacy registry entry round-trips intact; it'll be
+    // pruned naturally once new reports stop surfacing matching ids.
     const id = `sha256:${"c".repeat(64)}`;
     expect(normalizeDismissalId(id)).toBe(`comp:${"c".repeat(64)}`);
   });
