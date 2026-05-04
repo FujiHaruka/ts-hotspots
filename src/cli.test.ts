@@ -187,101 +187,16 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(stderr.text).toContain("unknown option");
   });
 
-  test("--metrics filters axes under --verbose; unspecified axes are empty", async () => {
+  test("--metrics flag was removed (commander rejects -m)", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
-      [
-        ...COMPLEXITY_PREFIX,
-        FIXTURE_DIR,
-        "-m",
-        "sloc",
-        "--verbose",
-        "--format",
-        "json",
-      ],
-      stdout,
-      stderr,
-    );
-    expect(code).toBe(0);
-    const report = JSON.parse(stdout.text) as ParsedFunctionReport;
-    expect((report.functionRankings?.sloc ?? []).length).toBeGreaterThan(0);
-    expect(report.functionRankings?.parameterCount).toEqual([]);
-    expect(report.functionRankings?.cognitiveComplexity).toEqual([]);
-  });
-
-  test("--metrics accepts new v0.3.0 axes without errors (under --verbose)", async () => {
-    const stdout = new StringSink();
-    const stderr = new StringSink();
-    const code = await run(
-      [
-        ...COMPLEXITY_PREFIX,
-        FIXTURE_DIR,
-        "-m",
-        "mutationSiteCount,tryCatchCount,awaitCount,calleeCount",
-        "--verbose",
-        "--format",
-        "json",
-      ],
-      stdout,
-      stderr,
-    );
-    expect(code).toBe(0);
-    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
-    const report = JSON.parse(stdout.text) as ParsedFunctionReport;
-    // Meta is emitted for every axis under --verbose.
-    expect(report.functionAxisMeta?.calleeCount).toBeDefined();
-    expect(report.functionAxisMeta?.tryCatchCount).toBeDefined();
-    expect(report.functionAxisMeta?.awaitCount).toBeDefined();
-    expect(report.functionAxisMeta?.mutationSiteCount).toBeDefined();
-    // Unrequested axes yield empty rankings under --verbose.
-    expect(report.functionRankings?.cognitiveComplexity).toEqual([]);
-  });
-
-  test("--metrics rejects callerCount (axis was removed)", async () => {
-    const stdout = new StringSink();
-    const stderr = new StringSink();
-    const code = await run(
-      [
-        ...COMPLEXITY_PREFIX,
-        FIXTURE_DIR,
-        "-m",
-        "callerCount",
-        "--format",
-        "json",
-      ],
+      [...COMPLEXITY_PREFIX, FIXTURE_DIR, "-m", "sloc", "--format", "json"],
       stdout,
       stderr,
     );
     expect(code).toBe(1);
-    const err = JSON.parse(stdout.text) as {
-      error: { code: string; message: string };
-    };
-    expect(err.error.code).toBe("INVALID_METRIC");
-    expect(err.error.message).toContain("callerCount");
-  });
-
-  test("--metrics rejects unknown axis ids", async () => {
-    const stdout = new StringSink();
-    const stderr = new StringSink();
-    const code = await run(
-      [
-        ...COMPLEXITY_PREFIX,
-        FIXTURE_DIR,
-        "-m",
-        "notARealAxis",
-        "--format",
-        "json",
-      ],
-      stdout,
-      stderr,
-    );
-    expect(code).toBe(1);
-    const err = JSON.parse(stdout.text) as {
-      error: { code: string; message: string };
-    };
-    expect(err.error.code).toBe("INVALID_METRIC");
-    expect(err.error.message).toContain("notARealAxis");
+    expect(stderr.text).toContain("unknown option");
   });
 
   test("--file drill-down: returns functions in file, no rankings", async () => {
@@ -457,33 +372,6 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(code).toBe(0);
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     expect(report.functionCoOccurrence).toBeUndefined();
-  });
-
-  test("--metrics still drops functionCoOccurrence from slim default", async () => {
-    const stdout = new StringSink();
-    const stderr = new StringSink();
-    const code = await run(
-      [
-        ...COMPLEXITY_PREFIX,
-        FIXTURE_DIR,
-        "-m",
-        "cognitiveComplexity,sloc",
-        "--format",
-        "json",
-      ],
-      stdout,
-      stderr,
-    );
-    expect(code).toBe(0);
-    const report = JSON.parse(stdout.text) as ParsedFunctionReport;
-    expect(report.functionCoOccurrence).toBeUndefined();
-    // Candidates must stay confined to the requested axes.
-    const allowed = new Set(["cognitiveComplexity", "sloc"]);
-    for (const c of report.hotspots) {
-      for (const key of Object.keys(c.metrics)) {
-        expect(allowed.has(key)).toBe(true);
-      }
-    }
   });
 
   test("--file drill-down omits functionCoOccurrence", async () => {

@@ -68,7 +68,6 @@ Each hotspot reports a `file:line` location, the axis it ranked highest on, and 
 
 Command-specific options:
 
-- `--metrics <list>` — comma-separated axis ids to include
 - `--file <path>` — single-file drill-down (raw metrics for every function in the file)
 - `--diff <revrange>` — display only hotspots in files changed by the revrange (rankings still computed against the full working tree)
 - `--churn-window <N>` / `--no-churn` — control the recent-commit window used for the churn axis (default 200)

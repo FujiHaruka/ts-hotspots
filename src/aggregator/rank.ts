@@ -93,22 +93,6 @@ export function emptyFunctionAxisMeta(): Record<FunctionAxisId, AxisMeta> {
   return result;
 }
 
-export function filterFunctionRankings(
-  rankings: Record<FunctionAxisId, RankedFunctionEntry[]>,
-  axes: readonly FunctionAxisId[],
-): Record<FunctionAxisId, RankedFunctionEntry[]> {
-  const allowed = new Set<FunctionAxisId>(axes);
-  const result = emptyFunctionRankings();
-  for (const axis of FUNCTION_AXIS_IDS) {
-    if (allowed.has(axis)) result[axis] = rankings[axis];
-  }
-  return result;
-}
-
-export function isFunctionAxisId(id: string): id is FunctionAxisId {
-  return (FUNCTION_AXIS_IDS as readonly string[]).includes(id);
-}
-
 export function computeFunctionAxisMeta(
   entries: readonly FunctionEntry[],
   rankings: Record<FunctionAxisId, RankedFunctionEntry[]>,
@@ -221,9 +205,7 @@ function accumulateHits(
   };
 
   for (const entry of coOccurrence) {
-    const liveAxes = entry.axes.filter(
-      (a) => !isDegenerateAxis(axisMeta[a]),
-    );
+    const liveAxes = entry.axes.filter((a) => !isDegenerateAxis(axisMeta[a]));
     if (liveAxes.length < HOTSPOT_CO_OCCURRENCE_MIN_AXES) continue;
     if (!liveAxes.some(isQualityAxis)) continue;
     for (const axis of liveAxes) addHit(entry.ref, axis);

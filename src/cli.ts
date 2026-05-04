@@ -10,9 +10,7 @@ import {
   computeFunctionCoOccurrence,
   computeFunctionHotspotCandidates,
   emptyFunctionRankings,
-  filterFunctionRankings,
   functionRefKey,
-  isFunctionAxisId,
   rankFunctions,
 } from "./aggregator/rank.ts";
 import type { ArchParsedArgs } from "./architecture/cli/args.ts";
@@ -107,7 +105,6 @@ interface ChurnCliOptions {
 interface FunctionCliOptions extends ChurnCliOptions {
   exclude?: string[];
   limit?: number;
-  metrics?: string[];
   file?: string;
   verbose?: boolean;
   format?: ReportFormat;
@@ -177,13 +174,6 @@ function parseChurnWindow(value: string): number {
     );
   }
   return n;
-}
-
-function parseMetrics(value: string): string[] {
-  return value
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
 }
 
 function collectExcludeGlob(
@@ -366,7 +356,6 @@ Examples:
   ts-hotspots complexity --format json > report.json
   ts-hotspots comp --diff origin/main...        # narrow display to PR files
   ts-hotspots comp --file src/big-module.ts     # raw metrics for one file
-  ts-hotspots comp -m cyclomatic,cognitive,length
   ts-hotspots comp --no-churn                   # skip git churn collection
   ts-hotspots comp --verbose                    # full schema (all axes, coOccurrence, functions[])
 
@@ -428,11 +417,6 @@ export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
       "--limit <N|all>",
       `max entries in hotspots[] (default: ${String(DEFAULT_LIMIT)}). Pass 'all' to keep every candidate.`,
       parseLimit,
-    )
-    .option(
-      "-m, --metrics <list>",
-      "comma-separated axis ids to include",
-      parseMetrics,
     )
     .option("--file <path>", "drill down into a single file (raw metrics only)")
     .option(
@@ -556,23 +540,6 @@ function writeError(
   stderr.write(`${humanMessage}\n`);
 }
 
-class InvalidMetricError extends Error {
-  code = "INVALID_METRIC" as const;
-}
-
-function parseFunctionAxes(ids: readonly string[]): FunctionAxisId[] {
-  const result: FunctionAxisId[] = [];
-  const rejected: string[] = [];
-  for (const id of ids) {
-    if (isFunctionAxisId(id)) result.push(id);
-    else rejected.push(id);
-  }
-  if (rejected.length > 0) {
-    throw new InvalidMetricError(`unknown axis id(s): ${rejected.join(", ")}`);
-  }
-  return result;
-}
-
 function toRelPath(rootDir: string, input: string): string {
   const absInput = resolve(rootDir, input);
   return relative(rootDir, absInput);
@@ -645,7 +612,7 @@ function slimProject(projectInfo: ReportProject): ReportProject {
 function validateFunctionCliInputs(
   positional: string | undefined,
   options: FunctionCliOptions,
-): { rootDir: string; functionAxes: FunctionAxisId[] | undefined } {
+): { rootDir: string } {
   const rootDir = resolveRootDir(positional);
   if (!existsSync(rootDir)) {
     throw new InvalidArgsError(`path does not exist: ${rootDir}`);
@@ -653,14 +620,10 @@ function validateFunctionCliInputs(
   if (!statSync(rootDir).isDirectory()) {
     throw new InvalidArgsError(`path is not a directory: ${rootDir}`);
   }
-  const functionAxes =
-    options.metrics !== undefined
-      ? parseFunctionAxes(options.metrics)
-      : undefined;
   if (options.diff !== undefined && options.file !== undefined) {
     throw new InvalidArgsError("--diff and --file are mutually exclusive");
   }
-  return { rootDir, functionAxes };
+  return { rootDir };
 }
 
 interface BuildFunctionReportInput {
@@ -941,9 +904,8 @@ async function runFunctions(
   // we commit to streaming output. Emitting the preamble early lets `claude`
   // pick up stdin within its 3s detection window, but once emitted we can no
   // longer switch to the old "# ts-hotspots complexity error" preamble on failure.
-  let functionAxes: FunctionAxisId[] | undefined;
   try {
-    ({ functionAxes } = validateFunctionCliInputs(positional, options));
+    validateFunctionCliInputs(positional, options);
   } catch (err) {
     writeError(
       stdout,
@@ -982,13 +944,9 @@ async function runFunctions(
       return 0;
     }
 
-    let functionRankings = rankFunctions(functions, {
+    const functionRankings = rankFunctions(functions, {
       topN: INTERNAL_AXIS_TOP_N,
     });
-
-    if (functionAxes !== undefined) {
-      functionRankings = filterFunctionRankings(functionRankings, functionAxes);
-    }
 
     const functionAxisMeta = computeFunctionAxisMeta(
       functions,

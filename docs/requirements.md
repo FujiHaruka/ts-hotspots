@@ -127,7 +127,6 @@ ts-hotspots complexity [path]    # function-axis report (FunctionReport); `comp`
 ```
 
 - `path` is a directory inside a git working tree; it defaults to the current directory. Sources are enumerated via `git ls-files` (`.ts`, `.tsx`, `.mts`, `.cts`); untracked files are skipped. When `path` is not inside a git repo, the run fails with `NOT_A_GIT_REPO`.
-- Passing an unknown axis ID to `--metrics` produces an `INVALID_METRIC` error.
 
 ### 7.2 Flags
 
@@ -135,7 +134,6 @@ ts-hotspots complexity [path]    # function-axis report (FunctionReport); `comp`
 |---|---|---|
 | `--top <N>` | Top-N entries per axis | 5 |
 | `--exclude <glob...>` | Exclude target files | `**/*.{test,spec}.{ts,tsx,mts,cts}` |
-| `--metrics <list>` | Restrict output to these axis IDs (comma-separated) | unset = all axes |
 | `--file <path>` | Single-file drill-down mode: return every function in that file across all metrics. Ranking and candidate computation are skipped. | — |
 | `--verbose` | On top of the default slim output, restore `functionRankings` / `functionAxisMeta` / `functionCoOccurrence` / `functions[]` | off |
 | `--churn-window <N>` | How many recent commits git churn walks | 200 |
@@ -163,7 +161,7 @@ A config file (`ts-hotspots.config.*`) is not shipped in v1. Candidate gates and
 
 ### 8.2 Error output
 
-Errors do not break the stdout JSON / Markdown structure: we return `status: "error"` + `code` + `message`. A separate human-oriented message goes to stderr. Example codes: `NOT_A_GIT_REPO` / `INVALID_ARGS` / `INVALID_METRIC` / `UNKNOWN_ERROR`.
+Errors do not break the stdout JSON / Markdown structure: we return `status: "error"` + `code` + `message`. A separate human-oriented message goes to stderr. Example codes: `NOT_A_GIT_REPO` / `INVALID_ARGS` / `UNKNOWN_ERROR`.
 
 ## 9. Non-functional Requirements
 

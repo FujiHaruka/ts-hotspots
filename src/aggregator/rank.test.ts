@@ -7,7 +7,6 @@ import {
   computeFunctionHotspotCandidates,
   emptyFunctionAxisMeta,
   emptyFunctionRankings,
-  filterFunctionRankings,
   rankFunctions,
 } from "./rank.ts";
 
@@ -213,27 +212,6 @@ describe("computeFunctionCoOccurrence", () => {
     const rankings = rankFunctions(entries, { topN: 5 });
     const co = computeFunctionCoOccurrence(rankings);
     expect(co.map((e) => e.ref.location)).toEqual(["a.ts:9", "a.ts:10"]);
-  });
-
-  test("respects --metrics-style filtering: only counts within filtered axes", () => {
-    const entries: FunctionEntry[] = [
-      fn({
-        file: "a.ts",
-        name: "wide",
-        cognitive: 10,
-        sloc: 10,
-        paramCount: 10,
-      }),
-    ];
-    const full = rankFunctions(entries, { topN: 5 });
-    const narrowed = filterFunctionRankings(full, [
-      "cognitiveComplexity",
-      "parameterCount",
-    ]);
-    const co = computeFunctionCoOccurrence(narrowed);
-    expect(co).toHaveLength(1);
-    expect(co[0]?.axisHitCount).toBe(2);
-    expect(co[0]?.axes).toEqual(["cognitiveComplexity", "parameterCount"]);
   });
 
   test("empty rankings produce empty co-occurrence", () => {
@@ -543,55 +521,6 @@ describe("computeFunctionHotspotCandidates", () => {
     expect(Object.hasOwn(hot?.metrics ?? {}, "parameterCount")).toBe(false);
   });
 
-  test("--metrics filter closes candidate computation over the filtered axis set", () => {
-    const entries: FunctionEntry[] = [
-      fn({
-        file: "a.ts",
-        name: "hot",
-        cognitive: 10,
-        sloc: 9,
-        paramCount: 4,
-      }),
-      fn({
-        file: "b.ts",
-        name: "b",
-        cognitive: 5,
-        sloc: 4,
-        paramCount: 2,
-      }),
-      fn({
-        file: "c.ts",
-        name: "c",
-        cognitive: 1,
-        sloc: 1,
-        paramCount: 1,
-      }),
-    ];
-    const full = rankFunctions(entries, { topN: 5 });
-    const narrowed = filterFunctionRankings(full, [
-      "cognitiveComplexity",
-      "sloc",
-    ]);
-    const meta = computeFunctionAxisMeta(entries, narrowed);
-    const co = computeFunctionCoOccurrence(narrowed);
-    const candidates = computeFunctionHotspotCandidates(
-      entries,
-      narrowed,
-      meta,
-      co,
-    );
-    // With parameterCount filtered out: "hot" has 2 axes → not in A. B still
-    // picks it (and "b", "c") because cognitive/sloc are discriminative.
-    const hot = candidates.find((c) => c.ref.name === "hot");
-    expect(hot).toBeDefined();
-    expect(Object.keys(hot?.metrics ?? {})).toEqual([
-      "cognitiveComplexity",
-      "sloc",
-    ]);
-    // parameterCount raw value must not leak into metrics.
-    expect(Object.hasOwn(hot?.metrics ?? {}, "parameterCount")).toBe(false);
-  });
-
   test("empty inputs produce empty candidates", () => {
     expect(
       computeFunctionHotspotCandidates(
@@ -865,17 +794,5 @@ describe("computeFunctionHotspotCandidates", () => {
     );
     // Top-3 of paramCount rescued.
     expect(candidates.map((c) => c.ref.name)).toEqual(["h0", "h1", "h2"]);
-  });
-});
-
-describe("filter rankings", () => {
-  test("filterFunctionRankings keeps only listed axes, others are empty", () => {
-    const entries: FunctionEntry[] = [
-      fn({ file: "a.ts", cognitive: 5, sloc: 7 }),
-    ];
-    const full = rankFunctions(entries, { topN: 5 });
-    const filtered = filterFunctionRankings(full, ["cognitiveComplexity"]);
-    expect(filtered.cognitiveComplexity).toHaveLength(1);
-    expect(filtered.sloc).toEqual([]);
   });
 });
