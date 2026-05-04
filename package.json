@@ -1,14 +1,18 @@
 {
   "name": "ts-hotspots",
   "version": "0.2.0",
-  "description": "A CLI that statically analyzes a TypeScript project and surfaces refactor-candidate coordinates: per-function hotspots and Type-3 duplication groups.",
+  "description": "Static analysis CLI that points AI coding agents at TypeScript hotspots: per-function complexity, Type-3 duplication, architectural pressure, and git co-change.",
   "keywords": [
     "typescript",
     "static-analysis",
     "code-metrics",
     "hotspots",
+    "complexity",
     "duplication",
     "clone-detection",
+    "architecture",
+    "dependency-graph",
+    "co-change",
     "refactoring",
     "cli",
     "ai-agent"
