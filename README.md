@@ -54,9 +54,9 @@ Pass `--format json` for the raw JSON without the Markdown wrapper, or `--verbos
 Ranks individual functions (including methods, arrow functions, and TSX components) by per-function metrics like cognitive complexity, line count, parameter count, and recent churn.
 
 ```bash
-ts-hotspots complexity                      # scan the working tree
-ts-hotspots complexity --file src/foo.ts    # raw metrics for every function in foo.ts
-ts-hotspots complexity --diff origin/main...
+ts-hotspots complexity                       # scan the working tree
+ts-hotspots comp --diff origin/main...       # show only hotspots in changed files
+ts-hotspots comp --file src/foo.ts           # raw metrics for every function in one file
 ```
 
 Each hotspot reports a `file:line` location, the axis it ranked highest on, and the raw metric values that triggered it.
@@ -73,8 +73,9 @@ Command-specific options:
 Finds near-duplicate code regions: copy-pasted fragments that have been lightly edited (renamed identifiers, reordered statements, slightly different argument shape). Tuned for recall — the goal is to surface every spot worth a second look, not to declare a strict clone verdict.
 
 ```bash
-ts-hotspots duplication                              # whole repo at HEAD
-ts-hotspots duplication --diff origin/main...        # changed code vs. the rest of the tree
+ts-hotspots duplication                      # scan HEAD
+ts-hotspots dup --diff origin/main...        # changed code vs. the rest of the tree
+ts-hotspots dup --ref release/v2             # scan a specific ref
 ```
 
 Each group reports the locations of every member fragment, a similarity score, and a short evidence block listing the shared calls and properties that drove the match. Group order is biased toward refactor value: when two groups have similar shapes, the one whose files have been edited more often comes first. Cold groups are not hidden — only re-ranked behind hotter ones.
@@ -91,9 +92,9 @@ Command-specific options:
 Ranks exported symbols — every named export, default export, function, class, const, type, interface, or enum — by structural pressure on the dependency graph. Re-exports are normalised to their original definitions.
 
 ```bash
-ts-hotspots architecture                # scan the working tree
-ts-hotspots arch --ref release/v2       # build the graph at a specific commit
-ts-hotspots arch --diff origin/main...  # display only components in changed files
+ts-hotspots architecture                     # scan the working tree
+ts-hotspots arch --diff origin/main...       # show only hotspots in changed files
+ts-hotspots arch --ref release/v2            # build the graph at a specific ref
 ```
 
 Each hotspot reports the component's defining `file:line`, its export name and kind, the structural pattern that ranked it highest, and a summary of incoming vs. outgoing edges.
@@ -110,9 +111,9 @@ Command-specific options:
 Ranks file pairs that change together in git history. Two files repeatedly touched in the same commit, even when no static import edge connects them, are logically coupled — editing one usually means the other needs a look. The walk is rename-tracked, so a refactor that moves `foo.ts` to `lib/foo.ts` does not split its history.
 
 ```bash
-ts-hotspots cochange                              # last 200 commits at HEAD
-ts-hotspots cochange --file src/foo.ts            # rank co-change partners of foo.ts
-ts-hotspots coch --window 500 --min-support 5
+ts-hotspots cochange                         # walk the last 200 commits at HEAD
+ts-hotspots coch --diff origin/main...       # show only pairs touching changed files
+ts-hotspots coch --file src/foo.ts           # rank co-change partners of one file
 ```
 
 Each hotspot reports the canonical-ordered file pair, a co-change score, and the raw counts behind it.
