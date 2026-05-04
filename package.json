@@ -50,7 +50,7 @@
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm lint-staged && pnpm typecheck && pnpm check:strip-only"
+    "pre-commit": "pnpm lint-staged && pnpm typecheck && pnpm check:strip-only && pnpm knip"
   },
   "lint-staged": {
     "*.{ts,js}": [

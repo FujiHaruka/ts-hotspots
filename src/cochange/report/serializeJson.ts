@@ -47,7 +47,7 @@ export interface CochangeReportInput {
   diff?: DiffInfo;
 }
 
-export interface SerializeOptions {
+interface SerializeOptions {
   verbose: boolean;
 }
 
