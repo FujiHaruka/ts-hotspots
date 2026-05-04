@@ -940,7 +940,7 @@ async function runFunctions(
   // Pre-stream validation: fast checks that can fail with a clear error before
   // we commit to streaming output. Emitting the preamble early lets `claude`
   // pick up stdin within its 3s detection window, but once emitted we can no
-  // longer switch to the old "# ts-hotspots error" preamble on failure.
+  // longer switch to the old "# ts-hotspots complexity error" preamble on failure.
   let functionAxes: FunctionAxisId[] | undefined;
   try {
     ({ functionAxes } = validateFunctionCliInputs(positional, options));

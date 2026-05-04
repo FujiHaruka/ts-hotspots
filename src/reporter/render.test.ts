@@ -91,7 +91,7 @@ describe("renderMarkdown (complexity)", () => {
   test("FunctionReport: includes prompt header and JSON fence whose body matches renderJson", () => {
     const report = makeFunctionReport();
     const md = renderMarkdown("complexity", report);
-    expect(md.startsWith("# ts-hotspots report")).toBe(true);
+    expect(md.startsWith("# ts-hotspots complexity report")).toBe(true);
     expect(md).toContain("## Data");
     const body = extractJsonFence(md);
     expect(JSON.parse(body)).toEqual(JSON.parse(renderJson(report)));
@@ -103,7 +103,7 @@ describe("renderMarkdown (complexity)", () => {
       error: { code: "TSCONFIG_NOT_FOUND", message: "missing at /x" },
     };
     const md = renderMarkdown("complexity", err);
-    expect(md.startsWith("# ts-hotspots error")).toBe(true);
+    expect(md.startsWith("# ts-hotspots complexity error")).toBe(true);
     expect(md).toContain("missing at /x");
     expect(md).not.toContain("```json");
     expect(() => {

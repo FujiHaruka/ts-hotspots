@@ -623,7 +623,9 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const code = await run([...COMPLEXITY_PREFIX, FIXTURE_DIR], stdout, stderr);
     expect(code).toBe(0);
     expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
-    expect(stdout.text.startsWith("# ts-hotspots report")).toBe(true);
+    expect(stdout.text.startsWith("# ts-hotspots complexity report")).toBe(
+      true,
+    );
     const match = /```json\n([\s\S]*?)\n```/.exec(stdout.text);
     expect(match).not.toBeNull();
     const body = match?.[1] ?? "";
@@ -653,7 +655,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const missing = resolve(FIXTURE_DIR, "no-such-dir");
     const code = await run([...COMPLEXITY_PREFIX, missing], stdout, stderr);
     expect(code).toBe(1);
-    expect(stdout.text.startsWith("# ts-hotspots error")).toBe(true);
+    expect(stdout.text.startsWith("# ts-hotspots complexity error")).toBe(true);
     expect(stdout.text).toContain(missing);
     expect(stderr.text.length).toBeGreaterThan(0);
   });
@@ -667,7 +669,9 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stdout.text.startsWith("# ts-hotspots report")).toBe(true);
+    expect(stdout.text.startsWith("# ts-hotspots complexity report")).toBe(
+      true,
+    );
   });
 
   test("--format rejects unknown values", async () => {
@@ -727,7 +731,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(code).toBe(0);
     expect(stdout.chunks.length).toBeGreaterThanOrEqual(2);
     const head = stdout.chunks[0] ?? "";
-    expect(head.startsWith("# ts-hotspots report")).toBe(true);
+    expect(head.startsWith("# ts-hotspots complexity report")).toBe(true);
     // Head contains only the fence opener, not the JSON body.
     expect(head.endsWith("```json\n")).toBe(true);
     expect(head).not.toContain('"tool"');
@@ -760,7 +764,9 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       const stderr = new StringSink();
       const code = await run([...COMPLEXITY_PREFIX, tmp], stdout, stderr);
       expect(code).toBe(1);
-      expect(stdout.text.startsWith("# ts-hotspots report")).toBe(true);
+      expect(stdout.text.startsWith("# ts-hotspots complexity report")).toBe(
+        true,
+      );
       const match = /```json\n([\s\S]*?)\n```/.exec(stdout.text);
       expect(match).not.toBeNull();
       const parsed = JSON.parse(match?.[1] ?? "") as {
