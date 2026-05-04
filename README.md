@@ -19,7 +19,7 @@ Four readings of "worth reading first", as subcommands of one binary:
 - `ts-hotspots architecture` (alias `arch`) — exported components ranked by structural pressure on the dependency graph. Best for *"which components are load-bearing?"*
 - `ts-hotspots cochange` (alias `coch`) — file pairs that change together in git history. Best for *"which files outside the static graph are entangled with this one?"*
 
-All four scan a git working tree (`.ts` / `.tsx` / `.mts` / `.cts`) and emit machine-readable output. No `tsconfig.json` required; monorepos work out of the box.
+All four operate on git-tracked TypeScript sources (`.ts` / `.tsx` / `.mts` / `.cts`) and emit machine-readable output. No `tsconfig.json` required; monorepos work out of the box.
 
 ## Quick start
 
