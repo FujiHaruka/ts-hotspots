@@ -122,17 +122,47 @@ export function sniffFormat(argv: readonly string[]): ReportFormat {
  * subcommands. Per-subcommand wrappers handle their own `ArgParseError`
  * (different class per subcommand) before delegating here.
  *
- * Heuristic mapping: detector failures bubble up `git`-flavoured
- * messages most of the time.
+ * Resolution order:
+ *   1. Errors carrying `code: "NOT_A_GIT_REPO"` (raised by `findGitRoot`
+ *      and `listRepoSources`) → preserve the friendly message verbatim.
+ *   2. Node `ENOENT` from spawning git (binary not on PATH) →
+ *      `GIT_NOT_INSTALLED` with an actionable replacement message; the
+ *      raw `spawn git ENOENT` is unhelpful to surface to users.
+ *   3. Any other git/spawn-flavoured error → `GIT_FAILED` (e.g. unknown
+ *      ref, repo corruption, permission denied).
+ *   4. Fallback → `UNKNOWN_ERROR`.
  */
 export function classifyGenericError(err: unknown): {
   code: string;
   message: string;
 } {
-  const message = err instanceof Error ? err.message : String(err);
-  if (message.startsWith("not in a git repository")) {
-    return { code: "NOT_A_GIT_REPO", message };
+  if (err !== null && typeof err === "object") {
+    const e = err as {
+      code?: unknown;
+      path?: unknown;
+      syscall?: unknown;
+      message?: unknown;
+    };
+    if (e.code === "NOT_A_GIT_REPO") {
+      const message =
+        typeof e.message === "string" && e.message.length > 0
+          ? e.message
+          : "not a git repository";
+      return { code: "NOT_A_GIT_REPO", message };
+    }
+    if (
+      e.code === "ENOENT" &&
+      (e.path === "git" ||
+        (typeof e.syscall === "string" && e.syscall.includes("git")))
+    ) {
+      return {
+        code: "GIT_NOT_INSTALLED",
+        message:
+          "git command not found on PATH — ts-hotspots requires git to be installed",
+      };
+    }
   }
+  const message = err instanceof Error ? err.message : String(err);
   if (/git/i.test(message) || /spawn/i.test(message)) {
     return { code: "GIT_FAILED", message };
   }

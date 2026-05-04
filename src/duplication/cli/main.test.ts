@@ -229,7 +229,9 @@ describe("main", () => {
     );
     expect(code).toBe(1);
     expect(cap.stderr()).toMatch(/ts-hotspots duplication:/);
-    expect(cap.stderr()).toContain("not in a git repository");
+    expect(cap.stderr()).toContain(
+      "ts-hotspots requires a git repository (none found at:",
+    );
   });
 
   it("--phase-timings emits a JSON Lines perf log on stderr", async () => {

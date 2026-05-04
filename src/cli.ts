@@ -20,6 +20,7 @@ import {
 } from "./architecture/cli/main.ts";
 import { addArchitectureCommand } from "./architecture/cli/registerCommand.ts";
 import { runDismiss, runListDismissed, runUndismiss } from "./cli/dismiss.ts";
+import { classifyGenericError } from "./cli/streaming.ts";
 import {
   DEFAULT_CHURN_WINDOW,
   DEFAULT_FORMAT,
@@ -743,47 +744,30 @@ interface DiffScope {
   isInScope: (location: string) => boolean;
 }
 
-class NotAGitRepoError extends Error {
-  code = "NOT_A_GIT_REPO" as const;
-}
-
-class GitFailedError extends Error {
-  code = "GIT_FAILED" as const;
-}
-
 /**
  * Resolve the diff scope: list of project-relative file paths whose
  * head-side content differs between `rev.baseRef` and `rev.headRef`,
  * intersected with files that contain functions in this project.
+ *
+ * Errors raised here (`NotAGitRepoError` from `findGitRoot`, raw spawn /
+ * non-zero exit errors from `resolveDiffEndpoints` and
+ * `listChangedFilePaths`) propagate to the caller, where
+ * `classifyGenericError` routes them to `NOT_A_GIT_REPO` /
+ * `GIT_NOT_INSTALLED` / `GIT_FAILED`.
  */
 async function resolveDiffScope(
   rev: RevRange,
   rootDir: string,
   functions: readonly FunctionEntry[],
 ): Promise<DiffScope> {
-  let gitRoot: string;
-  try {
-    gitRoot = findGitRoot(rootDir);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new NotAGitRepoError(msg);
-  }
-
-  let baseSha: string;
-  let headSha: string;
-  let repoRelChanged: string[];
-  try {
-    ({ baseSha, headSha } = await resolveDiffEndpoints(
-      gitRoot,
-      rev.baseRef,
-      rev.headRef,
-      rev.threeDot,
-    ));
-    repoRelChanged = await listChangedFilePaths(gitRoot, baseSha, headSha);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new GitFailedError(msg);
-  }
+  const gitRoot = findGitRoot(rootDir);
+  const { baseSha, headSha } = await resolveDiffEndpoints(
+    gitRoot,
+    rev.baseRef,
+    rev.headRef,
+    rev.threeDot,
+  );
+  const repoRelChanged = await listChangedFilePaths(gitRoot, baseSha, headSha);
 
   // Project-relative files that contain at least one collected function.
   const projectFiles = new Set<string>();
@@ -963,8 +947,7 @@ async function runFunctions(
     writeOk(stdout, report, streaming);
     return 0;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const code = errorCode(err, "UNKNOWN_ERROR");
+    const { code, message } = classifyGenericError(err);
     const errorReport: ErrorReport = {
       status: "error",
       error: { code, message },

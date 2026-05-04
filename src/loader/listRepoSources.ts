@@ -1,5 +1,6 @@
 import { resolve, sep } from "node:path";
 import { matchesAnyGlob } from "../duplication/diff/internal/globMatch.ts";
+import { notAGitRepoMessage } from "../util/git/findGitRoot.ts";
 import { execGit } from "../util/git/runner.ts";
 
 const SOURCE_EXTENSIONS: readonly string[] = [".ts", ".tsx", ".mts", ".cts"];
@@ -7,7 +8,7 @@ const SOURCE_EXTENSIONS: readonly string[] = [".ts", ".tsx", ".mts", ".cts"];
 export class NotAGitRepositoryError extends Error {
   readonly code = "NOT_A_GIT_REPO";
   constructor(rootDir: string) {
-    super(`not a git repository: ${rootDir}`);
+    super(notAGitRepoMessage(rootDir));
     this.name = "NotAGitRepositoryError";
   }
 }
