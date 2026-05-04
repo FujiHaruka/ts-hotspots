@@ -31,10 +31,7 @@ import {
   sniffFormat,
 } from "../../cli/streaming.ts";
 import { TOOL_NAME } from "../../cli-defaults.ts";
-import {
-  DEFAULT_EXCLUDE_GLOBS,
-  DEFAULT_EXCLUDE_GLOBS_NO_TESTS,
-} from "../../defaults.ts";
+import { DEFAULT_EXCLUDE_GLOBS } from "../../defaults.ts";
 import {
   loadRegistry,
   pruneRegistry,
@@ -91,13 +88,6 @@ function classifyError(err: unknown): { code: string; message: string } {
     return { code: "INVALID_ARGS", message: err.message };
   }
   return classifyGenericError(err);
-}
-
-function effectiveExcludeGlobs(args: ArchParsedArgs): string[] {
-  const base = args.includeTests
-    ? DEFAULT_EXCLUDE_GLOBS_NO_TESTS
-    : DEFAULT_EXCLUDE_GLOBS;
-  return [...base, ...args.excludeGlobs];
 }
 
 interface DiffScope {
@@ -182,7 +172,7 @@ export async function runPipeline(
   }
 
   try {
-    const exclude = effectiveExcludeGlobs(args);
+    const exclude = [...DEFAULT_EXCLUDE_GLOBS, ...args.excludeGlobs];
     const sources = await loadArchSources({
       rootDir: repoPath,
       ref: args.ref,

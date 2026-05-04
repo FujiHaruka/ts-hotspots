@@ -107,7 +107,6 @@ plan (see "Out of milestones") rather than reviving an unwired flag.
 
 | Flag                | Why arch only                                                  |
 | ------------------- | -------------------------------------------------------------- |
-| `--include-tests`   | Test edges distort fan-in/fan-out far more than they distort per-function complexity or per-fragment duplication. The default is "exclude" (matching comp/dup via `DEFAULT_EXCLUDE_GLOBS`), but the toggle matters more here, so it gets its own flag. |
 | `--include-types`   | Type-only edges have a meaningful but lower weight than runtime edges. Default on; pass `--include-types=false` to drop them entirely. |
 
 Re-export resolution is **always normalized** (barrel files are followed
@@ -165,7 +164,6 @@ ts-hotspots architecture [path]
     --diff <revrange>          display filter — show only candidates in changed
                                files. Same display-filter semantics as comp.
     --ref <ref>                build the graph at <ref> (default: working tree)
-    --include-tests            include test files in the graph (default: off)
     --include-types[=false]    include type-only edges (default: on, downweighted)
 ```
 
@@ -477,13 +475,13 @@ Goal: wire everything to `ts-hotspots architecture` / alias `arch`.
   - `--ref` — graph built at the given commit (mirrors dup's `--ref`).
   - `--diff` — display filter, mirroring comp (orthogonal to `--ref`;
     both can be passed).
-  - `--include-tests`, `--include-types[=false]`.
+  - `--include-types[=false]`.
 - Integration tests: end-to-end CLI invocations against a fixture repo,
   asserting against the same golden snapshots from M5.
 
 Exit: `pnpm start architecture <path>` produces the M5 output via the
 public CLI surface. CLAUDE.md updated to document the justified
-asymmetries (`--include-tests`, `--include-types`, churn omission).
+asymmetries (`--include-types`, churn omission).
 
 ### M7 — Allowlist downweight + real-repo tuning
 

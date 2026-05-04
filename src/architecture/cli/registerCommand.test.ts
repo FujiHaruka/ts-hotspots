@@ -35,7 +35,6 @@ describe("addArchitectureCommand — defaults", () => {
     expect(args.kind).toBe("run");
     expect(args.format).toBe("markdown");
     expect(args.limit).toBe(20);
-    expect(args.includeTests).toBe(false);
     expect(args.includeTypes).toBe(true);
     expect(args.ref).toBeUndefined();
     expect(args.diff).toBeUndefined();
@@ -46,11 +45,6 @@ describe("addArchitectureCommand — flag parsing", () => {
   it("--no-include-types flips includeTypes off", () => {
     const args = parse(["--no-include-types"]);
     expect(args.includeTypes).toBe(false);
-  });
-
-  it("--include-tests flips includeTests on", () => {
-    const args = parse(["--include-tests"]);
-    expect(args.includeTests).toBe(true);
   });
 
   it("--limit all → POSITIVE_INFINITY", () => {

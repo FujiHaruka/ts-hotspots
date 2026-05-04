@@ -50,7 +50,6 @@ Examples:
   ts-hotspots architecture --format json > report.json
   ts-hotspots arch --diff origin/main... > scoped.md
   ts-hotspots arch --ref release/v2 --exclude 'src/legacy/**'
-  ts-hotspots arch --include-tests --verbose
   ts-hotspots arch --no-include-types        # drop type-only edges entirely
 
 <revrange> forms accepted by --diff:
@@ -74,7 +73,6 @@ interface ArchCliOptions {
   format?: ReportFormat;
   limit?: number;
   verbose?: boolean;
-  includeTests?: boolean;
   /**
    * Commander defaults `--no-X` boolean flags to `true` and flips to
    * `false` when the user passes `--no-include-types`. We treat
@@ -125,10 +123,6 @@ export function addArchitectureCommand(
       "commit/branch/tag to build the graph at (default: working tree)",
     )
     .option(
-      "--include-tests",
-      "include test files (and stories/cypress/playwright) in the graph (default: off). Test edges distort fan-in/fan-out, so they are excluded by default.",
-    )
-    .option(
       "--no-include-types",
       `drop type-only edges from the graph (default: include them, weight ${String(EDGE_WEIGHTS.type)})`,
     )
@@ -152,7 +146,6 @@ function buildParsedArgs(
     diff: opts.diff,
     limit,
     verbose: opts.verbose === true,
-    includeTests: opts.includeTests === true,
     includeTypes: opts.includeTypes,
   };
 }

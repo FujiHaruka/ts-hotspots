@@ -30,8 +30,6 @@ export interface ArchParsedArgs {
   diff: RevRange | undefined;
   limit: number;
   verbose: boolean;
-  /** `--include-tests` (default: off). */
-  includeTests: boolean;
   /** `--include-types` (default: on). */
   includeTypes: boolean;
 }

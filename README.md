@@ -107,7 +107,6 @@ Command-specific options:
 
 - `--diff <revrange>` — display filter only (rankings still computed against the full graph)
 - `--ref <ref>` — build the graph at the given commit (default: working tree)
-- `--include-tests` — include test files in the graph (off by default — test edges distort fan-in / fan-out)
 - `--no-include-types` — drop type-only edges entirely (default: keep them at reduced weight)
 
 ### cochange (coch)
