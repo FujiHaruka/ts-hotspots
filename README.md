@@ -10,6 +10,12 @@ AI coding agents explore a repository by reading what looks salient — conspicu
 
 `ts-hotspots` gives the agent a starting point: coordinates (`file:line`) and metric facts pointing at the spots most worth reading first. No rewrite plans, no judgments — the agent reads from there and decides what to do.
 
+## Design principles
+
+- **Agent-first output.** Pipe to your agent, not your dashboard.
+- **Measure, don't lint.** No verdicts, no failed builds — just ranked coordinates.
+- **Facts, not opinions.** Axis + value + rank; the agent reasons.
+
 ## What it surfaces
 
 Four readings of "worth reading first", as subcommands of one binary:
