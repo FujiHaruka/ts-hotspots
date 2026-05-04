@@ -4,7 +4,7 @@ export const DISMISSAL_REGISTRY_VERSION = 1 as const;
 export const DISMISSAL_APP_DIR = "ts-hotspots";
 export const DISMISSAL_REGISTRY_FILE = "dismissed.json";
 
-export interface DismissalEntryDisplay {
+interface DismissalEntryDisplay {
   file?: string;
   name?: string;
   kind?: FunctionKind;

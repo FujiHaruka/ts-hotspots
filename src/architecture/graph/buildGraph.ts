@@ -43,7 +43,7 @@ export interface SourceInput {
   readonly text: string;
 }
 
-export interface BuildGraphOptions {
+interface BuildGraphOptions {
   readonly sources: readonly SourceInput[];
   /**
    * Preferred entry point. Bundles `tsconfig`, `packageMap`, and the

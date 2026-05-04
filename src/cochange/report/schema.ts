@@ -21,7 +21,7 @@ export interface CochangeHotspotRef {
   kind: "file";
 }
 
-export interface CochangeScore {
+interface CochangeScore {
   /**
    * Sort key surfaced as the headline score. Equals
    * `support × confidenceMax` — the same composite
@@ -33,7 +33,7 @@ export interface CochangeScore {
   value: number;
 }
 
-export interface SlimCochangePairMetrics {
+interface SlimCochangePairMetrics {
   /**
    * For pair rows: raw co-change count.
    * For cluster rows: median of the constituent pairs' supports.
@@ -55,7 +55,7 @@ export interface SlimCochangePairMetrics {
   lift: number;
 }
 
-export interface VerboseCochangePairMetrics extends SlimCochangePairMetrics {
+interface VerboseCochangePairMetrics extends SlimCochangePairMetrics {
   /**
    * Total commits touching A in the window (denominator for confidenceAtoB).
    * Pair rows only; cluster rows omit this (no canonical A/B side).
@@ -68,7 +68,7 @@ export interface VerboseCochangePairMetrics extends SlimCochangePairMetrics {
   changesOfB?: number;
 }
 
-export interface SlimCochangeEvidence {
+interface SlimCochangeEvidence {
   /**
    * Up to the 5 most recent commits (short SHAs, newest → oldest) where
    * both files were touched. This is a display cap, not a walker cap —
@@ -78,7 +78,7 @@ export interface SlimCochangeEvidence {
   recentCommits: string[];
 }
 
-export interface VerboseCochangeEvidence extends SlimCochangeEvidence {
+interface VerboseCochangeEvidence extends SlimCochangeEvidence {
   /**
    * Every commit (short SHA, newest → oldest) where both files were
    * touched. Length matches `metrics.support`.
@@ -129,7 +129,7 @@ export interface VerboseCochangeHotspot extends SlimCochangeHotspot {
   evidence: VerboseCochangeEvidence;
 }
 
-export interface CochangeProject {
+interface CochangeProject {
   /** Actual commits the walk consumed (may be < `--window` on shallow clones). */
   windowCommits: number;
   /** TS files in the analysed file-set (post-exclude). */
@@ -138,7 +138,7 @@ export interface CochangeProject {
   pairCandidateCountBeforeGate?: number;
 }
 
-export interface CochangeSummary {
+interface CochangeSummary {
   /** Window size requested via `--window`. */
   requestedWindow: number;
   /**

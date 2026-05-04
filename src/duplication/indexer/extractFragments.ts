@@ -1,8 +1,8 @@
 import ts from "typescript";
+import type { ParsedSource } from "../../parser/parseSource.ts";
 import type { Config } from "../config/config.ts";
 import type { Fragment, FragmentKind } from "../domain/fragment.ts";
 import { FragmentIdAllocator } from "./internal/fragmentId.ts";
-import type { ParsedSource } from "../../parser/parseSource.ts";
 
 /**
  * Extract Type-3 duplication candidate fragments from a parsed source.

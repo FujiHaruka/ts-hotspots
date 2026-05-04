@@ -42,9 +42,6 @@ export interface ResolveContext {
   readonly packageMap?: PackageMap;
 }
 
-/** @deprecated Use {@link ResolveContext}. Kept for one release while callers migrate. */
-export type ResolveOptions = ResolveContext;
-
 /**
  * Returns the resolved repo-relative file path or `null` when the
  * specifier does not point at a known local source.

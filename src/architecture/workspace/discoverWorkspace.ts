@@ -22,9 +22,9 @@ import { join } from "node:path/posix";
 import { expandPackageGlobs } from "./expandPackageGlobs.ts";
 import { parsePnpmWorkspaceYaml } from "./parsePnpmWorkspace.ts";
 
-export type WorkspaceMode = "pnpm-workspace" | "package-json-workspaces";
+type WorkspaceMode = "pnpm-workspace" | "package-json-workspaces";
 
-export interface DiscoveredWorkspace {
+interface DiscoveredWorkspace {
   readonly mode: WorkspaceMode;
   /** Repo-relative POSIX directory paths, sorted. */
   readonly packageRoots: readonly string[];

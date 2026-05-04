@@ -2,7 +2,7 @@ import ts from "typescript";
 import { makeCollector } from "../makeCollector.ts";
 import type { FunctionLikeNode } from "../types.ts";
 
-export interface SlocResult {
+interface SlocResult {
   sloc: number;
 }
 

@@ -29,14 +29,14 @@ export interface ArchTool {
   version: string;
 }
 
-export interface ArchProject {
+interface ArchProject {
   /** Number of `.ts/.tsx` source files contributing to the graph. */
   sourceFileCount: number;
   /** Number of exported components in the graph. Verbose only. */
   componentCount?: number;
 }
 
-export interface ArchRef {
+interface ArchRef {
   /** `file:line` coordinate of the export's defining declaration. */
   location: string;
   /** Export kind (`function`, `class`, `const`, `type`, `interface`, `enum`, `default`). */
@@ -45,7 +45,7 @@ export interface ArchRef {
   name: string;
 }
 
-export interface ArchScore {
+interface ArchScore {
   axis: "composite";
   value: number;
 }
@@ -95,14 +95,14 @@ export interface ArchHotspot {
   dismissalId: string;
 }
 
-export interface ArchDiffInfo {
+interface ArchDiffInfo {
   baseSha: string;
   headSha: string;
   threeDot: boolean;
   changedFiles: number;
 }
 
-export interface ArchNotice {
+interface ArchNotice {
   code: "DIFF_SCOPE_EMPTY";
   message: string;
 }
@@ -128,10 +128,4 @@ export interface ArchReport {
   dismissed?: DismissedSummary;
   /** `--verbose` only. */
   summary?: ArchSummary;
-}
-
-export interface ArchErrorReport {
-  status: "error";
-  tool: ArchTool;
-  error: { code: string; message: string };
 }

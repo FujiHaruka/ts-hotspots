@@ -15,7 +15,7 @@
  * Convention for the empty-empty case: jaccard / overlap = 0,
  * intersection = []. Absence of evidence is not similarity.
  */
-export interface JaccardCount {
+interface JaccardCount {
   jaccard: number;
   overlapCoefficient: number;
   intersectionSize: number;

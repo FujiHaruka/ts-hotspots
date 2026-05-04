@@ -21,12 +21,12 @@ import { computePageRank } from "./pageRank.ts";
 import { computeReverseClosure } from "./reverseClosure.ts";
 import type { MetricsRecord, NodeMetrics } from "./types.ts";
 
-export interface ComputeMetricsOptions {
+interface ComputeMetricsOptions {
   /** Default `true`. Mirrors `--include-types[=false]`. */
   readonly includeTypes?: boolean;
 }
 
-export interface MetricsBundle {
+interface MetricsBundle {
   readonly metrics: MetricsRecord;
   /** Adjacency reused by the M3 betweenness pass. */
   readonly adjacency: Adjacency;

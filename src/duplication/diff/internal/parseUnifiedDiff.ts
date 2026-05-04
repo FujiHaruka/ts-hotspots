@@ -1,6 +1,6 @@
 import type { ChangedHunk } from "../../domain/diff.ts";
 
-export interface ParsedDiffFile {
+interface ParsedDiffFile {
   /** head-side path (forward slash). Deleted files are skipped entirely. */
   filePath: string;
   hunks: ChangedHunk[];

@@ -23,7 +23,7 @@
 
 import type { Adjacency } from "./adjacency.ts";
 
-export interface InstabilityResult {
+interface InstabilityResult {
   readonly instability: readonly number[];
   readonly unstableEdgeCount: readonly number[];
   readonly unstableEdgeRatio: readonly number[];

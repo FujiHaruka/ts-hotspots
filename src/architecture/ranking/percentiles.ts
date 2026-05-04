@@ -20,7 +20,7 @@
  * therefore report "none" rather than mechanical false positives.
  */
 
-export interface PercentileEntry {
+interface PercentileEntry {
   readonly value: number;
   readonly percentile: number;
   /** 1-based, top end of the value's tied block. */
@@ -28,7 +28,7 @@ export interface PercentileEntry {
   readonly zScore: number;
 }
 
-export interface ComputePercentileOptions {
+interface ComputePercentileOptions {
   readonly population: readonly number[];
 }
 

@@ -1,10 +1,6 @@
 import ts from "typescript";
 import { makeCountingCollector } from "../countingCollector.ts";
 
-export interface AwaitCountResult {
-  awaitCount: number;
-}
-
 function matches(n: ts.Node): boolean {
   if (n.kind === ts.SyntaxKind.AwaitExpression) return true;
   if (n.kind === ts.SyntaxKind.ForOfStatement) {

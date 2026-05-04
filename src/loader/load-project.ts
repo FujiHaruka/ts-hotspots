@@ -3,7 +3,7 @@ import { parseSource } from "../parser/parseSource.ts";
 import type { RepoSource } from "./listRepoSources.ts";
 import type { SourceFileInfo } from "./types.ts";
 
-export interface LoadProjectOptions {
+interface LoadProjectOptions {
   /**
    * Sources to read and parse. The caller (typically `listRepoSources`)
    * decides which files count — `loadProject` does not consult any tsconfig
@@ -12,7 +12,7 @@ export interface LoadProjectOptions {
   sources: readonly RepoSource[];
 }
 
-export interface LoadedProject {
+interface LoadedProject {
   files: readonly SourceFileInfo[];
 }
 

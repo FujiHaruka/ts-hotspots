@@ -17,7 +17,7 @@
 
 import { EDGE_WEIGHTS, type Edge, type Graph } from "../graph/types.ts";
 
-export interface AdjacencyEntry {
+interface AdjacencyEntry {
   readonly targetIndex: number;
   readonly weight: number;
   readonly kind: Edge["kind"];
@@ -34,7 +34,7 @@ export interface Adjacency {
   readonly inEdges: readonly (readonly AdjacencyEntry[])[];
 }
 
-export interface BuildAdjacencyOptions {
+interface BuildAdjacencyOptions {
   /**
    * When `false`, drops every edge of kind `"type"` before indexing.
    * Default `true`; mirrors the CLI flag `--include-types[=false]`.

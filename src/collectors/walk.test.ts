@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
 import ts from "typescript";
+import { describe, expect, test } from "vitest";
 import { parseSource } from "../parser/parseSource.ts";
 import { walkBodyExcludingNestedFunctions } from "./walk.ts";
 
@@ -90,7 +90,10 @@ describe("walkBodyExcludingNestedFunctions", () => {
   });
 
   test("the body itself is visited even though it is a function-like child", () => {
-    const { sourceFile } = parseSource("a.ts", "const f = () => { return 1; };");
+    const { sourceFile } = parseSource(
+      "a.ts",
+      "const f = () => { return 1; };",
+    );
     const stmt = sourceFile.statements[0] as ts.VariableStatement;
     const decl = stmt.declarationList.declarations[0];
     if (!decl) throw new Error("no declaration");

@@ -40,7 +40,7 @@ export interface Cluster {
   pairs: ScoredPair[];
 }
 
-export interface ClusterConfig {
+interface ClusterConfig {
   enabled: boolean;
   minEdgeCombined: number;
   minDensity: number;

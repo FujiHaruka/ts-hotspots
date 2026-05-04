@@ -1,4 +1,4 @@
-export interface ExcludeRules {
+interface ExcludeRules {
   globs: string[];
 }
 
@@ -9,7 +9,7 @@ export interface ExcludeRules {
  * `numHashes` must equal `bands * rows`; `buildLshIndex` validates this
  * at construction time.
  */
-export interface LshAxisConfig {
+interface LshAxisConfig {
   enabled: boolean;
   numHashes: number;
   bands: number;

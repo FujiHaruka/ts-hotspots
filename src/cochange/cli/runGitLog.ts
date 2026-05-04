@@ -15,7 +15,7 @@
 import { spawnSync } from "node:child_process";
 import { COMMIT_MARKER } from "../../util/git/walkChurnLog.ts";
 
-export interface RunGitLogOptions {
+interface RunGitLogOptions {
   rootDir: string;
   ref: string;
   window: number;

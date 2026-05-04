@@ -5,7 +5,7 @@ import type {
   Range,
 } from "./loadFixtures.ts";
 
-export interface PositiveMatch {
+interface PositiveMatch {
   expected: ExpectedPositive;
   /** Index of the earliest matching pair in the report (rank starts at 0). */
   rank: number | null;
@@ -15,7 +15,7 @@ export interface PositiveMatch {
   minScoreFailure: string | null;
 }
 
-export interface NegativeMatch {
+interface NegativeMatch {
   expected: ExpectedNegative;
   /** Number of report candidates that hit the forbidden (file, file) pair. */
   violations: number;
@@ -104,11 +104,11 @@ function checkMinScore(
   return failures.length === 0 ? null : failures.join(", ");
 }
 
-export interface MatchOptions {
+interface MatchOptions {
   jaccardThreshold: number;
 }
 
-export const DEFAULT_MATCH_OPTIONS: MatchOptions = {
+const DEFAULT_MATCH_OPTIONS: MatchOptions = {
   jaccardThreshold: 0.5,
 };
 

@@ -4,7 +4,10 @@ import { runDetector } from "../../src/duplication/cli/runDetector.ts";
 import { runWholeRepoDetector } from "../../src/duplication/cli/runWholeRepoDetector.ts";
 import { defaultConfig } from "../../src/duplication/config/index.ts";
 import { loadFixtures } from "../../tools/bench/loadFixtures.ts";
-import { setupRepo, type SetupRepoResult } from "../../tools/bench/setupRepo.ts";
+import {
+  type SetupRepoResult,
+  setupRepo,
+} from "../../tools/bench/setupRepo.ts";
 
 /**
  * End-to-end determinism tripwire. Runs `runDetector` twice against the same
@@ -23,9 +26,7 @@ const SUBSET_IDS = new Set([
 ]);
 
 const suiteRoot = resolve(__dirname, "fixtures/suite");
-const fixtures = loadFixtures(suiteRoot).filter((f) =>
-  SUBSET_IDS.has(f.id),
-);
+const fixtures = loadFixtures(suiteRoot).filter((f) => SUBSET_IDS.has(f.id));
 
 describe("fixture suite determinism", () => {
   const repos: SetupRepoResult[] = [];

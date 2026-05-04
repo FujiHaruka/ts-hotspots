@@ -7,7 +7,7 @@
 
 import type { AxisId, SmellType } from "../ranking/types.ts";
 
-export type SmellWeights = Readonly<Partial<Record<AxisId, number>>>;
+type SmellWeights = Readonly<Partial<Record<AxisId, number>>>;
 export type WeightsTable = Readonly<Record<SmellType, SmellWeights>>;
 
 export const DEFAULT_WEIGHTS: WeightsTable = {

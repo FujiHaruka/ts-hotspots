@@ -31,7 +31,7 @@ export interface BaseIndexSource {
  * extractor order) so downstream determinism is unchanged from the
  * legacy serial loop.
  */
-export interface BaseIndexResult {
+interface BaseIndexResult {
   /** `(fragment, features)` pairs, one entry per fragment, in source order. */
   entries: { fragment: Fragment; features: FragmentFeatures }[];
   /** `fragment.id → FragmentFeatureSets` (Set views built once for scoring). */
@@ -48,7 +48,7 @@ export interface BaseIndexResult {
   fragmentsPerFile: number[];
 }
 
-export interface BuildBaseIndexOptions {
+interface BuildBaseIndexOptions {
   /**
    * When true, the worker also runs `isThinWrapperFragment` for every
    * fragment and returns the result. The runner passes the resulting

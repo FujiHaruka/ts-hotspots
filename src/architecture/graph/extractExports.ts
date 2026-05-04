@@ -33,7 +33,7 @@ import ts from "typescript";
 import type { ParsedSource } from "../../parser/parseSource.ts";
 import { DEFAULT_EXPORT_NAME, type ExportKind } from "./types.ts";
 
-export interface LocalExport {
+interface LocalExport {
   readonly exportName: string;
   readonly exportKind: ExportKind;
   /** 1-based line of the defining declaration. */
@@ -48,14 +48,14 @@ export interface LocalExport {
   readonly declarationNode: ts.Node;
 }
 
-export interface NamedReexport {
+interface NamedReexport {
   readonly exportName: string;
   readonly remoteName: string;
   readonly moduleSpecifier: string;
   readonly isTypeOnly: boolean;
 }
 
-export interface StarReexport {
+interface StarReexport {
   readonly moduleSpecifier: string;
   readonly isTypeOnly: boolean;
 }
@@ -314,7 +314,5 @@ function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
 }
 
 function endLineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
-  return (
-    ts.getLineAndCharacterOfPosition(sourceFile, node.getEnd()).line + 1
-  );
+  return ts.getLineAndCharacterOfPosition(sourceFile, node.getEnd()).line + 1;
 }

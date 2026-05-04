@@ -3,11 +3,11 @@ import {
   STUB_DIFF_SUMMARY,
   STUB_WHOLE_REPO_SUMMARY,
 } from "../../../test/dedup/helpers/stubSummary.ts";
+import { parseSource } from "../../parser/parseSource.ts";
 import { RecordingPerfLogger } from "../cli/perfLog.ts";
 import { defaultConfig } from "../config/index.ts";
 import type { CandidateScore, ScoreBreakdown } from "../domain/candidate.ts";
 import type { Fragment } from "../domain/fragment.ts";
-import { parseSource } from "../../parser/parseSource.ts";
 import { nonNull } from "../util/nonNull.ts";
 import { buildEvidence } from "./evidence.ts";
 import {
@@ -511,7 +511,12 @@ describe("buildJsonReport", () => {
       const perfLog = new RecordingPerfLogger();
       buildJsonReport(
         {
-          diff: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
+          diff: {
+            baseSha: "x",
+            headSha: "y",
+            threeDot: false,
+            changedFiles: 1,
+          },
           pairs: [makePair(a, b)],
           config: defaultConfig,
           summary: STUB_DIFF_SUMMARY,
@@ -530,7 +535,12 @@ describe("buildJsonReport", () => {
       const perfLog = new RecordingPerfLogger();
       buildJsonReport(
         {
-          diff: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
+          diff: {
+            baseSha: "x",
+            headSha: "y",
+            threeDot: false,
+            changedFiles: 1,
+          },
           pairs: [makePair(a, b)],
           config: defaultConfig,
           summary: STUB_DIFF_SUMMARY,

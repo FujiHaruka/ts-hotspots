@@ -1,33 +1,23 @@
-export type {
-  Candidate,
-  CandidateScore,
-  ScoreBreakdown,
-} from "./candidate.ts";
+export type { Candidate } from "./candidate.ts";
 export type {
   AggregateAxis,
   AggregateChurn,
-  AggregateCombinedAxis,
   AggregateScores,
   CloneGroup,
   FragmentView,
   GroupMember,
-  PairScores,
 } from "./cloneGroup.ts";
-export type { ChangedFile, ChangedHunk } from "./diff.ts";
+export type { ChangedFile } from "./diff.ts";
 export type {
-  Feature,
   FeatureKey,
   FeatureKind,
   FragmentFeatures,
 } from "./feature.ts";
-export type { Fragment, FragmentKind } from "./fragment.ts";
-export { fragmentLineCount } from "./fragment.ts";
+export type { Fragment } from "./fragment.ts";
 export type { InvertedIndex, Posting } from "./posting.ts";
 export type {
-  AnalysisSummary,
   CloneCandidateReport,
   DismissedSummary,
-  DuplicationErrorReport,
   DuplicationDiffInfo,
   Evidence,
   RecommendationHint,

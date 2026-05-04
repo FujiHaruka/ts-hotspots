@@ -6,9 +6,7 @@ import { parseSource } from "../../parser/parseSource.ts";
  * Keys are used both as the project-relative `path` and as the parser's
  * `fileName` (so script kind is derived from the `.ts` / `.tsx` suffix).
  */
-export function mkSourceFiles(
-  files: Record<string, string>,
-): SourceFileInfo[] {
+export function mkSourceFiles(files: Record<string, string>): SourceFileInfo[] {
   const out: SourceFileInfo[] = [];
   for (const [path, content] of Object.entries(files)) {
     const { sourceFile } = parseSource(path, content);

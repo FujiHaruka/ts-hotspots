@@ -20,7 +20,7 @@
  */
 
 import { componentIdToArchDismissalId } from "../../dismissal/hash.ts";
-import type { Component, Edge, Graph } from "../graph/types.ts";
+import type { Component, Graph } from "../graph/types.ts";
 import { SMELL_TYPES, type SmellType } from "../ranking/types.ts";
 import type { ArchCandidate } from "../scoring/score.ts";
 import type {
@@ -32,7 +32,7 @@ import type {
   ArchTool,
 } from "./types.ts";
 
-export interface SerializeOptions {
+interface SerializeOptions {
   readonly tool: ArchTool;
   readonly verbose: boolean;
   readonly ref: string;
@@ -188,10 +188,4 @@ function bump(
   if (cur === undefined) return;
   cur[axis] += 1;
   if (isRuntime) cur.runtimeIncident += 1;
-}
-
-// Helper kept exported for unit tests that want to assert the
-// per-edge-kind tagging without going through the full serialiser.
-export function _internalEdgeKindIsRuntime(edge: Edge): boolean {
-  return edge.kind !== "type";
 }

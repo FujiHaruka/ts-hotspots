@@ -3,7 +3,7 @@ import { makeCollector } from "../makeCollector.ts";
 import type { FunctionLikeNode } from "../types.ts";
 import { getFunctionBody, NESTED_FUNCTION_KINDS } from "../walk.ts";
 
-export interface CognitiveResult {
+interface CognitiveResult {
   cognitiveComplexity: number;
 }
 

@@ -32,7 +32,7 @@ export interface CliIO {
   cwd: () => string;
 }
 
-export interface CliTool {
+interface CliTool {
   name: "ts-hotspots";
   version: string;
 }

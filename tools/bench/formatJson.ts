@@ -6,7 +6,7 @@ import {
   totalPositives,
 } from "./metrics.ts";
 
-export interface JsonReport {
+interface JsonReport {
   configLabel: string;
   fixtureCount: number;
   positives: number;

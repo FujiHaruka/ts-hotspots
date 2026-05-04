@@ -27,8 +27,7 @@ export function parseRevRange(input: string): RevRange {
   }
 
   // `...` must be tried before `..` since `..` is a prefix of `...`.
-  const result =
-    trySplit(input, "...", true) ?? trySplit(input, "..", false);
+  const result = trySplit(input, "...", true) ?? trySplit(input, "..", false);
   if (result === null) {
     throw new RevRangeParseError(
       `revrange must contain ".." or "..." (got "${input}")`,

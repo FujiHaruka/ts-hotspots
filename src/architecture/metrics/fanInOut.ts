@@ -14,17 +14,14 @@
 
 import type { Adjacency } from "./adjacency.ts";
 
-export interface FanResult {
+interface FanResult {
   readonly fanInUnweighted: number;
   readonly fanInWeighted: number;
   readonly fanOutUnweighted: number;
   readonly fanOutWeighted: number;
 }
 
-export function computeFan(
-  adjacency: Adjacency,
-  nodeIndex: number,
-): FanResult {
+export function computeFan(adjacency: Adjacency, nodeIndex: number): FanResult {
   const out = adjacency.outEdges[nodeIndex] ?? [];
   const inn = adjacency.inEdges[nodeIndex] ?? [];
   let fanOutWeighted = 0;

@@ -16,18 +16,21 @@
  */
 
 import { readFileSync } from "node:fs";
-import { resolve as resolvePath } from "node:path";
+import {
+  execGit,
+  gitShow,
+  resolveSha,
+} from "../../duplication/diff/gitRunner.ts";
 import { matchesAnyGlob } from "../../duplication/diff/internal/globMatch.ts";
-import { execGit, gitShow, resolveSha } from "../../duplication/diff/gitRunner.ts";
 import { listRepoSources } from "../../loader/listRepoSources.ts";
 
-export interface ArchSourceFile {
+interface ArchSourceFile {
   /** Repo-relative POSIX path. Used verbatim for graph nodes. */
   path: string;
   text: string;
 }
 
-export interface LoadArchSourcesOptions {
+interface LoadArchSourcesOptions {
   rootDir: string;
   ref: string | undefined;
   excludeGlobs: readonly string[];
@@ -71,14 +74,7 @@ async function loadRefSources(
   const sha = await resolveSha(rootDir, ref);
   const prefixOut = await execGit(rootDir, ["rev-parse", "--show-prefix"]);
   const prefix = prefixOut.trim();
-  const lsTreeArgs = [
-    "ls-tree",
-    "-r",
-    "-z",
-    "--full-tree",
-    "--name-only",
-    sha,
-  ];
+  const lsTreeArgs = ["ls-tree", "-r", "-z", "--full-tree", "--name-only", sha];
   if (prefix !== "") lsTreeArgs.push("--", prefix);
   const out = await execGit(rootDir, lsTreeArgs);
 
@@ -114,8 +110,3 @@ function isTypeScript(path: string): boolean {
     lower.endsWith(".cts")
   );
 }
-
-// `resolvePath` is only used for `rootDir` resolution at the call site.
-// Re-export so tests can mirror the canonicalisation without importing
-// from `node:path` directly.
-export { resolvePath };

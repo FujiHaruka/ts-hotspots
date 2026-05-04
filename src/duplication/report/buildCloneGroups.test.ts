@@ -294,10 +294,7 @@ describe("buildCloneGroups", () => {
       ["coldB.ts", 0],
     ]);
     const groups = buildCloneGroups(
-      [
-        mkPair("cold", "coldB", 0.7),
-        mkPair("hot", "hotB", 0.6),
-      ],
+      [mkPair("cold", "coldB", 0.7), mkPair("hot", "hotB", 0.6)],
       defaultConfig,
       true,
       noThin,

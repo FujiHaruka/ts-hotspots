@@ -20,7 +20,7 @@ export interface PairEvidence {
   recent: string[];
 }
 
-export interface WalkCochangeOptions {
+interface WalkCochangeOptions {
   prefix?: string;
   /**
    * Drop commits whose surviving (canonical, tracked) file count exceeds this

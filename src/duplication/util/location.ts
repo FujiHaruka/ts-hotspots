@@ -13,7 +13,7 @@ export function buildLocation(
   return `${filePath}:${String(startLine)}-${String(endLine)}`;
 }
 
-export interface ParsedLocation {
+interface ParsedLocation {
   filePath: string;
   startLine: number;
   endLine: number;

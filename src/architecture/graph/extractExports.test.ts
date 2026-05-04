@@ -120,18 +120,14 @@ describe("extractExports — endLine", () => {
   });
 
   it("captures multi-line classes including the closing brace line", () => {
-    const result = exportsOf(
-      "export class Cls {\n  foo() {}\n  bar() {}\n}\n",
-    );
+    const result = exportsOf("export class Cls {\n  foo() {}\n  bar() {}\n}\n");
     const cls = result.local.get("Cls");
     expect(cls?.line).toBe(1);
     expect(cls?.endLine).toBe(4);
   });
 
   it("captures spans for `export const` arrow bodies", () => {
-    const result = exportsOf(
-      "export const fn = () => {\n  return 1;\n};\n",
-    );
+    const result = exportsOf("export const fn = () => {\n  return 1;\n};\n");
     const fn = result.local.get("fn");
     expect(fn?.line).toBe(1);
     expect(fn?.endLine).toBe(3);

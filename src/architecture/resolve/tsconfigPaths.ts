@@ -42,8 +42,7 @@ export interface TsconfigResolution {
 
 const EMPTY: TsconfigResolution = { baseUrl: ".", mappings: [] };
 
-export interface ReadTsconfigOptions
-  extends Partial<MakeParseConfigHostOptions> {
+interface ReadTsconfigOptions extends Partial<MakeParseConfigHostOptions> {
   /**
    * Absolute path to the tsconfig file. When omitted, defaults to
    * `<repoRoot>/tsconfig.json`. Used by the per-package loader.

@@ -176,7 +176,9 @@ function buildOneGroup(
   return group;
 }
 
-function collectClusterFiles(fragments: readonly Fragment[]): readonly string[] {
+function collectClusterFiles(
+  fragments: readonly Fragment[],
+): readonly string[] {
   const seen = new Set<string>();
   for (const f of fragments) seen.add(f.filePath);
   return [...seen].sort();

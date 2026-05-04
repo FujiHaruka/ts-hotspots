@@ -69,11 +69,13 @@ describe("computeAwaitCount", () => {
     );
     const outer = fns.find(
       (f): f is ts.FunctionDeclaration =>
-        f.kind === ts.SyntaxKind.FunctionDeclaration && f.name?.text === "outer",
+        f.kind === ts.SyntaxKind.FunctionDeclaration &&
+        f.name?.text === "outer",
     );
     const inner = fns.find(
       (f): f is ts.FunctionDeclaration =>
-        f.kind === ts.SyntaxKind.FunctionDeclaration && f.name?.text === "inner",
+        f.kind === ts.SyntaxKind.FunctionDeclaration &&
+        f.name?.text === "inner",
     );
     if (!outer || !inner) throw new Error("functions not found");
     expect(computeAwaitCount(outer)).toBe(0);

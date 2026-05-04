@@ -12,7 +12,7 @@ import type {
 import { FUNCTION_AXIS_IDS } from "../schema.ts";
 import { compareFunctionByLocation } from "./function-location.ts";
 
-export interface RankOptions {
+interface RankOptions {
   topN: number;
 }
 

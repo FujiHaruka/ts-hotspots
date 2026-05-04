@@ -87,7 +87,7 @@ import {
 } from "./util/git/parseRevRange.ts";
 import { resolveDiffEndpoints } from "./util/git/runner.ts";
 
-export interface WritableLike {
+interface WritableLike {
   write: (chunk: string) => void;
 }
 
@@ -387,7 +387,7 @@ regressions. To list active entries use 'ts-hotspots list-dismissed';
 to remove one explicitly use 'ts-hotspots undismiss <id>'.
 `;
 
-export function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
+function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
   const program = new Command();
   program.enablePositionalOptions();
   program

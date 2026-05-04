@@ -12,7 +12,7 @@ const FUNCTION_LIKE_KINDS = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.Constructor,
 ]);
 
-export interface ParsedFunctionLike {
+interface ParsedFunctionLike {
   sourceFile: ts.SourceFile;
   fn: FunctionLikeNode;
 }

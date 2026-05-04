@@ -19,7 +19,7 @@ export interface RepoSource {
   relative: string;
 }
 
-export interface ListRepoSourcesOptions {
+interface ListRepoSourcesOptions {
   exclude?: readonly string[];
 }
 

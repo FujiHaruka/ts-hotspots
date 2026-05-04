@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
 import ts from "typescript";
+import { describe, expect, test } from "vitest";
 import { parseSource } from "./parseSource.ts";
 
 describe("parseSource", () => {
@@ -39,10 +39,7 @@ describe("parseSource", () => {
   });
 
   test("setParentNodes is enabled (node.parent is reachable)", () => {
-    const { sourceFile } = parseSource(
-      "a.ts",
-      "function f() { return 1; }",
-    );
+    const { sourceFile } = parseSource("a.ts", "function f() { return 1; }");
     const fn = sourceFile.statements[0] as ts.FunctionDeclaration;
     expect(fn.parent).toBe(sourceFile);
   });

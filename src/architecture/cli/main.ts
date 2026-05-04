@@ -52,7 +52,7 @@ import {
 import type { DismissedSummary } from "../../schema.ts";
 import { findGitRoot } from "../../util/git/findGitRoot.ts";
 import { listChangedFilePaths } from "../../util/git/listChangedFilePaths.ts";
-import { parseRevRange, type RevRange } from "../../util/git/parseRevRange.ts";
+import type { RevRange } from "../../util/git/parseRevRange.ts";
 import { resolveDiffEndpoints } from "../../util/git/runner.ts";
 import { buildGraph } from "../graph/buildGraph.ts";
 import { computeMetrics, withBetweenness } from "../metrics/index.ts";
@@ -397,8 +397,3 @@ export async function main(
 
   return runPipeline(parsed, io);
 }
-
-// `parseRevRange` is an internal helper used by the registrar; re-export
-// here so `main.test.ts` can construct revranges without reaching across
-// directories.
-export { parseRevRange };

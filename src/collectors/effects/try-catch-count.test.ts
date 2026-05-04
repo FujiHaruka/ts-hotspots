@@ -58,11 +58,13 @@ describe("computeTryCatchCount", () => {
     );
     const outer = fns.find(
       (f): f is ts.FunctionDeclaration =>
-        f.kind === ts.SyntaxKind.FunctionDeclaration && f.name?.text === "outer",
+        f.kind === ts.SyntaxKind.FunctionDeclaration &&
+        f.name?.text === "outer",
     );
     const inner = fns.find(
       (f): f is ts.FunctionDeclaration =>
-        f.kind === ts.SyntaxKind.FunctionDeclaration && f.name?.text === "inner",
+        f.kind === ts.SyntaxKind.FunctionDeclaration &&
+        f.name?.text === "inner",
     );
     if (!outer || !inner) throw new Error("functions not found");
     expect(computeTryCatchCount(outer)).toBe(0);

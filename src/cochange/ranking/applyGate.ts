@@ -14,7 +14,7 @@ import {
 } from "./defaults.ts";
 import type { Candidate } from "./types.ts";
 
-export interface ApplyGateOptions {
+interface ApplyGateOptions {
   minSupport?: number;
   confidenceMaxFloor?: number;
   liftFloor?: number;

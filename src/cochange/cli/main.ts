@@ -20,7 +20,6 @@
  */
 
 import { sep as pathSep, resolve as resolvePath } from "node:path";
-import { Command, CommanderError } from "commander";
 import pkg from "../../../package.json" with { type: "json" };
 import {
   buildErrorWriters,
@@ -63,21 +62,13 @@ import type {
   SlimCochangeHotspot,
 } from "../report/schema.ts";
 import { serializeReport } from "../report/serializeJson.ts";
-import { serializeMarkdown } from "../report/serializeMarkdown.ts";
 import { walkCochange } from "../walk/walkCochange.ts";
 import { ArgParseError, type CochangeParsedArgs } from "./args.ts";
 import { loadCochangeSources } from "./loadSources.ts";
-import { addCochangeCommand } from "./registerCommand.ts";
 import { runGitIsShallow, runGitLog, runGitShowPrefix } from "./runGitLog.ts";
 
 const TOOL: ReportTool = { name: TOOL_NAME, version: pkg.version };
 const errorWriter = buildErrorWriters("cochange", TOOL);
-
-const REAL_IO: CliIO = {
-  stdout: process.stdout,
-  stderr: process.stderr,
-  cwd: () => process.cwd(),
-};
 
 export function writeCochangeParseError(
   io: CliIO,
@@ -504,60 +495,3 @@ function buildStatsPayload(
   }
   return payload;
 }
-
-export async function main(
-  argv: readonly string[],
-  io: CliIO = REAL_IO,
-): Promise<number> {
-  let parsed: CochangeParsedArgs | undefined;
-  const program = new Command();
-  program.exitOverride();
-  program.configureOutput({
-    writeOut: (s) => {
-      io.stdout.write(s);
-    },
-    writeErr: (s) => {
-      io.stderr.write(s);
-    },
-  });
-
-  addCochangeCommand(program, (args) => {
-    parsed = args;
-  });
-
-  try {
-    await program.parseAsync(["node", TOOL_NAME, "cochange", ...argv]);
-  } catch (err) {
-    if (err instanceof CommanderError) {
-      if (err.code === "commander.helpDisplayed") return 0;
-      const message = err.message;
-      errorWriter.pre(io, sniffFormat(argv), "INVALID_ARGS", message, message);
-      return 1;
-    }
-    if (err instanceof ArgParseError) {
-      errorWriter.pre(
-        io,
-        sniffFormat(argv),
-        "INVALID_ARGS",
-        err.message,
-        err.message,
-      );
-      return 1;
-    }
-    throw err;
-  }
-
-  if (parsed === undefined) {
-    io.stderr.write(
-      "ts-hotspots cochange: internal error — command did not run\n",
-    );
-    return 1;
-  }
-
-  return runPipeline(parsed, io);
-}
-
-// `serializeMarkdown` is exposed here so callers that want the
-// human-card render can reach it through the same module surface as
-// the JSON serializer used by `runPipeline`.
-export { serializeMarkdown };

@@ -10,7 +10,7 @@
 
 import { listRepoSources } from "../../loader/listRepoSources.ts";
 
-export interface LoadCochangeSourcesOptions {
+interface LoadCochangeSourcesOptions {
   rootDir: string;
   excludeGlobs: readonly string[];
 }

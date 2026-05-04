@@ -1,7 +1,7 @@
 import { makeCollector } from "../makeCollector.ts";
 import type { FunctionLikeNode } from "../types.ts";
 
-export interface ParameterCountResult {
+interface ParameterCountResult {
   parameterCount: number;
 }
 

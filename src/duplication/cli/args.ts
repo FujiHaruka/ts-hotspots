@@ -19,13 +19,13 @@ import {
  *   uses the head ref; whole-repo mode uses the scan ref. `--churn-ref`
  *   overrides both.
  */
-export interface ChurnCliConfig {
+interface ChurnCliConfig {
   enabled: boolean;
   window: number;
   ref: string | undefined;
 }
 
-export interface DiffModeArgs {
+interface DiffModeArgs {
   kind: "run";
   mode: "diff";
   baseRef: string;
@@ -61,7 +61,7 @@ export interface DiffModeArgs {
   churn: ChurnCliConfig;
 }
 
-export interface WholeRepoModeArgs {
+interface WholeRepoModeArgs {
   kind: "run";
   mode: "whole-repo";
   /** Commit / branch / tag to scan. */
@@ -82,11 +82,11 @@ export interface WholeRepoModeArgs {
 
 export type ParsedArgs = DiffModeArgs | WholeRepoModeArgs;
 
-export interface HelpArgs {
+interface HelpArgs {
   kind: "help";
 }
 
-export type ArgsResult = ParsedArgs | HelpArgs;
+type ArgsResult = ParsedArgs | HelpArgs;
 
 export class ArgParseError extends Error {
   override readonly name = "ArgParseError";

@@ -30,9 +30,7 @@ describe("computeParameterCount", () => {
   });
 
   test("destructured param counts as 1", () => {
-    expect(
-      compute("function f({ a, b }: { a: number; b: number }){}"),
-    ).toBe(1);
+    expect(compute("function f({ a, b }: { a: number; b: number }){}")).toBe(1);
   });
 
   test("generic function: type params excluded", () => {

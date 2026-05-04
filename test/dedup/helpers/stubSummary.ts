@@ -7,7 +7,7 @@ import type {
  * Zero-filled `ScopeStats` for tests that don't exercise the analysis
  * summary itself but still need to satisfy the report shape.
  */
-export const STUB_SCOPE_STATS: ScopeStats = {
+const STUB_SCOPE_STATS: ScopeStats = {
   files: 0,
   lines: 0,
   fragments: 0,

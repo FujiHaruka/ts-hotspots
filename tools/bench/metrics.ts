@@ -2,7 +2,7 @@ import type { PhaseTimingsRecord } from "../../src/duplication/cli/perfLog.ts";
 import type { MatchResult } from "./matchReport.ts";
 
 /** Re-export for the rest of the bench tool chain. */
-export type PhaseTimings = PhaseTimingsRecord;
+type PhaseTimings = PhaseTimingsRecord;
 
 export interface ScenarioRunMetrics {
   scenarioId: string;
@@ -131,7 +131,7 @@ export function aggregate(run: RunSummary): AggregateRow {
   };
 }
 
-export interface PerTagRow {
+interface PerTagRow {
   tag: string;
   matched: number;
   total: number;
@@ -178,7 +178,7 @@ const PHASE_KEYS = [
   "report",
 ] as const satisfies readonly (keyof PhaseTimings)[];
 
-export type PhaseKey = (typeof PHASE_KEYS)[number];
+type PhaseKey = (typeof PHASE_KEYS)[number];
 
 export interface PhaseBreakdownRow {
   phase: PhaseKey;

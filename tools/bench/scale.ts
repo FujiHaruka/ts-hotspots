@@ -139,9 +139,7 @@ async function main(): Promise<number> {
       `| ${p.padEnd(11)} | ${fmt(medians[p]).padStart(9)} |  ${pct(medians[p])} |`,
     );
   }
-  lines.push(
-    `| **total**   | ${fmt(total).padStart(9)} | 100% |`,
-  );
+  lines.push(`| **total**   | ${fmt(total).padStart(9)} | 100% |`);
   lines.push("");
 
   mkdirSync(dirname(args.out), { recursive: true });
@@ -164,4 +162,3 @@ if (isMain) {
     },
   );
 }
-

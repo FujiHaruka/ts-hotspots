@@ -24,7 +24,7 @@ export interface MinHashSignature {
   readonly values: Uint32Array;
 }
 
-export interface MinHasher {
+interface MinHasher {
   readonly numHashes: number;
   /**
    * Compute a MinHash signature over the feature set. Order-independent.

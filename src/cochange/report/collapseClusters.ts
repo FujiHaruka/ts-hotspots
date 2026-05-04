@@ -34,8 +34,8 @@
 
 import type { Candidate } from "../ranking/types.ts";
 
-export const CLUSTER_DENSITY_FLOOR = 0.5;
-export const CLUSTER_MIN_NODES = 3;
+const CLUSTER_DENSITY_FLOOR = 0.5;
+const CLUSTER_MIN_NODES = 3;
 
 export interface ClusterCandidate {
   /** Lex-sorted member file paths. Stable identity for dismissalId. */

@@ -22,9 +22,9 @@ describe("computeMutationCount", () => {
   });
 
   test("const/let declarations are not counted", () => {
-    expect(compute("function f(){ const a = 1; let b = 2; return a + b; }")).toBe(
-      0,
-    );
+    expect(
+      compute("function f(){ const a = 1; let b = 2; return a + b; }"),
+    ).toBe(0);
   });
 
   test("simple assignment `x = 1` → 1", () => {
@@ -69,7 +69,9 @@ describe("computeMutationCount", () => {
 
   test("destructuring assignment counts (as one BinaryExpression)", () => {
     expect(
-      compute("function f(){ let a = 0; let b = 0; [a, b] = [1, 2]; return a + b; }"),
+      compute(
+        "function f(){ let a = 0; let b = 0; [a, b] = [1, 2]; return a + b; }",
+      ),
     ).toBe(1);
     expect(
       compute("function f(){ let x = 0; ({ x } = { x: 1 }); return x; }"),
@@ -103,7 +105,9 @@ describe("computeMutationCount", () => {
 
   test("this.x = 1 inside method counts", () => {
     const { fns } = parseAllFunctionLikes(
-      ["class C {", "  x = 0;", "  m(v: number){ this.x = v; }", "}"].join("\n"),
+      ["class C {", "  x = 0;", "  m(v: number){ this.x = v; }", "}"].join(
+        "\n",
+      ),
     );
     const m = fns.find((f) => f.kind === ts.SyntaxKind.MethodDeclaration);
     if (!m) throw new Error("method not found");
@@ -127,11 +131,13 @@ describe("computeMutationCount", () => {
     );
     const outer = fns.find(
       (f): f is ts.FunctionDeclaration =>
-        f.kind === ts.SyntaxKind.FunctionDeclaration && f.name?.text === "outer",
+        f.kind === ts.SyntaxKind.FunctionDeclaration &&
+        f.name?.text === "outer",
     );
     const inner = fns.find(
       (f): f is ts.FunctionDeclaration =>
-        f.kind === ts.SyntaxKind.FunctionDeclaration && f.name?.text === "inner",
+        f.kind === ts.SyntaxKind.FunctionDeclaration &&
+        f.name?.text === "inner",
     );
     if (!outer || !inner) throw new Error("functions not found");
     expect(computeMutationCount(outer)).toBe(0);

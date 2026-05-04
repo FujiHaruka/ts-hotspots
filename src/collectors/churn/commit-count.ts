@@ -11,11 +11,11 @@ import { COMMIT_MARKER, walkChurnLog } from "../../util/git/walkChurnLog.ts";
  * wider type lets the duplication pipeline pass plain `{ path }` records
  * sourced from `git ls-tree` without re-parsing.
  */
-export interface ChurnFileInput {
+interface ChurnFileInput {
   path: string;
 }
 
-export interface ChurnCollectorOptions {
+interface ChurnCollectorOptions {
   rootDir: string;
   files: readonly ChurnFileInput[];
   window: number;

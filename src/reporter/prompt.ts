@@ -15,7 +15,7 @@ const STEP_4 = (action: string) =>
 const closing = (suffix = "") =>
   `If you reach the end without finding a worthwhile target, say so rather than forcing a refactor. Never propose changes without reading the actual code${suffix}.`;
 
-export const COMPLEXITY_REPORT_PROMPT = `# ts-hotspots complexity report
+const COMPLEXITY_REPORT_PROMPT = `# ts-hotspots complexity report
 
 Output of \`ts-hotspots complexity\`, a static analyzer that surfaces refactor-candidate hotspots in a TypeScript project.
 
@@ -33,12 +33,12 @@ ${walkPrompt("that genuinely warrants refactoring")}
 ${closing()}
 `;
 
-export const COMPLEXITY_ERROR_PROMPT = `# ts-hotspots complexity error
+const COMPLEXITY_ERROR_PROMPT = `# ts-hotspots complexity error
 
 \`ts-hotspots complexity\` failed to produce a report. See the error details below.
 `;
 
-export const DUPLICATION_REPORT_PROMPT = `# ts-hotspots duplication report
+const DUPLICATION_REPORT_PROMPT = `# ts-hotspots duplication report
 
 Output of \`ts-hotspots duplication\`, a static analyzer that surfaces likely Type-3 (modified-with-renames) duplication in a TypeScript codebase.
 
@@ -58,12 +58,12 @@ ${closing()}
 For per-member scores, fragment source, and full evidence, re-run with \`--verbose\`.
 `;
 
-export const DUPLICATION_ERROR_PROMPT = `# ts-hotspots duplication error
+const DUPLICATION_ERROR_PROMPT = `# ts-hotspots duplication error
 
 \`ts-hotspots duplication\` failed to produce a report. See the error details below.
 `;
 
-export const ARCHITECTURE_REPORT_PROMPT = `# ts-hotspots architecture report
+const ARCHITECTURE_REPORT_PROMPT = `# ts-hotspots architecture report
 
 Output of \`ts-hotspots architecture\`, a static analyzer that surfaces structurally load-bearing exported declarations in a TypeScript codebase, ranked by a percentile-weighted composite of structural metrics.
 
@@ -81,12 +81,12 @@ ${walkPrompt("that genuinely warrants restructuring")}
 ${closing()}
 `;
 
-export const ARCHITECTURE_ERROR_PROMPT = `# ts-hotspots architecture error
+const ARCHITECTURE_ERROR_PROMPT = `# ts-hotspots architecture error
 
 \`ts-hotspots architecture\` failed to produce a report. See the error details below.
 `;
 
-export const COCHANGE_REPORT_PROMPT = `# ts-hotspots cochange report
+const COCHANGE_REPORT_PROMPT = `# ts-hotspots cochange report
 
 Output of \`ts-hotspots cochange\`, a static analyzer that surfaces logical coupling between TypeScript files: pairs that change together in git history (renames followed), even when not statically connected by an \`import\`.
 
@@ -104,7 +104,7 @@ ${walkPrompt("whose coupling is genuinely worth acting on")}
 ${closing(" at both ends of the pair")}
 `;
 
-export const COCHANGE_ERROR_PROMPT = `# ts-hotspots cochange error
+const COCHANGE_ERROR_PROMPT = `# ts-hotspots cochange error
 
 \`ts-hotspots cochange\` failed to produce a report. See the error details below.
 `;

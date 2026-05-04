@@ -12,7 +12,7 @@ export interface FragmentView {
   code?: string;
 }
 
-export interface PairScores {
+interface PairScores {
   combined: number;
   tokenOverlap: number;
   statementKindSimilarity: number;
@@ -35,7 +35,7 @@ export interface AggregateAxis {
   max: number;
 }
 
-export interface AggregateCombinedAxis extends AggregateAxis {
+interface AggregateCombinedAxis extends AggregateAxis {
   /**
    * Group sort key: `max * churnAmplifier(aggregateChurn.max)`. Equals
    * `max` when churn is unavailable or zero, so `--no-churn` runs (or

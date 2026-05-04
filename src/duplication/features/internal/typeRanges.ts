@@ -24,7 +24,7 @@ export interface RegexRange {
  * tell them apart from object-literal shorthand. A separate lookup set is
  * exposed so the caller can skip them too.
  */
-export interface CollectedTypeInfo {
+interface CollectedTypeInfo {
   /** Sorted by `start`. Non-overlapping in typical TypeScript. */
   readonly ranges: TypeRange[];
   /** Exact byte positions of `:` tokens introducing a type node. */

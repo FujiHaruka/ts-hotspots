@@ -9,7 +9,7 @@
 
 import type { Candidate } from "./types.ts";
 
-export interface SortOptions {
+interface SortOptions {
   limit?: number;
 }
 

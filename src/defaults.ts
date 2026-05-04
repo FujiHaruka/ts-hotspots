@@ -9,7 +9,7 @@
  * sane policy. But arch needs the option to include them when the
  * agent is investigating a test surface specifically.
  */
-export const TEST_LIKE_EXCLUDE_GLOBS: readonly string[] = [
+const TEST_LIKE_EXCLUDE_GLOBS: readonly string[] = [
   "**/*.test.ts",
   "**/*.test.tsx",
   "**/*.spec.ts",
@@ -50,6 +50,4 @@ export const DEFAULT_EXCLUDE_GLOBS: readonly string[] = [
 
 /** Defaults minus the test-like globs — used by `arch --include-tests`. */
 export const DEFAULT_EXCLUDE_GLOBS_NO_TESTS: readonly string[] =
-  DEFAULT_EXCLUDE_GLOBS.filter(
-    (g) => !TEST_LIKE_EXCLUDE_GLOBS.includes(g),
-  );
+  DEFAULT_EXCLUDE_GLOBS.filter((g) => !TEST_LIKE_EXCLUDE_GLOBS.includes(g));

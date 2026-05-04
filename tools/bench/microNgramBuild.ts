@@ -387,7 +387,11 @@ interface PairPlan {
   j: number;
 }
 
-function makePairPlan(fragments: number, npairs: number, seed: number): PairPlan[] {
+function makePairPlan(
+  fragments: number,
+  npairs: number,
+  seed: number,
+): PairPlan[] {
   const rng = makeRng(seed);
   const pairs = new Array<PairPlan>(npairs);
   for (let p = 0; p < npairs; p += 1) {
@@ -559,8 +563,12 @@ function formatBlock(args: Args, results: VariantResult[]): string {
     `params: F=${String(args.fragments)}, T=${String(args.tokens)}, sizes=[${SIZES.join(",")}], pairs=${String(args.pairs)}, runs=${String(args.runs)} (median)`,
   );
   lines.push("");
-  lines.push("| variant                                | build ms | pairs ms | total ms | vs V0 |");
-  lines.push("|----------------------------------------|---------:|---------:|---------:|------:|");
+  lines.push(
+    "| variant                                | build ms | pairs ms | total ms | vs V0 |",
+  );
+  lines.push(
+    "|----------------------------------------|---------:|---------:|---------:|------:|",
+  );
   const fmt = (n: number): string => n.toFixed(1);
   for (const r of results) {
     const delta =

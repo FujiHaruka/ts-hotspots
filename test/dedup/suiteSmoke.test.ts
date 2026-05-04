@@ -5,7 +5,10 @@ import { defaultConfig } from "../../src/duplication/config/index.ts";
 import { groupsToPairs } from "../../tools/bench/groupsToPairs.ts";
 import { loadFixtures } from "../../tools/bench/loadFixtures.ts";
 import { matchReport } from "../../tools/bench/matchReport.ts";
-import { type SetupRepoResult, setupRepo } from "../../tools/bench/setupRepo.ts";
+import {
+  type SetupRepoResult,
+  setupRepo,
+} from "../../tools/bench/setupRepo.ts";
 
 /**
  * Smoke subset of the ts-dedup fixture suite. Picks one representative scenario

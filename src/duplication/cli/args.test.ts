@@ -337,12 +337,7 @@ describe("parseCliArgs", () => {
   });
 
   it("parses --churn-window as a positive integer", () => {
-    const r = parseCliArgs([
-      "--diff",
-      "main..feature",
-      "--churn-window",
-      "50",
-    ]);
+    const r = parseCliArgs(["--diff", "main..feature", "--churn-window", "50"]);
     if (r.kind !== "run" || r.mode !== "diff") {
       throw new Error("expected diff mode");
     }

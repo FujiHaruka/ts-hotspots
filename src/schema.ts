@@ -92,7 +92,7 @@ export interface AxisMeta {
  * axis. Mirrors `dup`'s `score: { axis, value }` so consumers can read the
  * "headline number" off a hotspot uniformly across subcommands.
  */
-export interface HotspotScore {
+interface HotspotScore {
   axis: FunctionAxisId;
   value: number;
 }

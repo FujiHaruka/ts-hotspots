@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Fragment } from "../../domain/fragment.ts";
 import { parseSource } from "../../../parser/parseSource.ts";
+import type { Fragment } from "../../domain/fragment.ts";
 import {
   isThinWrapperFragment,
   type ThinWrapperConfig,

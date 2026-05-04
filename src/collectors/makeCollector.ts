@@ -5,7 +5,7 @@ import type {
   DeclarationId,
 } from "./types.ts";
 
-export interface MakeCollectorOptions<T> {
+interface MakeCollectorOptions<T> {
   name: string;
   compute: (decl: Declaration) => T;
 }

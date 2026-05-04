@@ -7,20 +7,20 @@ import { awaitCountCollector } from "../collectors/effects/await-count.ts";
 import { mutationCountCollector } from "../collectors/effects/mutation-count.ts";
 import { tryCatchCountCollector } from "../collectors/effects/try-catch-count.ts";
 import type { CollectorContext } from "../collectors/types.ts";
-import type { SourceFileInfo } from "../loader/types.ts";
 import { computeBodyHash } from "../dismissal/hash.ts";
+import type { SourceFileInfo } from "../loader/types.ts";
 import type { FunctionEntry, FunctionMetrics } from "../schema.ts";
 import {
   buildFunctionLocation,
   compareFunctionByLocation,
 } from "./function-location.ts";
 
-export interface AggregateContext extends CollectorContext {
+interface AggregateContext extends CollectorContext {
   files: readonly SourceFileInfo[];
   churn?: ReadonlyMap<string, number>;
 }
 
-export interface AggregateResult {
+interface AggregateResult {
   functions: FunctionEntry[];
 }
 

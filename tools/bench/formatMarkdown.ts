@@ -1,15 +1,15 @@
 import {
+  type AggregateRow,
   aggregate,
+  type PhaseBreakdownRow,
   perTagRecall,
   phaseBreakdown,
-  type AggregateRow,
-  type PhaseBreakdownRow,
   type RunSummary,
   totalNegatives,
   totalPositives,
 } from "./metrics.ts";
 
-export interface FormatInput {
+interface FormatInput {
   configLabel: string;
   fixtureCount: number;
   runs: RunSummary[];
@@ -33,10 +33,8 @@ function summaryTable(rows: AggregateRow[]): string {
 }
 
 function phaseTable(rows: PhaseBreakdownRow[]): string {
-  const header =
-    "| phase       | mean ms | p90 ms | max ms | share |";
-  const sep =
-    "|-------------|--------:|-------:|-------:|------:|";
+  const header = "| phase       | mean ms | p90 ms | max ms | share |";
+  const sep = "|-------------|--------:|-------:|-------:|------:|";
   const body = rows
     .map(
       (r) =>

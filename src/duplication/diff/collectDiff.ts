@@ -16,7 +16,7 @@ export interface DiffRequest {
   config: Config;
 }
 
-export interface CollectDiffResult {
+interface CollectDiffResult {
   files: ChangedFile[];
   /**
    * Count of `.ts` / `.tsx` files in the diff that matched

@@ -68,27 +68,6 @@ export function buildTokenNgramsFromLocated(
   return buildNgramKeys(tokens, config.features.tokenNgramSizes);
 }
 
-/** Exposed for tests. */
-export function scanNormalizedTokensForTesting(
-  fragment: Fragment,
-  sourceFile: ts.SourceFile,
-): string[] {
-  const located = locateFragmentNode(fragment, sourceFile);
-  if (located.nodes.length === 0) {
-    return [];
-  }
-  const ctx = buildFileFeatureContext(sourceFile);
-  return scanNormalizedTokens(
-    sourceFile,
-    located.startPos,
-    located.endPos,
-    fragment.filePath,
-    ctx.typeRanges,
-    ctx.typeIntroducerColonPositions,
-    ctx.regexRanges,
-  );
-}
-
 function scanNormalizedTokens(
   sourceFile: ts.SourceFile,
   startPos: number,
@@ -167,7 +146,7 @@ function scanNormalizedTokens(
  * so the choice of short forms (e.g. `(`, `;`) cannot collide with it.
  * Display-side rendering (`stripPrefix`) substitutes a space.
  */
-export const TOKEN_NGRAM_SEPARATOR = "\x00";
+const TOKEN_NGRAM_SEPARATOR = "\x00";
 
 function buildNgramKeys(tokens: string[], sizes: number[]): FeatureKey[] {
   const out: FeatureKey[] = [];

@@ -1,2 +1,2 @@
-export type { Config, ExcludeRules } from "./config.ts";
+export type { Config } from "./config.ts";
 export { defaultConfig } from "./defaults.ts";

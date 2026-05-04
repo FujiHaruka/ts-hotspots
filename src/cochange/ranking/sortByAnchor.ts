@@ -19,7 +19,7 @@
 
 import type { Candidate } from "./types.ts";
 
-export interface SortByAnchorOptions {
+interface SortByAnchorOptions {
   limit?: number;
 }
 

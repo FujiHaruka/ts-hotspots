@@ -42,7 +42,7 @@ export type AxisId =
   | "size_pct"
   | "suppress_flag";
 
-export type AxisKind = "percentile" | "flag";
+type AxisKind = "percentile" | "flag";
 
 export const AXIS_KIND: Readonly<Record<AxisId, AxisKind>> = {
   fan_in_pct: "percentile",

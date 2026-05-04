@@ -1,10 +1,6 @@
 import ts from "typescript";
 import { makeCountingCollector } from "../countingCollector.ts";
 
-export interface MutationCountResult {
-  mutationSiteCount: number;
-}
-
 const ASSIGNMENT_OPERATORS = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.EqualsToken,
   ts.SyntaxKind.PlusEqualsToken,

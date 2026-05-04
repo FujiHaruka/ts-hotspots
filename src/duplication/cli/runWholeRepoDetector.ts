@@ -46,7 +46,7 @@ import {
 } from "./perfLogEvents.ts";
 import type { ChurnRunOptions } from "./runDetector.ts";
 
-export interface WholeRepoOptions {
+interface WholeRepoOptions {
   repoPath: string;
   /** Commit/branch/tag to scan. Resolved with `git rev-parse`. */
   ref: string;

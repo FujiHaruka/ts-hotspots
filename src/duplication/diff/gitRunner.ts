@@ -3,7 +3,6 @@ import { execGit } from "../../util/git/runner.ts";
 export {
   execGit,
   gitCatFileBatch,
-  mergeBaseSha,
   resolveDiffEndpoints,
   resolveSha,
 } from "../../util/git/runner.ts";

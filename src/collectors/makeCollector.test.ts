@@ -35,8 +35,8 @@ describe("makeCollector", () => {
       "src/a.ts": "export function f(){ return 1; }",
     });
     const declarations = enumerateDeclarations(files);
-    expect(() =>
-      collector.collect({ rootDir: "/proj", declarations }),
-    ).toThrow(/boomCollector failed at src\/a\.ts:1.*kaboom/);
+    expect(() => collector.collect({ rootDir: "/proj", declarations })).toThrow(
+      /boomCollector failed at src\/a\.ts:1.*kaboom/,
+    );
   });
 });

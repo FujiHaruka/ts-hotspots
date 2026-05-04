@@ -45,7 +45,7 @@ import type { EdgeKind } from "./types.ts";
  */
 export const DYNAMIC_FANOUT = "*";
 
-export interface RawEdge {
+interface RawEdge {
   /** Module specifier the import came from (verbatim). */
   readonly moduleSpecifier: string;
   /** Name to look up on the resolved file, or {@link DYNAMIC_FANOUT}. */

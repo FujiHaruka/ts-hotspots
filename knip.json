@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/**/*.{test,spec}.ts",
+    "test/**/*.{test,spec}.ts",
+    "tools/bench/diffPairs.ts",
+    "tools/bench/dumpPairs.ts"
+  ],
+  "project": ["src/**/*.ts", "test/**/*.ts", "tools/**/*.ts"],
+  "ignore": ["test/fixtures/**", "test/dedup/fixtures/**"],
+  "rules": {
+    "duplicates": "off"
+  }
+}

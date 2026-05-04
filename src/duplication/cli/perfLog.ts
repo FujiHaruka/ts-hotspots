@@ -98,21 +98,7 @@ export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/**
- * Pick the value at the given fractional rank in an ascending-sorted array.
- * Empty arrays return 0. `p` is clamped into `[0, 1]`.
- */
-export function pct(sortedAsc: readonly number[], p: number): number {
-  if (sortedAsc.length === 0) return 0;
-  const clamped = Math.max(0, Math.min(1, p));
-  const idx = Math.min(
-    sortedAsc.length - 1,
-    Math.floor(sortedAsc.length * clamped),
-  );
-  return sortedAsc[idx] ?? 0;
-}
-
-export interface DistSummary {
+interface DistSummary {
   sum: number;
   p50: number;
   p90: number;
@@ -143,7 +129,7 @@ export function distSummary(values: readonly number[]): DistSummary {
   };
 }
 
-export interface MeanMax {
+interface MeanMax {
   mean: number;
   max: number;
 }

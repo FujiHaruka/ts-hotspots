@@ -17,7 +17,7 @@ import {
   emptyRegistry,
 } from "./types.ts";
 
-export interface LoadOptions {
+interface LoadOptions {
   onWarning?: (msg: string) => void;
 }
 
@@ -72,7 +72,7 @@ export function saveRegistry(
   renameSync(tmp, path);
 }
 
-export interface PruneResult {
+interface PruneResult {
   registry: DismissalRegistry;
   prunedCount: number;
 }

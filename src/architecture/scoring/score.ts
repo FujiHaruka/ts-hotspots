@@ -37,7 +37,7 @@ import {
 } from "../ranking/types.ts";
 import { DEFAULT_WEIGHTS, type WeightsTable } from "./weights.ts";
 
-export interface ContributingMetric {
+interface ContributingMetric {
   readonly axis: AxisId;
   readonly weight: number;
   readonly value: number;
@@ -50,7 +50,7 @@ export interface ContributingMetric {
   readonly zScore: number;
 }
 
-export interface SmellHit {
+interface SmellHit {
   readonly smellType: SmellType;
   readonly composite: number;
   readonly contributing: readonly ContributingMetric[];
@@ -62,7 +62,7 @@ export interface ArchCandidate {
   readonly secondary: readonly SmellHit[];
 }
 
-export interface ScoreOptions {
+interface ScoreOptions {
   readonly percentileThreshold?: number;
   readonly zScoreFloor?: number;
   readonly smallNCutoff?: number;

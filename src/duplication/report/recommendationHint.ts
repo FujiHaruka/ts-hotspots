@@ -3,7 +3,7 @@ import type { CandidateScore } from "../domain/candidate.ts";
 import { type Fragment, fragmentLineCount } from "../domain/fragment.ts";
 import type { Evidence, RecommendationHint } from "../domain/report.ts";
 
-export interface DeriveHintArgs {
+interface DeriveHintArgs {
   score: CandidateScore;
   evidence: Evidence;
   changed: Fragment;

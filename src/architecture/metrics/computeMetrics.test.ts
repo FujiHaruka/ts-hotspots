@@ -33,10 +33,7 @@ function edge(
   };
 }
 
-function build(
-  nodes: readonly Component[],
-  edges: readonly Edge[],
-): Graph {
+function build(nodes: readonly Component[], edges: readonly Edge[]): Graph {
   const sortedNodes = [...nodes].sort((a, b) => a.id.localeCompare(b.id));
   return { nodes: sortedNodes, edges };
 }

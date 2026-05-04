@@ -17,7 +17,7 @@
 
 export const COMMIT_MARKER = "CMT";
 
-export interface WalkChurnLogOptions {
+interface WalkChurnLogOptions {
   /**
    * Repo-root-relative POSIX prefix to strip from every log path before
    * comparing against `fileSet` (used in monorepo sub-package mode where

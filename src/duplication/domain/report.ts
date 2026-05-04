@@ -97,13 +97,3 @@ export interface CloneCandidateReport {
   groups: CloneGroup[];
   dismissed?: DismissedSummary;
 }
-
-/**
- * Failure-mode envelope. Mirrors `comp`'s `ErrorReport` shape so an agent
- * branching on `status` can handle either subcommand identically.
- */
-export interface DuplicationErrorReport {
-  status: "error";
-  tool: ReportTool;
-  error: { code: string; message: string };
-}

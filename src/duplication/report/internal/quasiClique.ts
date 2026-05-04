@@ -18,7 +18,7 @@ import { nonNull } from "../../util/nonNull.ts";
  *   NP-hard; ts-dedup biases toward recall + downstream judgment, so a
  *   slightly suboptimal split is acceptable.
  */
-export interface QuasiCliqueInput {
+interface QuasiCliqueInput {
   /** Node ids that make up the connected component (or any subset). */
   nodes: readonly string[];
   /**

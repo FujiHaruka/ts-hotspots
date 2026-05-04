@@ -23,7 +23,7 @@
 import ts from "typescript";
 import type { ParsedSource } from "../../parser/parseSource.ts";
 
-export type ImportBindingKind = "named" | "default" | "namespace";
+type ImportBindingKind = "named" | "default" | "namespace";
 
 export interface ImportBinding {
   /** Identifier in scope inside the importing file. */

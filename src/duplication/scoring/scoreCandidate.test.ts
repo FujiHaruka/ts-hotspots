@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { parseSource } from "../../parser/parseSource.ts";
 import { defaultConfig } from "../config/index.ts";
 import type { Candidate } from "../domain/candidate.ts";
 import type { FragmentFeatures } from "../domain/feature.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import { extractFeatures } from "../features/extractFeatures.ts";
 import { extractFragments } from "../indexer/extractFragments.ts";
-import { parseSource } from "../../parser/parseSource.ts";
 import { buildFeatureSets } from "./featureSets.ts";
 import { scoreCandidateDetailedFromSets } from "./scoreCandidate.ts";
 

@@ -2,12 +2,12 @@ import type { Config } from "../config/index.ts";
 import { execGit, gitCatFileBatch } from "../diff/gitRunner.ts";
 import { matchesAnyGlob } from "../diff/internal/globMatch.ts";
 
-export interface BaseSource {
+interface BaseSource {
   path: string;
   text: string;
 }
 
-export interface ListBaseSourcesResult {
+interface ListBaseSourcesResult {
   sources: BaseSource[];
   /**
    * Count of `.ts` / `.tsx` files that matched `config.exclude.globs` and

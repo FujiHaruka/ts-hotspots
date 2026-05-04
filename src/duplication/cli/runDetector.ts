@@ -49,7 +49,7 @@ export interface ChurnRunOptions {
   onWarning?: (msg: string) => void;
 }
 
-export interface RunOptions {
+interface RunOptions {
   repoPath: string;
   baseRef: string;
   headRef: string;

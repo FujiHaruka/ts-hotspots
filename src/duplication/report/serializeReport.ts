@@ -36,12 +36,12 @@ import type {
  * score across the group. Mirrors `comp`'s `HotspotScore` so consumers
  * read the headline number off either subcommand uniformly.
  */
-export interface DupScore {
+interface DupScore {
   axis: "combined";
   value: number;
 }
 
-export interface SlimDupHotspot {
+interface SlimDupHotspot {
   kind: "duplication";
   /** Total fragments in the group: `(anchor ? 1 : 0) + members.length`. */
   size: number;
@@ -60,14 +60,14 @@ export interface SlimDupHotspot {
   dismissalId: string;
 }
 
-export interface HotspotRef {
+interface HotspotRef {
   /** `file:start-end` coordinate string, identical to comp's. */
   location: string;
   /** Fragment kind: `function | block | window`. */
   kind: string;
 }
 
-export interface VerboseDupHotspot extends SlimDupHotspot {
+interface VerboseDupHotspot extends SlimDupHotspot {
   /** min/median/max for combined + the four sub-axes. */
   aggregateScores: AggregateScores;
   /**
@@ -84,14 +84,14 @@ export interface VerboseDupHotspot extends SlimDupHotspot {
   anchor?: { ref: HotspotRef; code?: string };
 }
 
-export interface VerboseMember {
+interface VerboseMember {
   ref: HotspotRef;
   code?: string;
   scores: GroupMember["scores"];
   evidence: { calls: string[]; properties: string[] };
 }
 
-export interface SerializedDupReport {
+interface SerializedDupReport {
   tool: ReportTool;
   project: { sourceFileCount: number; fragmentCount?: number };
   /** Only emitted in diff mode (omitted in whole-repo). */
@@ -102,12 +102,12 @@ export interface SerializedDupReport {
   summary?: CloneCandidateReport["summary"];
 }
 
-export interface SerializedDupReportVerbose extends SerializedDupReport {
+interface SerializedDupReportVerbose extends SerializedDupReport {
   hotspots: VerboseDupHotspot[];
   summary: CloneCandidateReport["summary"];
 }
 
-export interface SerializeOptions {
+interface SerializeOptions {
   verbose: boolean;
 }
 

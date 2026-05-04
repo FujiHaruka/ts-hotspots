@@ -18,11 +18,11 @@ import type { DismissalEntry, DismissalFeature } from "../dismissal/types.ts";
 import { listRepoSources } from "../loader/listRepoSources.ts";
 import { loadProject } from "../loader/load-project.ts";
 
-export interface WritableLike {
+interface WritableLike {
   write: (chunk: string) => void;
 }
 
-export interface DismissOptions {
+interface DismissOptions {
   id: string;
   reason: string;
   /** Project root used as the registry key. */
@@ -76,7 +76,7 @@ export async function runDismiss(
   return 0;
 }
 
-export interface ListDismissedOptions {
+interface ListDismissedOptions {
   rootDir: string;
   json: boolean;
 }
@@ -110,7 +110,7 @@ export function runListDismissed(
   return 0;
 }
 
-export interface UndismissOptions {
+interface UndismissOptions {
   id: string;
   rootDir: string;
 }

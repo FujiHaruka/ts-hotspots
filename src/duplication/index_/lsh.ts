@@ -66,7 +66,7 @@ export interface LshParams {
   minFeatures: number;
 }
 
-export interface LshIndex {
+interface LshIndex {
   readonly params: LshParams;
   readonly fragmentCount: number;
   readonly signatureCount: number;

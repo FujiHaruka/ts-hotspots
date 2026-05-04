@@ -3,7 +3,7 @@ import { collectDiff, type DiffRequest } from "./collectDiff.ts";
 import { extractChangedFragments } from "./extractChangedFragments.ts";
 import { resolveDiffEndpoints } from "./gitRunner.ts";
 
-export interface CollectChangedFragmentsResult {
+interface CollectChangedFragmentsResult {
   baseSha: string;
   headSha: string;
   files: ChangedFile[];

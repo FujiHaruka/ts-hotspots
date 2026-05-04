@@ -42,7 +42,7 @@ function shouldUseContainment(
   );
 }
 
-export interface ScoreIntersections {
+interface ScoreIntersections {
   /** Ascending-sorted set of token n-grams present in both fragments. */
   tokens: string[];
   /** Ascending-sorted set of statement-kind n-grams present in both. */
@@ -51,12 +51,12 @@ export interface ScoreIntersections {
   calls: string[];
 }
 
-export interface DetailedScore {
+interface DetailedScore {
   score: CandidateScore;
   intersections: ScoreIntersections;
 }
 
-export interface ScoreInputsFromSets {
+interface ScoreInputsFromSets {
   candidate: Candidate;
   changedFragment: Fragment;
   baseFragment: Fragment;

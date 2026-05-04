@@ -10,7 +10,7 @@ import { parseLocation } from "../../src/duplication/util/location.ts";
  * `(filePath, startLine, endLine)` triples without re-parsing the
  * `location` string at every call site.
  */
-export interface PairFragment {
+interface PairFragment {
   filePath: string;
   startLine: number;
   endLine: number;

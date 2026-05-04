@@ -90,7 +90,7 @@ function expandSinglePattern(repoRoot: string, pattern: string): string[] {
   return out;
 }
 
-export interface ExpandPackageGlobsResult {
+interface ExpandPackageGlobsResult {
   /** Repo-relative POSIX paths of detected package roots, sorted. */
   readonly roots: readonly string[];
 }

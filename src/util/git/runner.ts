@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export interface ExecGitOptions {
+interface ExecGitOptions {
   /** Maximum stdout buffer (bytes). Defaults to 64 MiB. */
   maxBuffer?: number;
 }
@@ -39,7 +39,7 @@ export async function resolveSha(cwd: string, ref: string): Promise<string> {
  * Resolve the merge-base of two refs to a full commit sha.
  * Used for three-dot (`A...B`) PR semantics.
  */
-export async function mergeBaseSha(
+async function mergeBaseSha(
   cwd: string,
   a: string,
   b: string,
@@ -48,7 +48,7 @@ export async function mergeBaseSha(
   return out.trim();
 }
 
-export interface BatchCatFileResult {
+interface BatchCatFileResult {
   /** Map keyed by the input `<ref>:<path>` spec. Missing / unreadable specs are absent. */
   contents: Map<string, string>;
 }

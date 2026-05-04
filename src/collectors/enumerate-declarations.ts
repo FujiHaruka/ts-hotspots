@@ -16,7 +16,7 @@ const FUNCTION_KINDS: Partial<Record<ts.SyntaxKind, FunctionKind>> = {
 
 const SOURCE_EXTENSIONS: readonly string[] = [".ts", ".tsx", ".mts", ".cts"];
 
-export interface EnumerateDeclarationsOptions {
+interface EnumerateDeclarationsOptions {
   exclude?: readonly string[];
 }
 

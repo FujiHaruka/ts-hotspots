@@ -179,7 +179,7 @@ function substituteWildcard(literal: string, captured: string): string {
   return literal.replace("*", captured);
 }
 
-export interface ApplyExportsResult {
+interface ApplyExportsResult {
   /** Repo-relative-style target (starts with `./`). */
   readonly target: string;
 }
