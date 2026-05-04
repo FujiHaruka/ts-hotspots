@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { parse as parseYaml } from "yaml";
 import {
   createTempRepo,
   type TempRepo,
@@ -84,9 +85,9 @@ describe("main", () => {
     expect(code).toBe(0);
     const out = cap.stdout();
     expect(out).toContain("# ts-hotspots duplication report");
-    const fenceMatch = /```json\n([\s\S]*?)\n```/.exec(out);
+    const fenceMatch = /```yaml\n([\s\S]*?)\n```/.exec(out);
     expect(fenceMatch).not.toBeNull();
-    const parsed = JSON.parse(fenceMatch?.[1] ?? "") as {
+    const parsed = parseYaml(fenceMatch?.[1] ?? "") as {
       status?: string;
       hotspots: unknown[];
     };
@@ -122,8 +123,8 @@ describe("main", () => {
     expect(stdoutChunks.length).toBeGreaterThanOrEqual(2);
     const head = stdoutChunks[0] ?? "";
     expect(head.startsWith("# ts-hotspots duplication report")).toBe(true);
-    expect(head.endsWith("```json\n")).toBe(true);
-    expect(head).not.toContain('"status"');
+    expect(head.endsWith("```yaml\n")).toBe(true);
+    expect(head).not.toContain("status:");
     const full = stdoutChunks.join("");
     expect(full.endsWith("```\n")).toBe(true);
   });

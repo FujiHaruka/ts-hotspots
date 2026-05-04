@@ -14,11 +14,11 @@
  *
  * Returns an exit code rather than calling `process.exit` so callers
  * can compose. Streaming Markdown:
- *   - The agent-first head (instruction prelude + JSON fence) is
+ *   - The agent-first head (instruction prelude + YAML fence) is
  *     flushed before the heavy work runs, so consumers with short
  *     stdin timeouts see well-formed Markdown immediately.
  *   - Once the head is out, post-stream failures close the fence
- *     with the error envelope as its JSON body.
+ *     with the error envelope as its YAML body.
  */
 
 import { resolve as resolvePath } from "node:path";

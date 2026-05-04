@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { parse as parseYaml } from "yaml";
 import { emptyFunctionAxisMeta } from "../aggregator/rank.ts";
 import type { ErrorReport, FunctionReport } from "../schema.ts";
 import {
@@ -81,23 +82,23 @@ describe("renderJson", () => {
   });
 });
 
-function extractJsonFence(markdown: string): string {
-  const match = /```json\n([\s\S]*?)\n```/.exec(markdown);
-  if (match === null) throw new Error("no ```json fence found");
+function extractYamlFence(markdown: string): string {
+  const match = /```yaml\n([\s\S]*?)\n```/.exec(markdown);
+  if (match === null) throw new Error("no ```yaml fence found");
   return match[1] ?? "";
 }
 
 describe("renderMarkdown (complexity)", () => {
-  test("FunctionReport: includes prompt header and JSON fence whose body matches renderJson", () => {
+  test("FunctionReport: includes prompt header and YAML fence whose body round-trips to the report", () => {
     const report = makeFunctionReport();
     const md = renderMarkdown("complexity", report);
     expect(md.startsWith("# ts-hotspots complexity report")).toBe(true);
     expect(md).toContain("## Data");
-    const body = extractJsonFence(md);
-    expect(JSON.parse(body)).toEqual(JSON.parse(renderJson(report)));
+    const body = extractYamlFence(md);
+    expect(parseYaml(body)).toEqual(report);
   });
 
-  test("ErrorReport: produces a Markdown error block, not JSON", () => {
+  test("ErrorReport: produces a Markdown error block, not a fenced data block", () => {
     const err: ErrorReport = {
       status: "error",
       error: { code: "TSCONFIG_NOT_FOUND", message: "missing at /x" },
@@ -105,10 +106,8 @@ describe("renderMarkdown (complexity)", () => {
     const md = renderMarkdown("complexity", err);
     expect(md.startsWith("# ts-hotspots complexity error")).toBe(true);
     expect(md).toContain("missing at /x");
-    expect(md).not.toContain("```json");
-    expect(() => {
-      JSON.parse(md);
-    }).toThrow();
+    expect(md).not.toContain("```yaml");
+    expect(md).not.toContain("```");
   });
 
   test("head + body compose to the same string as renderMarkdown", () => {
@@ -127,56 +126,50 @@ describe("renderMarkdown (complexity)", () => {
     });
     const head = renderMarkdownHead("complexity");
     expect(renderMarkdownHead("complexity")).toBe(head);
-    // Building the streamed form for two different reports yields the same head.
     const headA = renderMarkdown("complexity", a).slice(0, head.length);
     const headB = renderMarkdown("complexity", b).slice(0, head.length);
     expect(headA).toBe(head);
     expect(headB).toBe(head);
   });
 
-  test("error body closes the fence and carries the error JSON", () => {
+  test("error body closes the fence and carries the error envelope", () => {
     const err: ErrorReport = {
       status: "error",
       error: { code: "X", message: "boom" },
     };
     const body = renderMarkdownErrorBody(err);
     expect(body.endsWith("```\n")).toBe(true);
-    // Head + errorBody must form a well-formed fenced-JSON Markdown document.
     const doc = `${renderMarkdownHead("complexity")}${body}`;
-    const match = /```json\n([\s\S]*?)\n```/.exec(doc);
-    expect(match).not.toBeNull();
-    const parsed = JSON.parse(match?.[1] ?? "") as ErrorReport;
-    expect(parsed).toEqual(err);
+    expect(parseYaml(extractYamlFence(doc))).toEqual(err);
   });
 });
 
 describe("renderMarkdown (duplication)", () => {
-  test("head starts with the duplication-specific instruction heading and opens a JSON fence", () => {
+  test("head starts with the duplication-specific instruction heading and opens a YAML fence", () => {
     const head = renderMarkdownHead("duplication");
     expect(head.startsWith("# ts-hotspots duplication report")).toBe(true);
     expect(head).toContain("## Data");
-    expect(head.endsWith("```json\n")).toBe(true);
+    expect(head.endsWith("```yaml\n")).toBe(true);
   });
 
-  test("head + body compose to a parseable fenced-JSON Markdown document for any payload", () => {
+  test("head + body compose to a parseable fenced-YAML Markdown document for any payload", () => {
     const payload = {
       status: "ok" as const,
       tool: { name: "ts-hotspots", version: "0.1.0" },
       groups: [],
     };
     const doc = `${renderMarkdownHead("duplication")}${renderMarkdownBody(payload)}`;
-    const fence = extractJsonFence(doc);
-    expect(JSON.parse(fence)).toEqual(payload);
+    expect(parseYaml(extractYamlFence(doc))).toEqual(payload);
   });
 
-  test("renderMarkdownPreError emits a stand-alone duplication-error block (no JSON fence)", () => {
+  test("renderMarkdownPreError emits a stand-alone duplication-error block (no fenced data block)", () => {
     const md = renderMarkdownPreError("duplication", "git ref does not exist");
     expect(md.startsWith("# ts-hotspots duplication error")).toBe(true);
     expect(md).toContain("git ref does not exist");
-    expect(md).not.toContain("```json");
+    expect(md).not.toContain("```");
   });
 
-  test("post-stream error closes the head's open JSON fence with the error envelope", () => {
+  test("post-stream error closes the head's open YAML fence with the error envelope", () => {
     const errPayload = {
       status: "error" as const,
       tool: { name: "ts-hotspots", version: "0.1.0" },
@@ -184,7 +177,21 @@ describe("renderMarkdown (duplication)", () => {
     };
     const doc = `${renderMarkdownHead("duplication")}${renderMarkdownErrorBody(errPayload)}`;
     expect(doc.endsWith("```\n")).toBe(true);
-    expect(JSON.parse(extractJsonFence(doc))).toEqual(errPayload);
+    expect(parseYaml(extractYamlFence(doc))).toEqual(errPayload);
+  });
+
+  test("YAML body preserves common ts-hotspots string shapes (paths with `:`, glob-like `*`, dismissal IDs)", () => {
+    const payload = {
+      hotspots: [
+        {
+          ref: { location: "src/cli.ts:200-209", name: "parseFlag" },
+          evidence: { properties: ["argv.*", "args.format"] },
+          dismissalId: "dup:f649e613aab247d9",
+        },
+      ],
+    };
+    const doc = `${renderMarkdownHead("duplication")}${renderMarkdownBody(payload)}`;
+    expect(parseYaml(extractYamlFence(doc))).toEqual(payload);
   });
 });
 

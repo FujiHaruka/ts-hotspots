@@ -513,7 +513,7 @@ describe("cochange CLI: runPipeline", () => {
     expect(code).toBe(1);
     const stdout = cap.stdout();
     // Markdown head was emitted before the validation throw, so the body
-    // is the JSON fence with the error envelope inside.
+    // is the YAML fence with the error envelope inside.
     expect(stdout).toContain("INVALID_ARGS");
     expect(stdout).toContain("not in the analyzed file-set");
   });

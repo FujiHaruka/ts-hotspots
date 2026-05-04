@@ -34,23 +34,23 @@ npx ts-hotspots complexity       # markdown report to stdout
 npx ts-hotspots complexity | claude --permission-mode plan
 ```
 
-The default output is a Markdown document containing a short instruction block followed by a JSON code block — pipeable straight into an agent in plan mode, which then knows it should read the top candidates and propose a plan. The JSON shape (schematic):
+The default output is a Markdown document: a short instruction block followed by a fenced YAML data block — pipeable straight into an agent in plan mode, which then knows it should read the top candidates and propose a plan. YAML is used inside the fence (instead of JSON) to spend fewer tokens for the same data. The shape (schematic):
 
-```jsonc
-{
-  "hotspots": [
-    {
-      "kind": "complexity",
-      "ref": { "location": "src/foo.ts:42-87", ... },
-      "score": { "axis": "...", "value": ... },
-      "metrics": { ... },
-      "dismissalId": "comp:..."
-    }
-  ]
-}
+```yaml
+hotspots:
+  - kind: complexity
+    ref:
+      location: src/foo.ts:42-87
+      # ...
+    score:
+      axis: # ...
+      value: # ...
+    metrics:
+      # ...
+    dismissalId: comp:...
 ```
 
-Pass `--format json` for the raw JSON without the Markdown wrapper, or `--verbose` for the full per-axis breakdown.
+Pass `--format json` for raw JSON without the Markdown wrapper, or `--verbose` for the full per-axis breakdown.
 
 ## Subcommands
 

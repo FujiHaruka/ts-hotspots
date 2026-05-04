@@ -1,3 +1,4 @@
+import { stringify as stringifyYaml } from "yaml";
 import { REPORT_PROMPTS, type ReportFeature } from "./prompt.ts";
 
 export type { ReportFeature };
@@ -7,22 +8,31 @@ export function renderJson(report: object): string {
 }
 
 /**
- * Markdown head: agent-first instruction prelude + opening JSON fence.
+ * YAML chosen over JSON for the markdown body: same data, fewer tokens for
+ * downstream LLM agents (no key quotes, no commas, no closing braces).
+ * `--format json` still emits raw JSON via `renderJson`.
+ */
+function renderYaml(payload: object): string {
+  return stringifyYaml(payload, { indent: 2, lineWidth: 0 });
+}
+
+/**
+ * Markdown head: agent-first instruction prelude + opening YAML fence.
  * Data-independent, so streaming consumers (e.g. `claude --permission-mode
  * plan`'s 3s detect window) see well-formed Markdown before the heavy
  * analysis runs.
  */
 export function renderMarkdownHead(feature: ReportFeature): string {
-  return `${REPORT_PROMPTS[feature].ok}\n## Data\n\n\`\`\`json\n`;
+  return `${REPORT_PROMPTS[feature].ok}\n## Data\n\n\`\`\`yaml\n`;
 }
 
 /**
- * Closing fence around any JSON-serializable payload (ok or error). Use
+ * Closing fence around any YAML-serializable payload (ok or error). Use
  * after `renderMarkdownHead` so the head + body compose to a well-formed
- * fenced-JSON Markdown document.
+ * fenced-YAML Markdown document.
  */
 export function renderMarkdownBody(payload: object): string {
-  return `${JSON.stringify(payload, null, 2)}\n\`\`\`\n`;
+  return `${renderYaml(payload)}\`\`\`\n`;
 }
 
 /**
@@ -36,7 +46,7 @@ export const renderMarkdownErrorBody = renderMarkdownBody;
  * head has not yet been emitted. Use this when a fast-fail validation
  * (e.g. "tsconfig not found") rejects the request before streaming
  * starts. Once the head is on stdout, switch to `renderMarkdownErrorBody`
- * instead so the JSON fence stays well-formed.
+ * instead so the YAML fence stays well-formed.
  */
 export function renderMarkdownPreError(
   feature: ReportFeature,
@@ -47,7 +57,7 @@ export function renderMarkdownPreError(
 
 /**
  * Single-shot Markdown for callers that don't stream — the head and body
- * are concatenated. Errors render as a stand-alone block (no JSON fence)
+ * are concatenated. Errors render as a stand-alone block (no YAML fence)
  * because nothing has been emitted yet.
  */
 /**

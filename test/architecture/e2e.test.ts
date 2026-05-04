@@ -95,13 +95,13 @@ describe("architecture e2e", () => {
     expect(hub?.dismissalId).toMatch(/^arch:[0-9a-f]{16}$/);
   });
 
-  it("emits a Markdown report with the agent prelude + JSON fence", async () => {
+  it("emits a Markdown report with the agent prelude + YAML fence", async () => {
     const r = makeHubRepo();
     const io = makeIO();
     const code = await archMain([r.path], io);
     expect(code).toBe(0);
     expect(io.out.startsWith("# ts-hotspots architecture report")).toBe(true);
-    expect(io.out).toContain("```json");
+    expect(io.out).toContain("```yaml");
     expect(io.out.trimEnd().endsWith("```")).toBe(true);
   });
 

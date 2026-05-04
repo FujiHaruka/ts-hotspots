@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { parse as parseYaml } from "yaml";
 import { run } from "./cli.ts";
 import { registryPath } from "./dismissal/store.ts";
 import type {
@@ -505,7 +506,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     );
   });
 
-  test("default invocation emits Markdown with the Claude prompt and fenced JSON", async () => {
+  test("default invocation emits Markdown with the Claude prompt and a fenced YAML body", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run([...COMPLEXITY_PREFIX, FIXTURE_DIR], stdout, stderr);
@@ -514,10 +515,10 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(stdout.text.startsWith("# ts-hotspots complexity report")).toBe(
       true,
     );
-    const match = /```json\n([\s\S]*?)\n```/.exec(stdout.text);
+    const match = /```yaml\n([\s\S]*?)\n```/.exec(stdout.text);
     expect(match).not.toBeNull();
     const body = match?.[1] ?? "";
-    const parsed = JSON.parse(body) as ParsedFunctionReport;
+    const parsed = parseYaml(body) as ParsedFunctionReport;
     expect(parsed.tool.name).toBe("ts-hotspots");
     expect(Array.isArray(parsed.hotspots)).toBe(true);
   });
@@ -620,9 +621,9 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(stdout.chunks.length).toBeGreaterThanOrEqual(2);
     const head = stdout.chunks[0] ?? "";
     expect(head.startsWith("# ts-hotspots complexity report")).toBe(true);
-    // Head contains only the fence opener, not the JSON body.
-    expect(head.endsWith("```json\n")).toBe(true);
-    expect(head).not.toContain('"tool"');
+    // Head contains only the fence opener, not the report body.
+    expect(head.endsWith("```yaml\n")).toBe(true);
+    expect(head).not.toContain("tool:");
     // Body appears in a later chunk and closes the fence.
     expect(stdout.text.endsWith("```\n")).toBe(true);
   });
@@ -644,7 +645,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     // Construct a directory that passes the pre-stream existsSync check
     // but is not a git repo, so `listRepoSources` throws after the
     // streaming preamble has been emitted. This exercises the post-head
-    // error path and must still produce a well-formed fenced-JSON
+    // error path and must still produce a well-formed fenced-YAML
     // Markdown document.
     const tmp = mkdtempSync(join(tmpdir(), "ts-hotspots-mid-err-"));
     try {
@@ -655,9 +656,9 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       expect(stdout.text.startsWith("# ts-hotspots complexity report")).toBe(
         true,
       );
-      const match = /```json\n([\s\S]*?)\n```/.exec(stdout.text);
+      const match = /```yaml\n([\s\S]*?)\n```/.exec(stdout.text);
       expect(match).not.toBeNull();
-      const parsed = JSON.parse(match?.[1] ?? "") as {
+      const parsed = parseYaml(match?.[1] ?? "") as {
         status: string;
         error: { code: string; message: string };
       };
