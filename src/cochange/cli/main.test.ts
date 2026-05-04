@@ -111,14 +111,12 @@ interface DiffStubOptions {
 
 function makeDeps(
   rawLog: string | undefined,
-  isShallow = false,
   diffStub?: DiffStubOptions,
 ): CochangeRunDeps {
   const runGitLog: typeof runGitLogReal = () => rawLog;
   return {
     runGitLog,
     runGitShowPrefix: () => "",
-    runGitIsShallow: () => isShallow,
     resolveDiffEndpoints: (_cwd, _baseRef, _headRef, _threeDot) => {
       if (diffStub === undefined) {
         return Promise.reject(
@@ -232,19 +230,24 @@ describe("cochange CLI: runPipeline", () => {
     expect(h.dismissalId).toMatch(/^coch:[0-9a-f]{16}$/);
   });
 
-  test("graceful skip on git-log failure: empty hotspots, intact envelope, stderr warning", async () => {
+  test("graceful skip on git-log failure: empty hotspots, intact envelope, no stderr noise", async () => {
     const repo = createFixtureRepo(["src/a.ts"]);
     cleanups.push(repo.cleanup);
     const cap = captureIO(repo.path);
     const code = await runPipeline(
-      makeArgs({ path: repo.path }),
+      makeArgs({ path: repo.path, verbose: true }),
       cap.io,
       makeDeps(undefined),
     );
     expect(code).toBe(0);
-    const out = JSON.parse(cap.stdout()) as { hotspots: unknown[] };
+    const out = JSON.parse(cap.stdout()) as {
+      hotspots: unknown[];
+      summary?: { actualWindow: number };
+    };
     expect(out.hotspots).toEqual([]);
-    expect(cap.stderr()).toContain("git log failed");
+    // Degraded state observable from the report: window saw 0 commits.
+    expect(out.summary?.actualWindow).toBe(0);
+    expect(cap.stderr()).toBe("");
   });
 
   test("graceful skip on non-git path: error envelope (NOT_A_GIT_REPO)", async () => {
@@ -313,7 +316,7 @@ describe("cochange CLI: runPipeline", () => {
         diff: { baseRef: "origin/main", headRef: "HEAD", threeDot: true },
       }),
       cap.io,
-      makeDeps(rawLog, false, diffStub),
+      makeDeps(rawLog, diffStub),
     );
     expect(code).toBe(0);
     const out = JSON.parse(cap.stdout()) as {
@@ -373,7 +376,7 @@ describe("cochange CLI: runPipeline", () => {
         diff: { baseRef: "main", headRef: "HEAD", threeDot: false },
       }),
       cap.io,
-      makeDeps(rawLog, false, diffStub),
+      makeDeps(rawLog, diffStub),
     );
     expect(code).toBe(0);
     const out = JSON.parse(cap.stdout()) as {
@@ -589,7 +592,7 @@ describe("cochange CLI: runPipeline", () => {
         diff: { baseRef: "origin/main", headRef: "HEAD", threeDot: true },
       }),
       cap.io,
-      makeDeps(rawLog, false, diffStub),
+      makeDeps(rawLog, diffStub),
     );
     expect(code).toBe(0);
     const out = JSON.parse(cap.stdout()) as {
@@ -605,7 +608,7 @@ describe("cochange CLI: runPipeline", () => {
     expect(out.hotspots[0]?.members[0]?.ref.location).toBe("src/b.ts");
   });
 
-  test("empty display + pairsAfterGate>0 emits a soft hint naming --diff as the cause", async () => {
+  test("--diff filter that misses every gated pair leaves hotspots empty while keeping pairsAfterGate>0 in the verbose summary", async () => {
     const repo = createFixtureRepo([
       "src/a.ts",
       "src/b.ts",
@@ -644,43 +647,25 @@ describe("cochange CLI: runPipeline", () => {
     const code = await runPipeline(
       makeArgs({
         path: repo.path,
+        verbose: true,
         diff: { baseRef: "origin/main", headRef: "HEAD", threeDot: true },
       }),
       cap.io,
-      makeDeps(rawLog, false, diffStub),
+      makeDeps(rawLog, diffStub),
     );
     expect(code).toBe(0);
-    const out = JSON.parse(cap.stdout()) as { hotspots: unknown[] };
+    const out = JSON.parse(cap.stdout()) as {
+      hotspots: unknown[];
+      diff?: { changedFiles: number };
+      summary?: { pairsAfterGate: number };
+    };
     expect(out.hotspots).toEqual([]);
-    const stderr = cap.stderr();
-    expect(stderr).toContain("no displayed pairs");
-    expect(stderr).toMatch(/pairsAfterGate=2\b/);
-    expect(stderr).toContain("--diff filter");
-    // The standard stats line is still emitted alongside.
-    expect(stderr).toContain("displayed=0");
+    expect(out.diff?.changedFiles).toBe(1);
+    expect(out.summary?.pairsAfterGate).toBe(2);
+    expect(cap.stderr()).toBe("");
   });
 
-  test("empty display soft hint NOT emitted when pairsAfterGate is zero", async () => {
-    const repo = createFixtureRepo(["src/a.ts", "src/b.ts"]);
-    cleanups.push(repo.cleanup);
-    const cap = captureIO(repo.path);
-    // Only one co-change, below the default min-support of 3 → gate zeroes.
-    const rawLog = [withSha("aaaaaaa"), "M\tsrc/a.ts", "M\tsrc/b.ts"].join(
-      "\n",
-    );
-    const code = await runPipeline(
-      makeArgs({ path: repo.path }),
-      cap.io,
-      makeDeps(rawLog),
-    );
-    expect(code).toBe(0);
-    const out = JSON.parse(cap.stdout()) as { hotspots: unknown[] };
-    expect(out.hotspots).toEqual([]);
-    const stderr = cap.stderr();
-    expect(stderr).not.toContain("no displayed pairs");
-  });
-
-  test("empty display soft hint names --file when anchor pivot drops every pair", async () => {
+  test("--file anchor that misses every gated pair leaves hotspots empty", async () => {
     const repo = createFixtureRepo([
       "src/anchor.ts",
       "src/a.ts",
@@ -707,16 +692,20 @@ describe("cochange CLI: runPipeline", () => {
       "M\tsrc/c.ts",
     ].join("\n");
     const code = await runPipeline(
-      makeArgs({ path: repo.path, file: "src/anchor.ts" }),
+      makeArgs({ path: repo.path, verbose: true, file: "src/anchor.ts" }),
       cap.io,
       makeDeps(rawLog),
     );
     expect(code).toBe(0);
-    const out = JSON.parse(cap.stdout()) as { hotspots: unknown[] };
+    const out = JSON.parse(cap.stdout()) as {
+      hotspots: unknown[];
+      summary?: { pairsAfterGate: number };
+    };
     expect(out.hotspots).toEqual([]);
-    const stderr = cap.stderr();
-    expect(stderr).toContain("no displayed pairs");
-    expect(stderr).toContain("--file anchor");
+    // The anchor pivot drops every gated pair: pairsAfterGate stays > 0
+    // but no pair contains the anchor, so hotspots[] is empty.
+    expect(out.summary?.pairsAfterGate).toBeGreaterThan(0);
+    expect(cap.stderr()).toBe("");
   });
 
   test("--ref and --diff are orthogonal: both can be passed simultaneously", async () => {
@@ -758,7 +747,6 @@ describe("cochange CLI: runPipeline", () => {
       {
         runGitLog,
         runGitShowPrefix: () => "",
-        runGitIsShallow: () => false,
         resolveDiffEndpoints: () =>
           Promise.resolve({
             baseSha: diffStub.baseSha,

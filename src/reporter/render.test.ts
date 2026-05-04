@@ -9,7 +9,6 @@ import {
   renderMarkdownErrorBody,
   renderMarkdownHead,
   renderMarkdownPreError,
-  renderStatsLine,
 } from "./render.ts";
 
 function makeFunctionReport(
@@ -192,16 +191,5 @@ describe("renderMarkdown (duplication)", () => {
     };
     const doc = `${renderMarkdownHead("duplication")}${renderMarkdownBody(payload)}`;
     expect(parseYaml(extractYamlFence(doc))).toEqual(payload);
-  });
-});
-
-describe("renderStatsLine", () => {
-  test("uses the `ts-hotspots <feature>: <payload>` format and ends with a newline", () => {
-    expect(
-      renderStatsLine("complexity", "files=3, functions=5, candidates=2"),
-    ).toBe("ts-hotspots complexity: files=3, functions=5, candidates=2\n");
-    expect(renderStatsLine("duplication", "repo=10 files/200 fragments")).toBe(
-      "ts-hotspots duplication: repo=10 files/200 fragments\n",
-    );
   });
 });

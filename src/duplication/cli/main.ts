@@ -3,7 +3,6 @@ import pkg from "../../../package.json" with { type: "json" };
 import {
   buildErrorWriters,
   type CliIO,
-  type CliWritable,
   classifyGenericError,
   sniffFormat,
 } from "../../cli/streaming.ts";
@@ -19,7 +18,6 @@ import {
   renderJson,
   renderMarkdownBody,
   renderMarkdownHead,
-  renderStatsLine,
 } from "../../reporter/render.ts";
 import { findGitRoot } from "../../util/git/findGitRoot.ts";
 import { defaultConfig } from "../config/defaults.ts";
@@ -79,34 +77,6 @@ const REAL_IO: MainIO = {
   cwd: () => process.cwd(),
 };
 
-function buildStatsPayload(
-  report: CloneCandidateReport,
-  fullCount: number,
-): string {
-  const summary = report.summary;
-  const base = summary.scope.base;
-  const pipeline = summary.pipeline;
-  const displayed = report.groups.length;
-  let fragmentsAcross = 0;
-  for (const g of report.groups) fragmentsAcross += g.size;
-  const sizeLine =
-    summary.mode === "diff" && summary.scope.changed !== undefined
-      ? `base=${String(base.files)} files/${String(base.fragments)} fragments, ` +
-        `changed=${String(summary.scope.changed.files)} files/${String(summary.scope.changed.fragments)} fragments`
-      : `repo=${String(base.files)} files/${String(base.fragments)} fragments`;
-  const displayedNote =
-    displayed === fullCount
-      ? `displayed=${String(displayed)} groups (${String(fragmentsAcross)} fragments)`
-      : `displayed=${String(displayed)} of ${String(fullCount)} groups (${String(fragmentsAcross)} fragments)`;
-  let payload =
-    `${sizeLine}, ` +
-    `candidates=${String(pipeline.candidatePairs)}, reported=${String(pipeline.reportedPairs)}, ${displayedNote}`;
-  if (report.dismissed !== undefined && report.dismissed.active > 0) {
-    payload += `, dismissed=${String(report.dismissed.active)}`;
-  }
-  return payload;
-}
-
 /**
  * Apply the dismissal registry to a freshly built report. Prunes entries
  * whose group is no longer reported (group composition changed — see
@@ -120,13 +90,8 @@ function buildStatsPayload(
 function applyDismissalRegistry(
   rootDir: string,
   report: CloneCandidateReport,
-  stderr: CliWritable,
 ): DismissedSummary | undefined {
-  const original = loadRegistry(rootDir, {
-    onWarning: (msg) => {
-      stderr.write(`${msg}\n`);
-    },
-  });
+  const original = loadRegistry(rootDir);
   if (original.entries.length === 0) return undefined;
 
   const currentIds = new Set<string>();
@@ -134,13 +99,6 @@ function applyDismissalRegistry(
   const { registry: pruned, prunedCount } = pruneRegistry(original, currentIds);
   if (prunedCount > 0) {
     saveRegistry(rootDir, withProjectPath(pruned, rootDir));
-    const noun = prunedCount === 1 ? "dismissal" : "dismissals";
-    stderr.write(
-      renderStatsLine(
-        "duplication",
-        `pruned ${String(prunedCount)} expired ${noun} (group composition changed since dismiss)`,
-      ),
-    );
   }
   const activeIds = registryIdSet(pruned);
   const kept: CloneCandidateReport["groups"] = [];
@@ -209,9 +167,6 @@ export async function runPipeline(
     ? {
         window: args.churn.window,
         ref: args.churn.ref ?? (args.mode === "diff" ? args.headRef : args.ref),
-        onWarning: (msg: string) => {
-          io.stderr.write(`${msg}\n`);
-        },
       }
     : undefined;
 
@@ -239,20 +194,16 @@ export async function runPipeline(
             churn: churnRunOpts,
           });
 
-    const dismissed = applyDismissalRegistry(repoPath, report, io.stderr);
+    const dismissed = applyDismissalRegistry(repoPath, report);
     if (dismissed !== undefined) report.dismissed = dismissed;
 
-    const fullCount = report.groups.length;
-    if (Number.isFinite(args.limit) && fullCount > args.limit) {
+    if (Number.isFinite(args.limit) && report.groups.length > args.limit) {
       report.groups = report.groups.slice(0, args.limit);
     }
 
     const output = serializeReport(report, { verbose: args.verbose });
     io.stdout.write(
       args.format === "json" ? renderJson(output) : renderMarkdownBody(output),
-    );
-    io.stderr.write(
-      renderStatsLine("duplication", buildStatsPayload(report, fullCount)),
     );
     return 0;
   } catch (err) {
@@ -279,12 +230,10 @@ export async function runPipeline(
  *   - missing required flag  → write error envelope, return 1.
  *   - any other thrown error → message to stderr, return 1.
  *   - on success             → report to stdout (Markdown by default,
- *                              JSON with `--format json`), stats line to
- *                              stderr, return 0 even when zero candidates
- *                              were reported.
- *   - `--phase-timings`      → in addition to the stats line, emit a
- *                              JSON Lines perf log to stderr (one event
- *                              per line, interleaved with the run).
+ *                              JSON with `--format json`), return 0 even
+ *                              when zero candidates were reported.
+ *   - `--phase-timings`      → emit a JSON Lines perf log to stderr (one
+ *                              event per line, interleaved with the run).
  */
 export async function main(
   argv: readonly string[],

@@ -55,8 +55,6 @@ export interface ChurnRunOptions {
    * override. Whole-repo mode passes the scan ref.
    */
   ref: string;
-  /** Sink for non-fatal collector warnings (shallow clone, git missing). */
-  onWarning?: (msg: string) => void;
 }
 
 interface RunOptions {
@@ -151,7 +149,6 @@ export async function runDetector(
       files: [...fileSet].map((path) => ({ path })),
       window: churn.window,
       ref: churn.ref,
-      onWarning: churn.onWarning,
     });
     emitPhaseEnd(perfLog, "churn", now() - t0);
   }

@@ -177,7 +177,7 @@ describe("complexity --diff (diff scope filter)", () => {
       expect(c.ref.location.startsWith("src/a.ts:")).toBe(true);
     }
     expect(report.notice).toBeUndefined();
-    expect(stderr.text).toMatch(/diff=1 changed files/);
+    expect(stderr.text).toBe("");
   });
 
   test("--verbose filters rankings and co-occurrence to changed files", async () => {
@@ -229,7 +229,7 @@ describe("complexity --diff (diff scope filter)", () => {
     expect(report.hotspots).toEqual([]);
     expect(report.notice?.code).toBe("DIFF_SCOPE_EMPTY");
     expect(report.notice?.message).toMatch(/no functions/i);
-    expect(stderr.text).toMatch(/diff=0 changed files/);
+    expect(stderr.text).toBe("");
   });
 
   test("DIFF_SCOPE_EMPTY notice also surfaces in --verbose mode", async () => {

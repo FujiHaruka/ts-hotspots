@@ -20,27 +20,16 @@ interface ChurnCollectorOptions {
   files: readonly ChurnFileInput[];
   window: number;
   ref: string;
-  onWarning?: (msg: string) => void;
 }
 
 export function collectChurn(opts: ChurnCollectorOptions): Map<string, number> {
   const fileSet = new Set(opts.files.map((f) => f.path));
-  const warn = (reason: string): Map<string, number> => {
-    opts.onWarning?.(`ts-hotspots: git churn skipped (${reason})`);
-    return new Map();
-  };
 
   const prefixRaw = runGit(opts.rootDir, ["rev-parse", "--show-prefix"]);
-  if (prefixRaw === undefined) return warn("not a git repository");
+  if (prefixRaw === undefined) return new Map();
   // `--show-prefix` is repo-root-relative and already posix, with a trailing
   // slash when non-empty. Strip the trailing slash so the parser can rebuild it.
   const prefixPosix = prefixRaw.trim().replace(/\/$/, "");
-
-  const shallow = runGit(opts.rootDir, [
-    "rev-parse",
-    "--is-shallow-repository",
-  ]);
-  const isShallow = shallow?.trim() === "true";
 
   const logOut = runGit(opts.rootDir, [
     "log",
@@ -53,17 +42,9 @@ export function collectChurn(opts: ChurnCollectorOptions): Map<string, number> {
     `--format=tformat:${COMMIT_MARKER}`,
     opts.ref,
   ]);
-  if (logOut === undefined) return warn("git log failed");
+  if (logOut === undefined) return new Map();
 
-  const counts = parseChurnLog(logOut, fileSet, prefixPosix);
-
-  if (isShallow) {
-    opts.onWarning?.(
-      "ts-hotspots: git churn may be incomplete (shallow clone)",
-    );
-  }
-
-  return counts;
+  return parseChurnLog(logOut, fileSet, prefixPosix);
 }
 
 // Walks `git log --name-status -M` output from newest to oldest, following

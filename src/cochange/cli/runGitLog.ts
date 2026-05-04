@@ -39,11 +39,6 @@ export function runGitShowPrefix(rootDir: string): string | undefined {
   return runGit(rootDir, ["rev-parse", "--show-prefix"]);
 }
 
-export function runGitIsShallow(rootDir: string): boolean {
-  const out = runGit(rootDir, ["rev-parse", "--is-shallow-repository"]);
-  return out?.trim() === "true";
-}
-
 function runGit(cwd: string, args: readonly string[]): string | undefined {
   try {
     const res = spawnSync("git", ["-c", "core.quotepath=false", ...args], {

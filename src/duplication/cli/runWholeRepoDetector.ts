@@ -115,7 +115,6 @@ export async function runWholeRepoDetector(
       files: sources.map((s) => ({ path: s.path })),
       window: churn.window,
       ref: churn.ref,
-      onWarning: churn.onWarning,
     });
     emitPhaseEnd(perfLog, "churn", now() - t0);
   }

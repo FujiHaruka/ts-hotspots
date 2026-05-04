@@ -189,14 +189,20 @@ describe("architecture pipeline composition — workspace mode", () => {
     r.commit("setup");
 
     const cap = captureIO(r.path);
-    const code = await main([r.path, "--format", "json"], cap.io);
+    const code = await main([r.path, "--verbose", "--format", "json"], cap.io);
     expect(code).toBe(0);
-    expect(cap.stderr()).toContain(
-      "discovered 2 workspace packages (mode: pnpm-workspace)",
-    );
+    expect(cap.stderr()).toBe("");
+    const report = JSON.parse(cap.stdout()) as {
+      project: { sourceFileCount: number; componentCount?: number };
+    };
+    // Both packages' .ts files made it into the graph — proves the
+    // workspace discovery + ingestion pipeline picked up the monorepo
+    // layout, not just a single tree.
+    expect(report.project.sourceFileCount).toBe(2);
+    expect(report.project.componentCount ?? 0).toBeGreaterThan(0);
   });
 
-  it("does not emit the workspace stats line on a plain repo", async () => {
+  it("plain repo runs are silent on stderr", async () => {
     const r = newRepo();
     r.write("src/a.ts", "export const a = 1;\n");
     r.commit("setup");
@@ -204,7 +210,7 @@ describe("architecture pipeline composition — workspace mode", () => {
     const cap = captureIO(r.path);
     const code = await main([r.path, "--format", "json"], cap.io);
     expect(code).toBe(0);
-    expect(cap.stderr()).not.toContain("discovered");
+    expect(cap.stderr()).toBe("");
   });
 });
 
@@ -358,9 +364,12 @@ describe("architecture main — smoke", () => {
     r.commit("setup");
 
     const cap = captureIO(r.path);
-    const code = await main([r.path, "--format", "json"], cap.io);
+    const code = await main([r.path, "--verbose", "--format", "json"], cap.io);
     expect(code).toBe(0);
-    const stderr = cap.stderr();
-    expect(stderr).toMatch(/files=2/);
+    expect(cap.stderr()).toBe("");
+    const report = JSON.parse(cap.stdout()) as {
+      project: { sourceFileCount: number };
+    };
+    expect(report.project.sourceFileCount).toBe(2);
   });
 });

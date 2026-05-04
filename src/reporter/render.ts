@@ -74,15 +74,3 @@ export function renderMarkdown(
   }
   return `${renderMarkdownHead(feature)}${renderMarkdownBody(report)}`;
 }
-
-/**
- * stderr summary line shared across subcommands. Format:
- * `ts-hotspots <feature>: <payload>\n`. The payload is feature-specific
- * but the prefix is fixed so consumers can grep across both.
- */
-export function renderStatsLine(
-  feature: ReportFeature,
-  payload: string,
-): string {
-  return `ts-hotspots ${feature}: ${payload}\n`;
-}

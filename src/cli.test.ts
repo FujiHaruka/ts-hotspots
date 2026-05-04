@@ -88,12 +88,12 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
+    expect(stderr.text).toBe("");
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     expect(report.tool.name).toBe("ts-hotspots");
     expect(report.project.sourceFileCount).toBeGreaterThan(0);
-    // Slim default trims `functionCount` from the envelope — it remains
-    // on the stderr stats line and surfaces only under `--verbose`.
+    // Slim default trims `functionCount` from the envelope —
+    // it surfaces only under `--verbose`.
     expect(report.project.functionCount).toBeUndefined();
 
     // Slim default: only hotspot candidates remain as the primary signal.
@@ -143,7 +143,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(report.hotspots.length).toBeGreaterThan(0);
   });
 
-  test("--limit is ignored in --file mode and warns on stderr", async () => {
+  test("--limit is silently ignored in --file mode (file shows all functions)", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
@@ -161,7 +161,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toContain("--limit is ignored in --file mode");
+    expect(stderr.text).toBe("");
   });
 
   test("--top is no longer accepted (removed from public CLI)", async () => {
@@ -427,7 +427,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
+    expect(stderr.text).toBe("");
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
 
     expect(Array.isArray(report.functionCoOccurrence)).toBe(true);
@@ -471,7 +471,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     expect(slimReport.hotspots).toEqual(fullReport.hotspots);
   });
 
-  test("emits a `ts-hotspots complexity:` stats line on stderr after a successful run", async () => {
+  test("successful runs are silent on stderr", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
@@ -480,12 +480,10 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toMatch(
-      /^ts-hotspots complexity: files=\d+, functions=\d+, candidates=\d+\n$/,
-    );
+    expect(stderr.text).toBe("");
   });
 
-  test("--file mode stats line names the inspected file", async () => {
+  test("--file mode runs are silent on stderr", async () => {
     const stdout = new StringSink();
     const stderr = new StringSink();
     const code = await run(
@@ -501,9 +499,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toMatch(
-      /ts-hotspots complexity: file=src\/a\.ts, functions=\d+/,
-    );
+    expect(stderr.text).toBe("");
   });
 
   test("default invocation emits Markdown with the Claude prompt and a fenced YAML body", async () => {
@@ -511,7 +507,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
     const stderr = new StringSink();
     const code = await run([...COMPLEXITY_PREFIX, FIXTURE_DIR], stdout, stderr);
     expect(code).toBe(0);
-    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
+    expect(stderr.text).toBe("");
     expect(stdout.text.startsWith("# ts-hotspots complexity report")).toBe(
       true,
     );
@@ -591,7 +587,7 @@ describe("run (complexity subcommand: function-axis ranking)", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
+    expect(stderr.text).toBe("");
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     for (const f of report.functions ?? []) {
       expect(f.metrics.commitCount).toBeUndefined();
@@ -795,15 +791,13 @@ describe("dismissal registry subcommands", () => {
       analyzeErr,
     );
     expect(analyzeCode).toBe(0);
+    expect(analyzeErr.text).toBe("");
     const report = JSON.parse(analyzeOut.text) as ParsedFunctionReport;
     expect(report.dismissed).toEqual({
       active: 0,
       filteredThisRun: 0,
       prunedThisRun: 1,
     });
-    expect(analyzeErr.text).toContain(
-      "ts-hotspots complexity: pruned 1 expired dismissal (function changed since dismiss)",
-    );
 
     const after = JSON.parse(readFileSync(registryFile, "utf8")) as {
       entries: unknown[];
@@ -976,7 +970,7 @@ describe("complexity subcommand routing", () => {
       stderr,
     );
     expect(code).toBe(0);
-    expect(stderr.text).toMatch(/^ts-hotspots complexity: [^\n]+\n$/);
+    expect(stderr.text).toBe("");
     const report = JSON.parse(stdout.text) as ParsedFunctionReport;
     expect(report.tool.name).toBe("ts-hotspots");
     expect(report.project.sourceFileCount).toBeGreaterThan(0);

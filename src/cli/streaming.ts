@@ -22,7 +22,7 @@ import {
   renderMarkdownPreError,
 } from "../reporter/render.ts";
 
-export interface CliWritable {
+interface CliWritable {
   write: (chunk: string) => unknown;
 }
 

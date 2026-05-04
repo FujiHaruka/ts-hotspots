@@ -15,8 +15,9 @@
  * shells out to git in `runGitLog.ts`.
  *
  * Graceful skip path: non-git, missing git binary, empty walker
- * output — emit a single stderr warning and return an empty
- * `hotspots[]`, mirroring comp's churn graceful-skip shape.
+ * output — return an empty `hotspots[]` (the empty `summary.actualWindow`
+ * and `summary.pairsAfterGate` make the degraded state observable in
+ * the report itself), mirroring comp's churn graceful-skip shape.
  */
 
 import { sep as pathSep, resolve as resolvePath } from "node:path";
@@ -24,7 +25,6 @@ import pkg from "../../../package.json" with { type: "json" };
 import {
   buildErrorWriters,
   type CliIO,
-  type CliWritable,
   classifyGenericError,
   sniffFormat,
 } from "../../cli/streaming.ts";
@@ -41,7 +41,6 @@ import {
   renderJson,
   renderMarkdownBody,
   renderMarkdownHead,
-  renderStatsLine,
 } from "../../reporter/render.ts";
 import type { DiffInfo, DismissedSummary, ReportTool } from "../../schema.ts";
 import { findGitRoot } from "../../util/git/findGitRoot.ts";
@@ -65,7 +64,7 @@ import { serializeReport } from "../report/serializeJson.ts";
 import { walkCochange } from "../walk/walkCochange.ts";
 import { ArgParseError, type CochangeParsedArgs } from "./args.ts";
 import { loadCochangeSources } from "./loadSources.ts";
-import { runGitIsShallow, runGitLog, runGitShowPrefix } from "./runGitLog.ts";
+import { runGitLog, runGitShowPrefix } from "./runGitLog.ts";
 
 const TOOL: ReportTool = { name: TOOL_NAME, version: pkg.version };
 const errorWriter = buildErrorWriters("cochange", TOOL);
@@ -97,7 +96,6 @@ function effectiveExcludeGlobs(args: CochangeParsedArgs): string[] {
 export interface CochangeRunDeps {
   runGitLog: typeof runGitLog;
   runGitShowPrefix: typeof runGitShowPrefix;
-  runGitIsShallow: typeof runGitIsShallow;
   resolveDiffEndpoints: typeof resolveDiffEndpoints;
   listChangedFilePaths: typeof listChangedFilePaths;
 }
@@ -105,7 +103,6 @@ export interface CochangeRunDeps {
 const DEFAULT_DEPS: CochangeRunDeps = {
   runGitLog,
   runGitShowPrefix,
-  runGitIsShallow,
   resolveDiffEndpoints,
   listChangedFilePaths,
 };
@@ -147,13 +144,8 @@ async function resolveDiffScope(
 function applyDismissalRegistry(
   rootDir: string,
   hotspots: SlimCochangeHotspot[],
-  stderr: CliWritable,
 ): { hotspots: SlimCochangeHotspot[]; summary?: DismissedSummary } {
-  const original = loadRegistry(rootDir, {
-    onWarning: (msg) => {
-      stderr.write(`${msg}\n`);
-    },
-  });
+  const original = loadRegistry(rootDir);
   if (original.entries.length === 0) return { hotspots };
 
   const currentIds = new Set<string>();
@@ -161,13 +153,6 @@ function applyDismissalRegistry(
   const { registry: pruned, prunedCount } = pruneRegistry(original, currentIds);
   if (prunedCount > 0) {
     saveRegistry(rootDir, withProjectPath(pruned, rootDir));
-    const noun = prunedCount === 1 ? "dismissal" : "dismissals";
-    stderr.write(
-      renderStatsLine(
-        "cochange",
-        `pruned ${String(prunedCount)} expired ${noun} (pair changed since dismiss)`,
-      ),
-    );
   }
   const activeIds = registryIdSet(pruned);
   const kept: SlimCochangeHotspot[] = [];
@@ -238,8 +223,6 @@ export async function runPipeline(
       window: args.window,
     });
 
-    const isShallow = deps.runGitIsShallow(repoPath);
-
     const reportInput = buildReportInput({
       args,
       rawLog,
@@ -248,16 +231,6 @@ export async function runPipeline(
       analyzedFileCount: filePaths.length,
       anchor,
     });
-
-    if (rawLog === undefined) {
-      io.stderr.write(
-        "ts-hotspots cochange: git log failed; emitting empty report\n",
-      );
-    } else if (isShallow) {
-      io.stderr.write(
-        "ts-hotspots cochange: history may be incomplete (shallow clone)\n",
-      );
-    }
 
     const fullReport = serializeReport(reportInput, { verbose: args.verbose });
 
@@ -286,7 +259,7 @@ export async function runPipeline(
           });
 
     const { hotspots: hotspotsAfterDismissal, summary: dismissed } =
-      applyDismissalRegistry(repoPath, hotspotsAfterDiff, io.stderr);
+      applyDismissalRegistry(repoPath, hotspotsAfterDiff);
 
     const finalHotspots = Number.isFinite(args.limit)
       ? hotspotsAfterDismissal.slice(0, args.limit)
@@ -311,31 +284,6 @@ export async function runPipeline(
       args.format === "json"
         ? renderJson(outReport)
         : renderMarkdownBody(outReport),
-    );
-
-    if (finalHotspots.length === 0 && reportInput.pairsAfterGate > 0) {
-      const cause = describeEmptyDisplayCause({
-        diffApplied: scope !== undefined,
-        anchorApplied: anchor !== undefined,
-        dismissalFiltered:
-          dismissed !== undefined && dismissed.filteredThisRun > 0,
-        limitZero: args.limit === 0,
-      });
-      io.stderr.write(
-        renderStatsLine(
-          "cochange",
-          `no displayed pairs (pairsAfterGate=${String(
-            reportInput.pairsAfterGate,
-          )}; ${cause})`,
-        ),
-      );
-    }
-
-    io.stderr.write(
-      renderStatsLine(
-        "cochange",
-        buildStatsPayload(reportInput, finalHotspots.length, dismissed, scope),
-      ),
     );
     return 0;
   } catch (err) {
@@ -447,51 +395,4 @@ function toRepoRelativePosix(rootDir: string, input: string): string {
     rel = abs;
   }
   return pathSep === "/" ? rel : rel.split(pathSep).join("/");
-}
-
-interface EmptyDisplayCauseInput {
-  diffApplied: boolean;
-  anchorApplied: boolean;
-  dismissalFiltered: boolean;
-  limitZero: boolean;
-}
-
-/**
- * Describe why `finalHotspots` is empty even though pairs survived the gate.
- * Listed in the order the filters run; "+" joins multiple active causes.
- * Falls back to a neutral phrase when none of the known filters fired
- * (pairs were trimmed by some path that doesn't expose itself here).
- */
-function describeEmptyDisplayCause(input: EmptyDisplayCauseInput): string {
-  const causes: string[] = [];
-  if (input.diffApplied) causes.push("--diff filter");
-  if (input.anchorApplied) causes.push("--file anchor");
-  if (input.dismissalFiltered) causes.push("dismissal registry");
-  if (input.limitZero) causes.push("--limit 0");
-  if (causes.length === 0) return "no active display filter";
-  return `trimmed by ${causes.join(" + ")}`;
-}
-
-function buildStatsPayload(
-  reportInput: ReturnType<typeof buildReportInput>,
-  displayed: number,
-  dismissed: DismissedSummary | undefined,
-  scope: DiffScope | undefined,
-): string {
-  let payload =
-    `files=${String(reportInput.analyzedFileCount)}, ` +
-    `window=${String(reportInput.actualWindow)}/${String(reportInput.requestedWindow)} commits, ` +
-    `pairsBeforeGate=${String(reportInput.pairCandidateCountBeforeGate)}, ` +
-    `pairsAfterGate=${String(reportInput.pairsAfterGate)}, ` +
-    `displayed=${String(displayed)}`;
-  if (reportInput.commitsSkippedAsLargeChange > 0) {
-    payload += `, skippedLarge=${String(reportInput.commitsSkippedAsLargeChange)}`;
-  }
-  if (scope !== undefined) {
-    payload += `, diff=${String(scope.changedFiles)} changed files`;
-  }
-  if (dismissed !== undefined && dismissed.active > 0) {
-    payload += `, dismissed=${String(dismissed.active)}`;
-  }
-  return payload;
 }

@@ -27,7 +27,6 @@ import pkg from "../../../package.json" with { type: "json" };
 import {
   buildErrorWriters,
   type CliIO,
-  type CliWritable,
   classifyGenericError,
   sniffFormat,
 } from "../../cli/streaming.ts";
@@ -47,7 +46,6 @@ import {
   renderJson,
   renderMarkdownBody,
   renderMarkdownHead,
-  renderStatsLine,
 } from "../../reporter/render.ts";
 import type { DismissedSummary } from "../../schema.ts";
 import { findGitRoot } from "../../util/git/findGitRoot.ts";
@@ -135,13 +133,8 @@ async function resolveDiffScope(
 function applyDismissalRegistry(
   rootDir: string,
   hotspots: ArchHotspot[],
-  stderr: CliWritable,
 ): { hotspots: ArchHotspot[]; summary?: DismissedSummary } {
-  const original = loadRegistry(rootDir, {
-    onWarning: (msg) => {
-      stderr.write(`${msg}\n`);
-    },
-  });
+  const original = loadRegistry(rootDir);
   if (original.entries.length === 0) return { hotspots };
 
   const currentIds = new Set<string>();
@@ -149,13 +142,6 @@ function applyDismissalRegistry(
   const { registry: pruned, prunedCount } = pruneRegistry(original, currentIds);
   if (prunedCount > 0) {
     saveRegistry(rootDir, withProjectPath(pruned, rootDir));
-    const noun = prunedCount === 1 ? "dismissal" : "dismissals";
-    stderr.write(
-      renderStatsLine(
-        "architecture",
-        `pruned ${String(prunedCount)} expired ${noun} (component changed since dismiss)`,
-      ),
-    );
   }
   const activeIds = registryIdSet(pruned);
   const kept: ArchHotspot[] = [];
@@ -202,7 +188,7 @@ export async function runPipeline(
       ref: args.ref,
       excludeGlobs: exclude,
     });
-    const packageMap = discoverAndBuildPackageMap(repoPath, io.stderr);
+    const packageMap = discoverAndBuildPackageMap(repoPath);
     const tsconfig = readTsconfigResolution(repoPath, { packageMap });
     const graph = buildGraph({
       sources,
@@ -253,7 +239,7 @@ export async function runPipeline(
           );
 
     const { hotspots: hotspotsAfterDismissal, summary: dismissed } =
-      applyDismissalRegistry(repoPath, hotspotsAfterDiff, io.stderr);
+      applyDismissalRegistry(repoPath, hotspotsAfterDiff);
 
     const finalHotspots = Number.isFinite(args.limit)
       ? hotspotsAfterDismissal.slice(0, args.limit)
@@ -282,17 +268,6 @@ export async function runPipeline(
         ? renderJson(outReport)
         : renderMarkdownBody(outReport),
     );
-    io.stderr.write(
-      renderStatsLine(
-        "architecture",
-        buildStatsPayload(
-          outReport,
-          candidates.length,
-          sources.length,
-          graph.nodes.length,
-        ),
-      ),
-    );
     return 0;
   } catch (err) {
     const { code, message } = classifyError(err);
@@ -308,43 +283,13 @@ function splitFile(location: string): string {
   return idx === -1 ? location : location.slice(0, idx);
 }
 
-function discoverAndBuildPackageMap(
-  repoPath: string,
-  stderr: CliWritable,
-): PackageMap | undefined {
+function discoverAndBuildPackageMap(repoPath: string): PackageMap | undefined {
   const ws = discoverWorkspace(repoPath);
   if (ws === null) return undefined;
-  const map = buildPackageMap({
+  return buildPackageMap({
     repoRoot: repoPath,
     packageRoots: ws.packageRoots,
   });
-  stderr.write(
-    renderStatsLine(
-      "architecture",
-      `discovered ${String(map.packages.length)} workspace packages (mode: ${ws.mode})`,
-    ),
-  );
-  return map;
-}
-
-function buildStatsPayload(
-  report: ArchReport,
-  candidateCount: number,
-  sourceFileCount: number,
-  componentCount: number,
-): string {
-  let payload =
-    `files=${String(sourceFileCount)}, ` +
-    `components=${String(componentCount)}, ` +
-    `candidates=${String(candidateCount)}, ` +
-    `displayed=${String(report.hotspots.length)}`;
-  if (report.diff !== undefined) {
-    payload += `, diff=${String(report.diff.changedFiles)} changed files`;
-  }
-  if (report.dismissed !== undefined && report.dismissed.active > 0) {
-    payload += `, dismissed=${String(report.dismissed.active)}`;
-  }
-  return payload;
 }
 
 export async function main(

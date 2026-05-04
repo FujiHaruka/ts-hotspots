@@ -341,21 +341,21 @@ describe("main", () => {
       hotspots: unknown[];
     };
     expect(cappedReport.hotspots).toHaveLength(1);
-    expect(capped.stderr()).toContain(
-      `displayed=1 of ${String(fullCount)} groups`,
-    );
+    // fullCount is observable from the unlimited run's hotspots[].length.
+    expect(fullCount).toBeGreaterThan(1);
   });
 
   it("default --limit caps the output to 50 candidates max", async () => {
-    // Smoke check: with a tiny repo we can't easily exceed 50; verify
-    // displayed= appears WITHOUT a "of N" suffix when the cap doesn't bind.
+    // Smoke check: a tiny repo cannot exceed 50 groups, so the run must
+    // succeed with at least zero hotspots and no error output.
     const r = newRepo();
     r.write("src/a.ts", "export const x = 1;\n");
     const sha = r.commit("only");
 
     const cap = captureIO();
-    await main(["--diff", `${sha}..${sha}`, r.path], cap.io);
-    expect(cap.stderr()).toMatch(/displayed=\d+(?! of)/);
+    const code = await main(["--diff", `${sha}..${sha}`, r.path], cap.io);
+    expect(code).toBe(0);
+    expect(cap.stderr()).toBe("");
   });
 
   describe("dismissal round-trip", () => {
@@ -562,9 +562,7 @@ describe("main", () => {
         filteredThisRun: 0,
         prunedThisRun: 1,
       });
-      expect(cap.stderr()).toContain(
-        "ts-hotspots duplication: pruned 1 expired dismissal (group composition changed since dismiss)",
-      );
+      expect(cap.stderr()).toBe("");
       const regPath = registryPath(r.path);
       const after = JSON.parse(readFileSync(regPath, "utf-8")) as {
         entries: unknown[];
@@ -573,7 +571,7 @@ describe("main", () => {
     });
   });
 
-  it("runs whole-repo mode end-to-end and prints a summary line with repo=", async () => {
+  it("runs whole-repo mode end-to-end and emits a non-empty hotspots[] envelope", async () => {
     const r = newRepo();
     // Bodies are padded to clear the default minLines gate (5 lines).
     r.write(
@@ -609,10 +607,6 @@ describe("main", () => {
       }[];
     };
     expect(parsed.hotspots.length).toBeGreaterThan(0);
-
-    const stderr = cap.stderr();
-    expect(stderr).toMatch(
-      /^ts-hotspots duplication: repo=\d+ files\/\d+ fragments/,
-    );
+    expect(cap.stderr()).toBe("");
   });
 });

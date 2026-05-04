@@ -119,36 +119,26 @@ describe("collectChurn (integration)", () => {
     expect(counts.get("src/foo.ts")).toBe(2);
   });
 
-  test("non-git directory is skipped gracefully with a warning", () => {
-    const warnings: string[] = [];
+  test("non-git directory is skipped gracefully (returns an empty map)", () => {
     const counts = collectChurn({
       rootDir: tmp,
       files: fakeFiles(["src/foo.ts"]),
       window: 200,
       ref: "HEAD",
-      onWarning: (msg) => {
-        warnings.push(msg);
-      },
     });
     expect(counts.size).toBe(0);
-    expect(warnings.some((m) => m.includes("skipped"))).toBe(true);
   });
 
-  test("empty repo (no HEAD yet) is skipped gracefully with a warning", () => {
+  test("empty repo (no HEAD yet) is skipped gracefully (returns an empty map)", () => {
     git(tmp, ["init", "--initial-branch=main"]);
 
-    const warnings: string[] = [];
     const counts = collectChurn({
       rootDir: tmp,
       files: fakeFiles(["src/foo.ts"]),
       window: 200,
       ref: "HEAD",
-      onWarning: (msg) => {
-        warnings.push(msg);
-      },
     });
     expect(counts.size).toBe(0);
-    expect(warnings.some((m) => m.includes("skipped"))).toBe(true);
   });
 
   test("rename history is followed back to the pre-rename path", () => {

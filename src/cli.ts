@@ -62,7 +62,6 @@ import {
   renderMarkdownErrorBody,
   renderMarkdownHead,
   renderMarkdownPreError,
-  renderStatsLine,
 } from "./reporter/render.ts";
 import type {
   AxisMeta,
@@ -569,7 +568,6 @@ async function prepare(
   positional: string | undefined,
   exclude: readonly string[],
   churnOptions: ChurnPrepareOptions,
-  stderr: WritableLike,
 ): Promise<PreparedContext> {
   const rootDir = resolveRootDir(positional);
   const sources = await listRepoSources(rootDir, { exclude });
@@ -581,9 +579,6 @@ async function prepare(
         files,
         window: churnOptions.window,
         ref: churnOptions.ref,
-        onWarning: (msg) => {
-          stderr.write(`${msg}\n`);
-        },
       })
     : undefined;
   const { functions } = aggregate({
@@ -697,13 +692,8 @@ function applyDismissalRegistry(
   rootDir: string,
   candidates: HotspotCandidate[],
   activeDismissalIds: ReadonlySet<string>,
-  stderr: WritableLike,
 ): DismissalApplyResult {
-  const original = loadRegistry(rootDir, {
-    onWarning: (msg) => {
-      stderr.write(`${msg}\n`);
-    },
-  });
+  const original = loadRegistry(rootDir);
   if (original.entries.length === 0) {
     return { candidates };
   }
@@ -713,13 +703,6 @@ function applyDismissalRegistry(
   );
   if (prunedCount > 0) {
     saveRegistry(rootDir, withProjectPath(pruned, rootDir));
-    const noun = prunedCount === 1 ? "dismissal" : "dismissals";
-    stderr.write(
-      renderStatsLine(
-        "complexity",
-        `pruned ${String(prunedCount)} expired ${noun} (function changed since dismiss)`,
-      ),
-    );
   }
   const activeIds = registryIdSet(pruned);
   let filteredThisRun = 0;
@@ -753,32 +736,6 @@ function writeOk(
   streaming: boolean,
 ): void {
   stdout.write(streaming ? renderMarkdownBody(report) : renderJson(report));
-}
-
-function writeStatsLine(
-  stderr: WritableLike,
-  report: FunctionReport,
-  fileMode: { file: string } | undefined,
-  functionCount: number,
-): void {
-  const { project } = report;
-  let payload: string;
-  if (fileMode !== undefined) {
-    const fnCount = report.functions?.length ?? 0;
-    payload = `file=${fileMode.file}, functions=${String(fnCount)}`;
-  } else {
-    payload =
-      `files=${String(project.sourceFileCount)}, ` +
-      `functions=${String(functionCount)}, ` +
-      `candidates=${String(report.hotspots.length)}`;
-  }
-  if (report.diff !== undefined) {
-    payload += `, diff=${String(report.diff.changedFiles)} changed files`;
-  }
-  if (report.dismissed !== undefined && report.dismissed.active > 0) {
-    payload += `, dismissed=${String(report.dismissed.active)}`;
-  }
-  stderr.write(renderStatsLine("complexity", payload));
 }
 
 interface DiffScope {
@@ -889,16 +846,9 @@ async function runFunctions(
 ): Promise<number> {
   const format = options.format ?? DEFAULT_FORMAT;
   const streaming = format !== "json";
-  const userLimit = options.limit;
-  const limit = userLimit ?? DEFAULT_LIMIT;
+  const limit = options.limit ?? DEFAULT_LIMIT;
   const userExclude = options.exclude ?? [];
   const exclude = [...DEFAULT_EXCLUDE_GLOBS, ...userExclude];
-
-  // Warn (not fail) when --limit is supplied alongside a mode that ignores
-  // it, so users do not silently assume their cap was honoured.
-  if (options.file !== undefined && userLimit !== undefined) {
-    stderr.write("ts-hotspots complexity: --limit is ignored in --file mode\n");
-  }
 
   // Pre-stream validation: fast checks that can fail with a clear error before
   // we commit to streaming output. Emitting the preamble early lets `claude`
@@ -924,7 +874,6 @@ async function runFunctions(
       positional,
       exclude,
       resolveChurnOptions(options),
-      stderr,
     );
 
     if (options.file !== undefined) {
@@ -940,7 +889,6 @@ async function runFunctions(
         functions: targetFunctions,
       };
       writeOk(stdout, report, streaming);
-      writeStatsLine(stderr, report, { file: rel }, functions.length);
       return 0;
     }
 
@@ -964,12 +912,7 @@ async function runFunctions(
       functions.map((f) => bodyHashToCompDismissalId(f.bodyHash)),
     );
     const { candidates: filteredCandidates, summary: dismissed } =
-      applyDismissalRegistry(
-        rootDir,
-        rawCandidates,
-        activeDismissalIds,
-        stderr,
-      );
+      applyDismissalRegistry(rootDir, rawCandidates, activeDismissalIds);
 
     // Diff scope narrows the displayed surfaces (rankings, co-occurrence,
     // candidates) to functions in changed files. axisMeta keeps the full
@@ -1018,7 +961,6 @@ async function runFunctions(
     });
     applyOptionalReportFields(report, { dismissed, diffScope, diffNotice });
     writeOk(stdout, report, streaming);
-    writeStatsLine(stderr, report, undefined, functions.length);
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
