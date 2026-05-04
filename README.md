@@ -24,7 +24,7 @@ All four scan a git working tree (`.ts` / `.tsx` / `.mts` / `.cts`) and emit mac
 ## Quick start
 
 ```bash
-npm i -D ts-hotspots             # requires Node.js 24+
+npm i -D ts-hotspots
 npx ts-hotspots complexity       # markdown report to stdout
 npx ts-hotspots complexity | claude --permission-mode plan
 ```
