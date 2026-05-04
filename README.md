@@ -34,7 +34,7 @@ npx ts-hotspots complexity       # markdown report to stdout
 npx ts-hotspots complexity | claude --permission-mode plan
 ```
 
-The default output is a Markdown document: a short instruction block followed by a fenced YAML data block — pipeable straight into an agent in plan mode, which then knows it should read the top candidates and propose a plan. YAML is used inside the fence (instead of JSON) to spend fewer tokens for the same data. The shape (schematic):
+The default output is a Markdown document: a short instruction block followed by a fenced YAML data block — pipeable straight into an agent in plan mode, which then knows it should read the top candidates and propose a plan. The shape (schematic):
 
 ```yaml
 hotspots:
