@@ -1,14 +1,14 @@
 # ts-hotspots
 
-Static analysis that tells AI coding agents where to read first when refactoring or reviewing your TypeScript repo.
+Static analysis that points AI coding agents at the hotspots worth refactoring or reviewing in your TypeScript repo.
 
 > Status: under active development. Output schemas may change between minor versions.
 
 ## Why
 
-When a coding agent is dropped into an unfamiliar TypeScript codebase, "where should I start reading?" is the first question — and the hardest. Human reviewers answer it from experience; agents do it from scratch every run.
+AI coding agents have no bird's-eye view of a large repository. They can grep and read, and everything else they have to discover one call at a time. Asked to refactor or review an unfamiliar TypeScript codebase, they gravitate toward conspicuously-named files or recently-touched ones — and miss the real hotspots.
 
-`ts-hotspots` returns coordinates (`file:line`) and metric facts. It does not propose refactors or rewrite plans. The judgment of *what to do* stays with the agent or human downstream.
+`ts-hotspots` gives the agent a starting point: coordinates (`file:line`) and metric facts pointing at the spots most worth reading first. No rewrite plans, no judgments — the agent reads from there and decides what to do.
 
 ## What it surfaces
 
@@ -19,7 +19,7 @@ Four readings of "worth reading first", as subcommands of one binary:
 - `ts-hotspots architecture` (alias `arch`) — exported components ranked by structural pressure on the dependency graph. Best for *"which components are load-bearing?"*
 - `ts-hotspots cochange` (alias `coch`) — file pairs that change together in git history. Best for *"which files outside the static graph are entangled with this one?"*
 
-All four operate on a directory inside a git repository, enumerate sources via `git ls-files` (`.ts`, `.tsx`, `.mts`, `.cts`), and emit machine-readable output. No `tsconfig.json` is required; monorepos work without further configuration.
+All four scan a git working tree (`.ts` / `.tsx` / `.mts` / `.cts`) and emit machine-readable output. No `tsconfig.json` required; monorepos work out of the box.
 
 ## Quick start
 
