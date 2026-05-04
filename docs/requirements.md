@@ -161,13 +161,19 @@ A config file (`ts-hotspots.config.*`) is not shipped in v1. Candidate gates and
 
 ### 8.2 Error output
 
-Errors do not break the stdout JSON / Markdown structure: we return `status: "error"` + `code` + `message`. A separate human-oriented message goes to stderr. Example codes: `NOT_A_GIT_REPO` / `INVALID_ARGS` / `UNKNOWN_ERROR`.
+Errors do not break the stdout JSON / Markdown structure: we return `status: "error"` + `code` + `message`. A separate human-oriented message goes to stderr. Codes:
+
+- `INVALID_ARGS` — CLI flag / arg validation failure (bad `--limit`, `--diff` revrange, mutually-exclusive flags, etc.).
+- `NOT_A_GIT_REPO` — `path` is not inside a git working tree. Raised by `findGitRoot` (no `.git` ancestor) or by `git ls-files` rejecting the directory.
+- `GIT_NOT_INSTALLED` — `git` binary not found on `PATH`. Distinct from `GIT_FAILED` so that consumers can render a "please install git" hint instead of a raw spawn error.
+- `GIT_FAILED` — any other git invocation failure (unknown ref, broken repo, permission denied, etc.).
+- `UNKNOWN_ERROR` — fallback for errors that don't match the above heuristics.
 
 ## 9. Non-functional Requirements
 
 - **Determinism**: same repo state + same `HEAD` + same window ⇒ same output. Churn values differing across branches of the same repo is a deliberate design consequence.
 - **git churn folding assumption**: we adopt `--first-parent -m`. Merge-commit-based PRs and squash merges collapse to one count per PR. In repos using rebase-merge, individual commits land on first-parent, so PR-level folding is impossible and 1 PR becomes multiple counts.
-- **Graceful skip**: non-git, shallow-clone-with-insufficient-window, and missing git binary all avoid crashing. We zero-fill the churn axis (`commitCount = 0`) and continue. Only a single-line warning is emitted to stderr. The stdout JSON stays intact.
+- **Graceful skip (churn only)**: shallow-clone-with-insufficient-window and `--no-churn` zero-fill the churn axis (`commitCount = 0`) and continue; the rest of the analysis runs unaffected. Non-git and missing-git-binary cases instead fast-fail with `NOT_A_GIT_REPO` / `GIT_NOT_INSTALLED`, since every subcommand enumerates sources via `git ls-files` and cannot proceed without it.
 - **CI environments**: the GitHub Actions default shallow clone (`fetch-depth: 1`) zeros out the churn axis and disables that amplifier. If you need it, use the equivalent of `fetch-depth: 0`.
 - **Token economy**: the default output (candidates only) fits comfortably in an LLM context on typical projects. For big projects, lower `--top`.
 - **Performance**: target on the order of minutes for a 10k-file codebase. The ts-morph Project is built exactly once and never materializes a TypeChecker — collectors are syntax-only or git-only.
@@ -280,7 +286,7 @@ churnAmplifier = 1 + alpha * min(groupChurnMax, cap) / cap
 
 `groupChurnMax` is the maximum recent-commit count across the files the group spans (`git log --first-parent -m --name-status -M`, same window and rename handling as `comp`). With the defaults (`alpha = 0.5`, `cap = 20`) a fully saturated group earns a 1.5× boost, just enough to flip a moderately-similar hot group above a colder near-clone — without letting churn overwhelm similarity. Pair-level scores are not modified, so `--limit` still cuts on similarity strength; the amplifier only re-orders the surviving groups.
 
-When churn collection is unavailable (non-git, shallow clone, missing git binary, `--no-churn`) the amplifier is exactly `1.0` for every group and the ranking falls back to the legacy `combined.max` order. Flags (`--churn-window`, `--churn-ref`, `--no-churn`) carry the same meaning as in `comp` (§7.2).
+When churn collection is skipped (`--no-churn`) or returns empty (shallow clone with insufficient window) the amplifier is exactly `1.0` for every group and the ranking falls back to the legacy `combined.max` order. Non-git and missing-git-binary cases never reach churn — they fast-fail at source enumeration (§8.2). Flags (`--churn-window`, `--churn-ref`, `--no-churn`) carry the same meaning as in `comp` (§7.2).
 
 ## B.6 Output: Hotspots
 
