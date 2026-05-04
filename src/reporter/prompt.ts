@@ -20,7 +20,7 @@ This is the output of \`ts-hotspots complexity\`, a static analyzer that scans a
 
 ## Your task
 
-You have been handed a list of hotspots below in \`hotspots[]\`. Each hotspot has \`kind: "complexity"\`, a \`ref\` giving a \`file:start-end\` coordinate (or \`file:line\` for single-line functions) and the function name, a \`score\` (\`{ axis, value }\` — the metric where this hotspot ranked highest), a \`metrics\` map with the raw values for every quality axis it hit, and a \`dismissalId\` (\`comp:<hex>\`).
+Each hotspot in \`hotspots[]\` is a function ranked high on at least one quality axis (complexity, length, nesting, side-effect density, etc.). \`score\` names the axis it ranked highest on; \`metrics\` carries the raw value for every axis it tripped.
 
 ${walkPrompt("that genuinely warrants refactoring")}
 
@@ -43,7 +43,7 @@ This is the output of \`ts-hotspots duplication\`, a static analyzer that surfac
 
 ## Your task
 
-You have been handed a list of clone-candidate hotspots below in \`hotspots[]\`. Each hotspot has \`kind: "duplication"\`, an optional \`anchor\` (diff mode pivots on the changed-side fragment; whole-repo mode has no anchor), a \`members[]\` array of fragments judged similar enough, a \`score\` (\`{ axis: "combined", value }\` — median \`combined\` similarity across pairs, in the 0..1 range), and \`evidence\` listing the top \`calls\` and \`properties\` every member has in common. Each fragment's \`ref.location\` is \`file:start-end\` (or \`file:line\` for single-line fragments) and \`ref.kind\` is \`function\` / \`block\` / \`window\`. Each hotspot also carries a \`dismissalId\` (\`dup:<hex>\`).
+Each hotspot in \`hotspots[]\` is a cluster of fragments judged similar enough to be a Type-3 clone candidate. In diff mode the cluster has an \`anchor\` (the changed-side fragment everything was matched against); in whole-repo mode it does not. \`score\` is the median pairwise similarity (0..1).
 
 ${walkPrompt("that genuinely warrants extracting a shared helper or otherwise unifying the duplication")}
 
@@ -68,7 +68,7 @@ This is the output of \`ts-hotspots architecture\`, a static analyzer that surfa
 
 ## Your task
 
-You have been handed a list of architecture hotspots below in \`hotspots[]\`. Each hotspot has \`kind: "architecture"\`, a \`ref\` giving the export's defining \`file:line\` coordinate, the export name and kind, a \`score\` (\`{ axis: "composite", value }\` — the top-listed smell's composite, in 0..1), \`smells\` (an array of smell types this node tripped, ordered by composite descending — values from \`architectural_hub\`, \`high_fanout_component\`, \`high_impact_component\`, \`bridge_component\`, \`unstable_dependency_candidate\`, \`over_shared_component\`), a \`metrics\` array with the contributing axes for the top-listed smell — each entry has the raw \`value\`, its \`percentile\` in the per-axis distribution (0..1), and a population \`zScore\` so you can tell "barely above threshold" from "extreme outlier" — and a \`dismissalId\` (\`arch:<hex>\`).
+Each hotspot in \`hotspots[]\` is an exported declaration that tripped one or more structural smells (\`smells\`, ordered by composite descending — drawn from \`architectural_hub\`, \`high_fanout_component\`, \`high_impact_component\`, \`bridge_component\`, \`unstable_dependency_candidate\`, \`over_shared_component\`). \`metrics\` lists the contributing axes for the top smell; use \`percentile\` and \`zScore\` together to tell "barely above threshold" from "extreme outlier".
 
 ${walkPrompt("that genuinely warrants restructuring")}
 
@@ -91,7 +91,7 @@ This is the output of \`ts-hotspots cochange\`, a static analyzer that surfaces 
 
 ## Your task
 
-You have been handed a list of file-pair hotspots below in \`hotspots[]\`. Each hotspot has \`kind: "cochange"\`, a \`members[]\` array (length 2 — the two files in the pair), a \`score\` (\`{ axis: "confidenceMax", value }\` — the most actionable directional confidence in 0..1), a \`metrics\` block with raw values (\`support\`, \`confidenceAtoB\`, \`confidenceBtoA\`, \`confidenceMax\`, \`lift\`), an \`evidence.recentCommits\` list of up to 5 short SHAs you can pass to \`git show\` to confirm the coupling, and a \`dismissalId\` (\`coch:<hex>\`).
+Each hotspot in \`hotspots[]\` is a pair of files that change together more often than chance. \`score\` is the more actionable of the two directional confidences (0..1). Pass any SHA in \`evidence.recentCommits\` to \`git show\` to verify.
 
 ${walkPrompt("whose coupling is genuinely worth acting on")}
 
