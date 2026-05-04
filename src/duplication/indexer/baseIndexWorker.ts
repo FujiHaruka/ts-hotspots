@@ -1,9 +1,10 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { parseSource } from "../../parser/parseSource.ts";
-import type { Config } from "../config/index.ts";
+import type { Config } from "../config/config.ts";
 import type { FragmentFeatures } from "../domain/feature.ts";
 import type { Fragment } from "../domain/fragment.ts";
-import { buildFileFeatureContext, extractFeatures } from "../features/index.ts";
+import { extractFeatures } from "../features/extractFeatures.ts";
+import { buildFileFeatureContext } from "../features/fileContext.ts";
 import { isThinWrapperFragment } from "../features/internal/isThinWrapper.ts";
 import { extractFragments } from "./extractFragments.ts";
 

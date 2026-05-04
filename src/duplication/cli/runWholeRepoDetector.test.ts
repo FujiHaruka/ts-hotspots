@@ -3,7 +3,7 @@ import {
   createTempRepo,
   type TempRepo,
 } from "../../../test/dedup/e2e/helpers/tempRepo.ts";
-import { defaultConfig } from "../config/index.ts";
+import { defaultConfig } from "../config/defaults.ts";
 import { parseLocation } from "../util/location.ts";
 import { nonNull } from "../util/nonNull.ts";
 import { PhaseTimingsCollector, RecordingPerfLogger } from "./perfLog.ts";

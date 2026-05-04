@@ -1,4 +1,5 @@
-import type { ChangedFile, Fragment } from "../domain/index.ts";
+import type { ChangedFile } from "../domain/diff.ts";
+import type { Fragment } from "../domain/fragment.ts";
 import { collectDiff, type DiffRequest } from "./collectDiff.ts";
 import { extractChangedFragments } from "./extractChangedFragments.ts";
 import { resolveDiffEndpoints } from "./gitRunner.ts";

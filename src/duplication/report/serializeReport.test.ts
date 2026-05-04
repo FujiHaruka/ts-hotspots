@@ -3,7 +3,7 @@ import {
   STUB_DIFF_SUMMARY,
   STUB_WHOLE_REPO_SUMMARY,
 } from "../../../test/dedup/helpers/stubSummary.ts";
-import { defaultConfig } from "../config/index.ts";
+import { defaultConfig } from "../config/defaults.ts";
 import type { CandidateScore, ScoreBreakdown } from "../domain/candidate.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import { buildJsonReport, type ScoredPair } from "./jsonReport.ts";

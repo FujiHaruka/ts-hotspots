@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { runDetector } from "../../../src/duplication/cli/runDetector.ts";
-import { defaultConfig } from "../../../src/duplication/config/index.ts";
+import { defaultConfig } from "../../../src/duplication/config/defaults.ts";
 import { nonNull } from "../../../src/duplication/util/nonNull.ts";
 import { createTempRepo, type TempRepo } from "./helpers/tempRepo.ts";
 

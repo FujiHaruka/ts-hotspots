@@ -307,8 +307,6 @@ src/architecture/
   cli/        — registerCommand, args, main, perfLog (mirrors dup)
 ```
 
-`index_/` trailing-underscore convention from dup applies if needed.
-
 ## Reused infrastructure
 
 - Parser: `src/parser/parseSource.ts`. No new parser path.

@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runDetector } from "../../src/duplication/cli/runDetector.ts";
 import { runWholeRepoDetector } from "../../src/duplication/cli/runWholeRepoDetector.ts";
-import { defaultConfig } from "../../src/duplication/config/index.ts";
+import { defaultConfig } from "../../src/duplication/config/defaults.ts";
 import { loadFixtures } from "../../tools/bench/loadFixtures.ts";
 import {
   type SetupRepoResult,

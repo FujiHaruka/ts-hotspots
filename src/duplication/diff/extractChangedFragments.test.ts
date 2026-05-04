@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { defaultConfig } from "../config/index.ts";
-import type { ChangedFile } from "../domain/index.ts";
+import { defaultConfig } from "../config/defaults.ts";
+import type { ChangedFile } from "../domain/diff.ts";
 import { extractChangedFragments } from "./extractChangedFragments.ts";
 
 function makeFile(

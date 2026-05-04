@@ -1,7 +1,7 @@
 import type {
   CloneGroup,
   FragmentView,
-} from "../../src/duplication/domain/index.ts";
+} from "../../src/duplication/domain/cloneGroup.ts";
 import { parseLocation } from "../../src/duplication/util/location.ts";
 
 /**

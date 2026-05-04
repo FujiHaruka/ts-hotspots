@@ -5,7 +5,7 @@ import {
 } from "../../../test/dedup/helpers/stubSummary.ts";
 import { parseSource } from "../../parser/parseSource.ts";
 import { RecordingPerfLogger } from "../cli/perfLog.ts";
-import { defaultConfig } from "../config/index.ts";
+import { defaultConfig } from "../config/defaults.ts";
 import type { CandidateScore, ScoreBreakdown } from "../domain/candidate.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import { nonNull } from "../util/nonNull.ts";

@@ -1,12 +1,12 @@
 import { availableParallelism } from "node:os";
 import { Worker } from "node:worker_threads";
-import type { Config } from "../config/index.ts";
+import type { Config } from "../config/config.ts";
 import type { FragmentFeatures } from "../domain/feature.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import {
   buildFeatureSets,
   type FragmentFeatureSets,
-} from "../scoring/index.ts";
+} from "../scoring/featureSets.ts";
 import { nonNull } from "../util/nonNull.ts";
 import {
   type BaseIndexWorkerInit,

@@ -22,12 +22,12 @@ import {
   renderStatsLine,
 } from "../../reporter/render.ts";
 import { findGitRoot } from "../../util/git/findGitRoot.ts";
-import { defaultConfig } from "../config/index.ts";
+import { defaultConfig } from "../config/defaults.ts";
 import type {
   CloneCandidateReport,
   DismissedSummary,
   ReportTool,
-} from "../domain/index.ts";
+} from "../domain/report.ts";
 import { serializeReport } from "../report/serializeReport.ts";
 import { ArgParseError, type ParsedArgs } from "./args.ts";
 import { JsonlPerfLogger, type PerfLogger } from "./perfLog.ts";

@@ -6,7 +6,7 @@ import {
   type PhaseTimingsRecord,
 } from "../../src/duplication/cli/perfLog.ts";
 import { runDetector } from "../../src/duplication/cli/runDetector.ts";
-import { defaultConfig } from "../../src/duplication/config/index.ts";
+import { defaultConfig } from "../../src/duplication/config/defaults.ts";
 
 type PhaseTimings = PhaseTimingsRecord;
 

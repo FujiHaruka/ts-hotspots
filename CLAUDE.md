@@ -15,7 +15,7 @@ See `docs/requirements.md` for the full spec (Part A = complexity, Part B = dupl
 
 ## Duplication maintenance notes
 
-- **Module layout mirrors the pipeline.** `src/duplication/{diff,indexer,features,index_,search,scoring,report,cli}/` map to the 7-stage pipeline. The trailing underscore in `index_/` is intentional — Node's loader treats `index.ts` specially when adjacent to `index/`, and the underscore avoids the collision.
+- **Module layout mirrors the pipeline.** `src/duplication/{diff,indexer,features,lookup,search,scoring,report,cli}/` map to the 7-stage pipeline. `lookup/` builds the inverted-index and LSH structures consumed by `search/`.
 - **Determinism is a hard invariant.** Same input ⇒ bit-identical output, including ordering of groups, members, and evidence keys. If you add a new feature kind, sort it through every aggregation seam.
 - **Strip-only TS execution.** The repo runs under Node 24+ with type stripping (`pnpm start`). `tools/check-strip-only.ts` imports `src/cli.ts`, which transitively pulls in every duplication module, so strip-only violations (`enum`, `namespace`, parameter properties) surface as a single check. Runs in `pre-commit`.
 - **`perfLog` must stay zero-cost when disabled.** The pipeline only allocates timing events / hot-path measurements when `--phase-timings` is set; do not add unconditional `performance.now()` calls.

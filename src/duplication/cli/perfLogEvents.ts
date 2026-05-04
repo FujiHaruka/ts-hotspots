@@ -1,7 +1,7 @@
 import type { Config } from "../config/config.ts";
 import type { CandidateScore } from "../domain/candidate.ts";
 import type { InvertedIndex } from "../domain/posting.ts";
-import type { LshParams, LshStats } from "../index_/index.ts";
+import type { LshParams, LshStats } from "../lookup/lsh.ts";
 import { distSummary, meanMax, type PerfLogger, round2 } from "./perfLog.ts";
 
 /**

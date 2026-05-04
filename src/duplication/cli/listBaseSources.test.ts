@@ -4,7 +4,7 @@ import {
   createTempRepo,
   type TempRepo,
 } from "../../../test/dedup/e2e/helpers/tempRepo.ts";
-import { defaultConfig } from "../config/index.ts";
+import { defaultConfig } from "../config/defaults.ts";
 import { listBaseSources } from "./listBaseSources.ts";
 
 describe("listBaseSources", () => {

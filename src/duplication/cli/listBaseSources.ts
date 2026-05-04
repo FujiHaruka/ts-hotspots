@@ -1,4 +1,4 @@
-import type { Config } from "../config/index.ts";
+import type { Config } from "../config/config.ts";
 import { execGit, gitCatFileBatch } from "../diff/gitRunner.ts";
 import { matchesAnyGlob } from "../diff/internal/globMatch.ts";
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseSource } from "../../parser/parseSource.ts";
 import type { Config } from "../config/config.ts";
-import { defaultConfig } from "../config/index.ts";
+import { defaultConfig } from "../config/defaults.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import { extractFragments } from "../indexer/extractFragments.ts";
 import { buildTokenNgrams } from "./normalizedTokenNgram.ts";

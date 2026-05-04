@@ -5,11 +5,11 @@ import type {
   AggregateChurn,
   AggregateScores,
   CloneGroup,
-  Fragment,
   FragmentView,
   GroupMember,
-  RecommendationHint,
-} from "../domain/index.ts";
+} from "../domain/cloneGroup.ts";
+import type { Fragment } from "../domain/fragment.ts";
+import type { RecommendationHint } from "../domain/report.ts";
 import { churnAmplifier } from "../scoring/churnAmplifier.ts";
 import { buildLocation } from "../util/location.ts";
 import { nonNull } from "../util/nonNull.ts";

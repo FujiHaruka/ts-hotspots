@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { runDetector } from "../../src/duplication/cli/runDetector.ts";
-import type { Config } from "../../src/duplication/config/index.ts";
-import { defaultConfig } from "../../src/duplication/config/index.ts";
+import type { Config } from "../../src/duplication/config/config.ts";
+import { defaultConfig } from "../../src/duplication/config/defaults.ts";
 import { groupsToPairs, type ReportPair } from "./groupsToPairs.ts";
 
 /**

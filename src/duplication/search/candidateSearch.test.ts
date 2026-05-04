@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { Config } from "../config/index.ts";
-import { defaultConfig } from "../config/index.ts";
-import type { Fragment, FragmentFeatures } from "../domain/index.ts";
+import type { Config } from "../config/config.ts";
+import { defaultConfig } from "../config/defaults.ts";
+import type { FragmentFeatures } from "../domain/feature.ts";
+import type { Fragment } from "../domain/fragment.ts";
 import {
   buildInvertedIndex,
   type IndexInput,
-} from "../index_/invertedIndex.ts";
+} from "../lookup/invertedIndex.ts";
 import { searchCandidates } from "./candidateSearch.ts";
 
 function makeFragment(id: string, overrides: Partial<Fragment> = {}): Fragment {

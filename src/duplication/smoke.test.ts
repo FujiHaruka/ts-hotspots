@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultConfig } from "./config/index.ts";
+import { defaultConfig } from "./config/defaults.ts";
 
 describe("smoke", () => {
   it("defaultConfig has expected weights summing to 1", () => {

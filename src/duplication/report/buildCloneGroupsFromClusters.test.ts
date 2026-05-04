@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultConfig } from "../config/index.ts";
+import { defaultConfig } from "../config/defaults.ts";
 import type { CandidateScore, ScoreBreakdown } from "../domain/candidate.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import { nonNull } from "../util/nonNull.ts";

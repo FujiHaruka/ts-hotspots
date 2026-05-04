@@ -1,6 +1,8 @@
-import type { Config } from "../config/index.ts";
-import type { ChangedFile, Fragment } from "../domain/index.ts";
-import { extractFragments, parseSource } from "../indexer/index.ts";
+import { parseSource } from "../../parser/parseSource.ts";
+import type { Config } from "../config/config.ts";
+import type { ChangedFile } from "../domain/diff.ts";
+import type { Fragment } from "../domain/fragment.ts";
+import { extractFragments } from "../indexer/extractFragments.ts";
 
 /**
  * Given the head-side text of a changed file and its hunks, return every

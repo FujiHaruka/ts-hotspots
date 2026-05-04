@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultConfig } from "../config/index.ts";
+import { defaultConfig } from "../config/defaults.ts";
 import { type BaseIndexSource, buildBaseIndex } from "./buildBaseIndex.ts";
 
 const SOURCES: BaseIndexSource[] = [

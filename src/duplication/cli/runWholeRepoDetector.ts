@@ -1,32 +1,29 @@
 import { performance } from "node:perf_hooks";
 import { collectChurn } from "../../collectors/churn/commit-count.ts";
-import type { Config } from "../config/index.ts";
+import type { Config } from "../config/config.ts";
 import { resolveSha } from "../diff/gitRunner.ts";
+import type { Fragment } from "../domain/fragment.ts";
 import type {
   CloneCandidateReport,
-  Fragment,
   ReportTool,
   ScopeStats,
-} from "../domain/index.ts";
-import {
-  buildInvertedIndex,
-  buildLshIndex,
-  type LshIndexInput,
-} from "../index_/index.ts";
-import { buildBaseIndex } from "../indexer/index.ts";
-import { buildJsonReport, type ScoredPair } from "../report/index.ts";
+} from "../domain/report.ts";
+import { buildBaseIndex } from "../indexer/buildBaseIndex.ts";
+import { buildInvertedIndex } from "../lookup/invertedIndex.ts";
+import { buildLshIndex, type LshIndexInput } from "../lookup/lsh.ts";
+import { buildJsonReport, type ScoredPair } from "../report/jsonReport.ts";
+import { shouldReport } from "../scoring/decide.ts";
+import { type FragmentFeatureSets } from "../scoring/featureSets.ts";
+import { meetsMinSize } from "../scoring/minSize.ts";
 import {
   buildIntersectionsFromSets,
-  type FragmentFeatureSets,
-  meetsMinSize,
   scoreCandidateFromSets,
-  shouldReport,
-} from "../scoring/index.ts";
+} from "../scoring/scoreCandidate.ts";
 import {
-  isSameFileOverlap,
   type SearchStats,
   searchCandidates,
-} from "../search/index.ts";
+} from "../search/candidateSearch.ts";
+import { isSameFileOverlap } from "../search/sameFileOverlap.ts";
 import { countLines, listBaseSources } from "./listBaseSources.ts";
 import type { PerfLogger } from "./perfLog.ts";
 import {

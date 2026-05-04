@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Fragment, FragmentFeatures, Posting } from "../domain/index.ts";
+import type { FragmentFeatures } from "../domain/feature.ts";
+import type { Fragment } from "../domain/fragment.ts";
+import type { Posting } from "../domain/posting.ts";
 import { buildInvertedIndex, type IndexInput } from "./invertedIndex.ts";
 
 function makeFragment(overrides: Partial<Fragment> & { id: string }): Fragment {

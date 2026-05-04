@@ -1,11 +1,10 @@
 import type {
   FeatureKey,
   FeatureKind,
-  Fragment,
   FragmentFeatures,
-  InvertedIndex,
-  Posting,
-} from "../domain/index.ts";
+} from "../domain/feature.ts";
+import type { Fragment } from "../domain/fragment.ts";
+import type { InvertedIndex, Posting } from "../domain/posting.ts";
 
 export interface IndexInput {
   fragment: Fragment;

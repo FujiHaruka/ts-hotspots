@@ -1,5 +1,5 @@
-import type { Config } from "../config/index.ts";
-import type { ChangedFile } from "../domain/index.ts";
+import type { Config } from "../config/config.ts";
+import type { ChangedFile } from "../domain/diff.ts";
 import { gitDiff, gitShow, resolveDiffEndpoints } from "./gitRunner.ts";
 import { matchesAnyGlob } from "./internal/globMatch.ts";
 import { parseUnifiedDiff } from "./internal/parseUnifiedDiff.ts";

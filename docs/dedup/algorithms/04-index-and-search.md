@@ -2,7 +2,7 @@
 
 ## 4.1 転置索引
 
-実装は `src/index_/invertedIndex.ts`。
+実装は `src/duplication/lookup/invertedIndex.ts`。
 
 データ構造は `Map<FeatureKey, Posting[]>`。`Posting` は `{ fragmentId, filePath, startLine, endLine, featureKind }`。
 

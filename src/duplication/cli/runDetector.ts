@@ -1,27 +1,37 @@
 import { performance } from "node:perf_hooks";
 import type ts from "typescript";
 import { collectChurn } from "../../collectors/churn/commit-count.ts";
-import type { Config } from "../config/index.ts";
+import { parseSource } from "../../parser/parseSource.ts";
+import type { Config } from "../config/config.ts";
 import { collectChangedFragments } from "../diff/pipeline.ts";
+import type { Fragment } from "../domain/fragment.ts";
 import type {
   CloneCandidateReport,
-  Fragment,
   ReportTool,
   ScopeStats,
-} from "../domain/index.ts";
-import { buildFileFeatureContext, extractFeatures } from "../features/index.ts";
-import { buildInvertedIndex, type IndexInput } from "../index_/index.ts";
-import { extractFragments, parseSource } from "../indexer/index.ts";
-import { buildJsonReport, type ScoredPair } from "../report/index.ts";
+} from "../domain/report.ts";
+import { extractFeatures } from "../features/extractFeatures.ts";
+import { buildFileFeatureContext } from "../features/fileContext.ts";
+import { extractFragments } from "../indexer/extractFragments.ts";
+import {
+  buildInvertedIndex,
+  type IndexInput,
+} from "../lookup/invertedIndex.ts";
+import { buildJsonReport, type ScoredPair } from "../report/jsonReport.ts";
+import { shouldReport } from "../scoring/decide.ts";
 import {
   buildFeatureSets,
-  buildIntersectionsFromSets,
   type FragmentFeatureSets,
-  meetsMinSize,
+} from "../scoring/featureSets.ts";
+import { meetsMinSize } from "../scoring/minSize.ts";
+import {
+  buildIntersectionsFromSets,
   scoreCandidateFromSets,
-  shouldReport,
-} from "../scoring/index.ts";
-import { type SearchStats, searchCandidates } from "../search/index.ts";
+} from "../scoring/scoreCandidate.ts";
+import {
+  type SearchStats,
+  searchCandidates,
+} from "../search/candidateSearch.ts";
 import { countLines, listBaseSources } from "./listBaseSources.ts";
 import type { PerfLogger } from "./perfLog.ts";
 import {

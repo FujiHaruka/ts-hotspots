@@ -1,11 +1,8 @@
-import type { Config } from "../config/index.ts";
-import type {
-  Candidate,
-  FeatureKey,
-  Fragment,
-  FragmentFeatures,
-  InvertedIndex,
-} from "../domain/index.ts";
+import type { Config } from "../config/config.ts";
+import type { Candidate } from "../domain/candidate.ts";
+import type { FeatureKey, FragmentFeatures } from "../domain/feature.ts";
+import type { Fragment } from "../domain/fragment.ts";
+import type { InvertedIndex } from "../domain/posting.ts";
 import { isSameFileOverlap } from "./sameFileOverlap.ts";
 
 interface HitCounts {

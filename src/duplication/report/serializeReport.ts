@@ -1,16 +1,18 @@
 import type {
   AggregateChurn,
   AggregateScores,
-  CloneCandidateReport,
   CloneGroup,
+  FragmentView,
+  GroupMember,
+} from "../domain/cloneGroup.ts";
+import type {
+  CloneCandidateReport,
   DismissedSummary,
   DuplicationDiffInfo,
   Evidence,
-  FragmentView,
-  GroupMember,
   RecommendationHint,
   ReportTool,
-} from "../domain/index.ts";
+} from "../domain/report.ts";
 
 /**
  * Output schema emitted by `ts-hotspots duplication`. The internal

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseSource } from "../../parser/parseSource.ts";
-import { defaultConfig } from "../config/index.ts";
+import { defaultConfig } from "../config/defaults.ts";
 import type { Candidate } from "../domain/candidate.ts";
 import type { FragmentFeatures } from "../domain/feature.ts";
 import type { Fragment } from "../domain/fragment.ts";
