@@ -26,6 +26,15 @@
     ".": "./dist/index.js"
   },
   "license": "MIT",
+  "author": "FujiHaruka <fizzyjohn1427@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FujiHaruka/ts-hotspots.git"
+  },
+  "bugs": {
+    "url": "https://github.com/FujiHaruka/ts-hotspots/issues"
+  },
+  "homepage": "https://github.com/FujiHaruka/ts-hotspots#readme",
   "files": [
     "dist",
     "README.md",
