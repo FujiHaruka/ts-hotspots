@@ -1,20 +1,11 @@
 import ts from "typescript";
 import { makeCollector } from "../makeCollector.ts";
 import type { FunctionLikeNode } from "../types.ts";
+import { getFunctionBody, NESTED_FUNCTION_KINDS } from "../walk.ts";
 
 export interface CognitiveResult {
   cognitiveComplexity: number;
 }
-
-const NESTED_FUNCTION_KINDS = new Set<ts.SyntaxKind>([
-  ts.SyntaxKind.FunctionDeclaration,
-  ts.SyntaxKind.MethodDeclaration,
-  ts.SyntaxKind.ArrowFunction,
-  ts.SyntaxKind.FunctionExpression,
-  ts.SyntaxKind.GetAccessor,
-  ts.SyntaxKind.SetAccessor,
-  ts.SyntaxKind.Constructor,
-]);
 
 const LOGICAL_OPERATOR_KINDS = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.AmpersandAmpersandToken,
@@ -23,7 +14,7 @@ const LOGICAL_OPERATOR_KINDS = new Set<ts.SyntaxKind>([
 ]);
 
 export function computeCognitive(node: FunctionLikeNode): number {
-  const body = getBody(node);
+  const body = getFunctionBody(node);
   if (!body) return 0;
 
   const ownName = getOwnName(node);
@@ -174,13 +165,6 @@ export function computeCognitive(node: FunctionLikeNode): number {
 
   visit(body, 0);
   return score;
-}
-
-function getBody(node: FunctionLikeNode): ts.Node | undefined {
-  if (node.kind === ts.SyntaxKind.ArrowFunction) {
-    return node.body;
-  }
-  return node.body;
 }
 
 function getOwnName(node: FunctionLikeNode): string | undefined {

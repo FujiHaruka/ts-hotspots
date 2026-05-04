@@ -1,23 +1,14 @@
 import ts from "typescript";
 import { makeCollector } from "../makeCollector.ts";
 import type { FunctionLikeNode } from "../types.ts";
+import { getFunctionBody, NESTED_FUNCTION_KINDS } from "../walk.ts";
 
 export interface MaxNestingDepthResult {
   maxNestingDepth: number;
 }
 
-const NESTED_FUNCTION_KINDS = new Set<ts.SyntaxKind>([
-  ts.SyntaxKind.FunctionDeclaration,
-  ts.SyntaxKind.MethodDeclaration,
-  ts.SyntaxKind.ArrowFunction,
-  ts.SyntaxKind.FunctionExpression,
-  ts.SyntaxKind.GetAccessor,
-  ts.SyntaxKind.SetAccessor,
-  ts.SyntaxKind.Constructor,
-]);
-
 export function computeMaxNestingDepth(node: FunctionLikeNode): number {
-  const body = getBody(node);
+  const body = getFunctionBody(node);
   if (!body) return 0;
 
   let max = 0;
@@ -73,13 +64,6 @@ export function computeMaxNestingDepth(node: FunctionLikeNode): number {
 
   walk(body, 0);
   return max;
-}
-
-function getBody(node: FunctionLikeNode): ts.Node | undefined {
-  if (node.kind === ts.SyntaxKind.ArrowFunction) {
-    return node.body;
-  }
-  return node.body;
 }
 
 export const maxNestingDepthCollector = makeCollector<MaxNestingDepthResult>({

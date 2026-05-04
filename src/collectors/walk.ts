@@ -8,7 +8,7 @@ export function getFunctionBody(node: FunctionLikeNode): ts.Node | undefined {
   return node.body;
 }
 
-const NESTED_FUNCTION_KINDS = new Set<ts.SyntaxKind>([
+export const NESTED_FUNCTION_KINDS = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.FunctionDeclaration,
   ts.SyntaxKind.MethodDeclaration,
   ts.SyntaxKind.ArrowFunction,
