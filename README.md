@@ -24,7 +24,6 @@ All four operate on git-tracked TypeScript sources (`.ts` / `.tsx` / `.mts` / `.
 ## Quick start
 
 ```bash
-npm i -D ts-hotspots
 npx ts-hotspots complexity       # markdown report to stdout
 npx ts-hotspots complexity | claude --permission-mode plan
 ```
