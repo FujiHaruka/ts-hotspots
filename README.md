@@ -18,7 +18,7 @@ AI coding agents explore a repository by reading what looks salient — conspicu
 
 ## What it surfaces
 
-Four readings of "worth reading first", as subcommands of one binary:
+Four readings of "worth reading first", as subcommands of one CLI:
 
 - `ts-hotspots complexity` (alias `comp`) — per-function metrics ranked into hotspot candidates. Best for *"where should I refactor?"*
 - `ts-hotspots duplication` (alias `dup`) — near-duplicate code regions across the tree or against a PR diff. Best for *"is this change copy-pasting something we already have?"*
