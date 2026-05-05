@@ -4,6 +4,7 @@ import { collectChurn } from "../../collectors/churn/commit-count.ts";
 import { parseSource } from "../../parser/parseSource.ts";
 import type { Config } from "../config/config.ts";
 import { collectChangedFragments } from "../diff/pipeline.ts";
+import type { Candidate } from "../domain/candidate.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import type {
   CloneCandidateReport,
@@ -214,6 +215,82 @@ export async function runDetector(
         }
       : undefined;
 
+  /** Score one candidate pair and, if it passes, push it into `scoredPairs`. */
+  const scoreOne = (
+    changedFragment: Fragment,
+    changedFeatureSets: FragmentFeatureSets,
+    candidate: Candidate,
+  ): void => {
+    const baseFragment = fragmentById.get(candidate.baseFragmentId);
+    const baseFeatureSets = featureSetsById.get(candidate.baseFragmentId);
+    if (baseFragment === undefined || baseFeatureSets === undefined) return;
+    if (
+      !meetsMinSize(
+        changedFragment,
+        baseFragment,
+        config.scoring.thresholds.minLines,
+      )
+    ) {
+      return;
+    }
+
+    const tsc = now();
+    const score = scoreCandidateFromSets(
+      {
+        candidate,
+        changedFragment,
+        baseFragment,
+        changedFeatureSets,
+        baseFeatureSets,
+      },
+      config,
+    );
+    tracker.tScore += now() - tsc;
+    tracker.scored += 1;
+
+    const td = now();
+    const ok = shouldReport(
+      score,
+      config.scoring.thresholds,
+      config.features.enabled,
+    );
+    tracker.tDecide += now() - td;
+
+    if (perfLog !== undefined) {
+      tracker.axisToken.push(score.breakdown.tokenOverlap);
+      tracker.axisStatement.push(score.breakdown.statementKindSimilarity);
+      tracker.axisCall.push(score.breakdown.callOverlap);
+      tracker.axisSize.push(score.breakdown.sizeCompatibility);
+      tracker.axisCombined.push(score.combined);
+      if (ok) {
+        tracker.passed += 1;
+        recordPassReasons(
+          tracker,
+          score,
+          config.scoring.thresholds,
+          config.features.enabled,
+        );
+      }
+    }
+
+    if (!ok) return;
+    const intersections = buildIntersectionsFromSets(
+      changedFeatureSets,
+      baseFeatureSets,
+    );
+    if (perfLog !== undefined) {
+      tracker.intersectionTokens.push(intersections.tokens.length);
+      tracker.intersectionStatements.push(intersections.statements.length);
+      tracker.intersectionCalls.push(intersections.calls.length);
+    }
+    scoredPairs.push({
+      score,
+      changedFragment,
+      baseFragment,
+      intersections,
+    });
+  };
+
   for (const file of diff.files) {
     const frags = diff.fragmentsByFile.get(file.filePath) ?? [];
     if (frags.length === 0) continue;
@@ -248,75 +325,7 @@ export async function runDetector(
       candidatePairs += candidates.length;
 
       for (const candidate of candidates) {
-        const baseFragment = fragmentById.get(candidate.baseFragmentId);
-        const baseFeatureSets = featureSetsById.get(candidate.baseFragmentId);
-        if (baseFragment === undefined || baseFeatureSets === undefined) {
-          continue;
-        }
-        if (
-          !meetsMinSize(
-            changedFragment,
-            baseFragment,
-            config.scoring.thresholds.minLines,
-          )
-        ) {
-          continue;
-        }
-        const tsc = now();
-        const score = scoreCandidateFromSets(
-          {
-            candidate,
-            changedFragment,
-            baseFragment,
-            changedFeatureSets,
-            baseFeatureSets,
-          },
-          config,
-        );
-        tracker.tScore += now() - tsc;
-        tracker.scored += 1;
-
-        const td = now();
-        const ok = shouldReport(
-          score,
-          config.scoring.thresholds,
-          config.features.enabled,
-        );
-        tracker.tDecide += now() - td;
-
-        if (perfLog !== undefined) {
-          tracker.axisToken.push(score.breakdown.tokenOverlap);
-          tracker.axisStatement.push(score.breakdown.statementKindSimilarity);
-          tracker.axisCall.push(score.breakdown.callOverlap);
-          tracker.axisSize.push(score.breakdown.sizeCompatibility);
-          tracker.axisCombined.push(score.combined);
-          if (ok) {
-            tracker.passed += 1;
-            recordPassReasons(
-              tracker,
-              score,
-              config.scoring.thresholds,
-              config.features.enabled,
-            );
-          }
-        }
-
-        if (!ok) continue;
-        const intersections = buildIntersectionsFromSets(
-          changedFeatureSets,
-          baseFeatureSets,
-        );
-        if (perfLog !== undefined) {
-          tracker.intersectionTokens.push(intersections.tokens.length);
-          tracker.intersectionStatements.push(intersections.statements.length);
-          tracker.intersectionCalls.push(intersections.calls.length);
-        }
-        scoredPairs.push({
-          score,
-          changedFragment,
-          baseFragment,
-          intersections,
-        });
+        scoreOne(changedFragment, changedFeatureSets, candidate);
       }
     }
   }
