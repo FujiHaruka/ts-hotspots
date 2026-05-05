@@ -148,7 +148,12 @@ async function runParallel(
   init: BaseIndexWorkerInit,
   workerCount: number,
 ): Promise<BaseIndexWorkerResult[]> {
-  const workerUrl = new URL("./baseIndexWorker.ts", import.meta.url);
+  // `new URL(...)` is a runtime string, not an import specifier, so tsc's
+  // `rewriteRelativeImportExtensions` does not touch it. Mirror the current
+  // module's extension so the worker resolves both under Node's type-stripping
+  // dev runtime (`.ts`) and the compiled dist output (`.js`).
+  const workerExt = import.meta.url.endsWith(".js") ? ".js" : ".ts";
+  const workerUrl = new URL(`./baseIndexWorker${workerExt}`, import.meta.url);
   const partials: (BaseIndexWorkerResult | undefined)[] = Array.from({
     length: sources.length,
   });
