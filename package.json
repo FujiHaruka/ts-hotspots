@@ -1,6 +1,6 @@
 {
   "name": "ts-hotspots",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Static analysis CLI that points AI coding agents at TypeScript hotspots: per-function complexity, Type-3 duplication, architectural pressure, and git co-change.",
   "keywords": [
     "typescript",
@@ -41,7 +41,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/index.js",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm clean && pnpm build",
     "start": "node src/index.ts",
