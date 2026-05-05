@@ -1,5 +1,12 @@
 import { type Command, InvalidArgumentError } from "commander";
 import {
+  collectExcludeGlob,
+  parseDiff,
+  parseFormat,
+  parseLimit,
+  parsePositiveInteger,
+} from "../../cli/optionParsers.ts";
+import {
   DEFAULT_CHURN_WINDOW,
   DEFAULT_FORMAT,
   DEFAULT_LIMIT,
@@ -9,10 +16,7 @@ import {
   type PhaseTimingsLevel,
   type ReportFormat,
 } from "../../cli-defaults.ts";
-import {
-  parseRevRange,
-  RevRangeParseError,
-} from "../../util/git/parseRevRange.ts";
+import type { RevRange } from "../../util/git/parseRevRange.ts";
 import { ArgParseError, type ParsedArgs } from "./args.ts";
 
 /**
@@ -63,7 +67,7 @@ The id auto-expires when the group's membership changes.
 
 interface DuplicationCliOptions {
   exclude: string[];
-  diff?: ReturnType<typeof parseRevRange>;
+  diff?: RevRange;
   ref?: string;
   format?: ReportFormat;
   /**
@@ -115,7 +119,7 @@ export function addDuplicationCommand(
     .option(
       "--diff <revrange>",
       "scope to a git revision range. Mutually exclusive with --ref. Defines the comparison's base/head sides (changed fragments on the head side are compared against the rest of the codebase on the base side). Note: `comp --diff` instead acts as a display filter on top of full-repo ranking.",
-      parseDiffOption,
+      parseDiff,
     )
     .option(
       "--ref <ref>",
@@ -124,7 +128,7 @@ export function addDuplicationCommand(
     .option(
       "--format <markdown|json>",
       `report format (default: ${DEFAULT_FORMAT})`,
-      parseFormatOption,
+      parseFormat,
     )
     .option(
       "--phase-timings [level]",
@@ -134,7 +138,7 @@ export function addDuplicationCommand(
     .option(
       "--limit <N|all>",
       `max entries in hotspots[] (default: ${String(DEFAULT_LIMIT)}). Pass 'all' to keep every group.`,
-      parseLimitOption,
+      parseLimit,
     )
     .option(
       "--verbose",
@@ -143,7 +147,7 @@ export function addDuplicationCommand(
     .option(
       "--churn-window <N>",
       "number of commits walked by 'git log' to compute per-file churn",
-      parseChurnWindowOption,
+      parsePositiveInteger("--churn-window"),
       DEFAULT_CHURN_WINDOW,
     )
     .option(
@@ -215,35 +219,6 @@ function resolvePhaseTimings(
   return raw;
 }
 
-function collectExcludeGlob(
-  value: string,
-  previous: readonly string[],
-): string[] {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    throw new InvalidArgumentError("--exclude requires a non-empty glob");
-  }
-  return [...previous, trimmed];
-}
-
-function parseDiffOption(value: string): ReturnType<typeof parseRevRange> {
-  try {
-    return parseRevRange(value);
-  } catch (err) {
-    if (err instanceof RevRangeParseError) {
-      throw new InvalidArgumentError(err.message);
-    }
-    throw err;
-  }
-}
-
-function parseFormatOption(value: string): ReportFormat {
-  if (value === "markdown" || value === "json") return value;
-  throw new InvalidArgumentError(
-    `invalid --format '${value}' (expected 'markdown' or 'json')`,
-  );
-}
-
 /**
  * Custom processor for `--phase-timings [level]`. Commander only calls
  * this when an explicit level is supplied (via `=verbose` or as the
@@ -256,39 +231,6 @@ function parsePhaseTimingsOption(value: string): PhaseTimingsLevel {
   throw new InvalidArgumentError(
     `invalid --phase-timings level '${value}' (expected 'summary' or 'verbose')`,
   );
-}
-
-function parseLimitOption(value: string): number {
-  const trimmed = value.trim();
-  if (trimmed.toLowerCase() === "all") return Number.POSITIVE_INFINITY;
-  if (!/^\d+$/.test(trimmed)) {
-    throw new InvalidArgumentError(
-      `invalid --limit '${value}' (expected a positive integer or 'all')`,
-    );
-  }
-  const n = Number.parseInt(trimmed, 10);
-  if (n <= 0) {
-    throw new InvalidArgumentError(
-      `invalid --limit '${value}' (expected a positive integer or 'all')`,
-    );
-  }
-  return n;
-}
-
-function parseChurnWindowOption(value: string): number {
-  const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    throw new InvalidArgumentError(
-      `invalid --churn-window '${value}' (expected a positive integer)`,
-    );
-  }
-  const n = Number.parseInt(trimmed, 10);
-  if (n <= 0) {
-    throw new InvalidArgumentError(
-      `invalid --churn-window '${value}' (expected a positive integer)`,
-    );
-  }
-  return n;
 }
 
 function validateChurnRef(value: string): string {

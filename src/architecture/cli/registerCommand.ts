@@ -15,16 +15,19 @@
  * registrar.
  */
 
-import { type Command, InvalidArgumentError } from "commander";
+import type { Command } from "commander";
+import {
+  collectExcludeGlob,
+  parseDiff,
+  parseFormat,
+  parseLimit,
+} from "../../cli/optionParsers.ts";
 import {
   DEFAULT_FORMAT,
   DEFAULT_LIMIT,
   type ReportFormat,
 } from "../../cli-defaults.ts";
-import {
-  parseRevRange,
-  RevRangeParseError,
-} from "../../util/git/parseRevRange.ts";
+import type { RevRange } from "../../util/git/parseRevRange.ts";
 import { EDGE_WEIGHTS } from "../graph/types.ts";
 import { type ArchParsedArgs } from "./args.ts";
 
@@ -68,7 +71,7 @@ Each reported hotspot carries a 'dismissalId' (arch:<hex>) you can pass to
 
 interface ArchCliOptions {
   exclude: string[];
-  diff?: ReturnType<typeof parseRevRange>;
+  diff?: RevRange;
   ref?: string;
   format?: ReportFormat;
   limit?: number;
@@ -102,12 +105,12 @@ export function addArchitectureCommand(
     .option(
       "--limit <N|all>",
       `max entries in hotspots[] (default: ${String(DEFAULT_LIMIT)}). Pass 'all' to keep every candidate.`,
-      parseLimitOption,
+      parseLimit,
     )
     .option(
       "--format <markdown|json>",
       `report format (default: ${DEFAULT_FORMAT})`,
-      parseFormatOption,
+      parseFormat,
     )
     .option(
       "--verbose",
@@ -116,7 +119,7 @@ export function addArchitectureCommand(
     .option(
       "--diff <revrange>",
       "scope hotspot output to components in files changed by <revrange> (e.g. origin/main...). Display filter only — rankings are computed against the full graph. (Note: `dup --diff` instead defines the comparison's base/head sides.)",
-      parseDiffOption,
+      parseDiff,
     )
     .option(
       "--ref <ref>",
@@ -148,50 +151,4 @@ function buildParsedArgs(
     verbose: opts.verbose === true,
     includeTypes: opts.includeTypes,
   };
-}
-
-function collectExcludeGlob(
-  value: string,
-  previous: readonly string[],
-): string[] {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    throw new InvalidArgumentError("--exclude requires a non-empty glob");
-  }
-  return [...previous, trimmed];
-}
-
-function parseDiffOption(value: string): ReturnType<typeof parseRevRange> {
-  try {
-    return parseRevRange(value);
-  } catch (err) {
-    if (err instanceof RevRangeParseError) {
-      throw new InvalidArgumentError(err.message);
-    }
-    throw err;
-  }
-}
-
-function parseFormatOption(value: string): ReportFormat {
-  if (value === "markdown" || value === "json") return value;
-  throw new InvalidArgumentError(
-    `invalid --format '${value}' (expected 'markdown' or 'json')`,
-  );
-}
-
-function parseLimitOption(value: string): number {
-  const trimmed = value.trim();
-  if (trimmed.toLowerCase() === "all") return Number.POSITIVE_INFINITY;
-  if (!/^\d+$/.test(trimmed)) {
-    throw new InvalidArgumentError(
-      `invalid --limit '${value}' (expected a positive integer or 'all')`,
-    );
-  }
-  const n = Number.parseInt(trimmed, 10);
-  if (n <= 0) {
-    throw new InvalidArgumentError(
-      `invalid --limit '${value}' (expected a positive integer or 'all')`,
-    );
-  }
-  return n;
 }

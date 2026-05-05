@@ -15,17 +15,21 @@
  * registrar.
  */
 
-import { type Command, InvalidArgumentError } from "commander";
+import type { Command } from "commander";
+import {
+  collectExcludeGlob,
+  parseDiff,
+  parseFormat,
+  parseLimit,
+  parsePositiveInteger,
+} from "../../cli/optionParsers.ts";
 import {
   DEFAULT_FORMAT,
   DEFAULT_LIMIT,
   DEFAULT_REF,
   type ReportFormat,
 } from "../../cli-defaults.ts";
-import {
-  parseRevRange,
-  RevRangeParseError,
-} from "../../util/git/parseRevRange.ts";
+import type { RevRange } from "../../util/git/parseRevRange.ts";
 import { DEFAULT_MIN_SUPPORT } from "../ranking/defaults.ts";
 import { type CochangeParsedArgs } from "./args.ts";
 import {
@@ -82,7 +86,7 @@ runs.
 
 interface CochangeCliOptions {
   exclude: string[];
-  diff?: ReturnType<typeof parseRevRange>;
+  diff?: RevRange;
   ref?: string;
   format?: ReportFormat;
   limit?: number;
@@ -113,12 +117,12 @@ export function addCochangeCommand(
     .option(
       "--limit <N|all>",
       `max entries in hotspots[] (default: ${String(DEFAULT_LIMIT)}). Pass 'all' to keep every candidate.`,
-      parseLimitOption,
+      parseLimit,
     )
     .option(
       "--format <markdown|json>",
       `report format (default: ${DEFAULT_FORMAT})`,
-      parseFormatOption,
+      parseFormat,
     )
     .option(
       "--verbose",
@@ -127,7 +131,7 @@ export function addCochangeCommand(
     .option(
       "--diff <revrange>",
       "scope hotspot output to pairs touching at least one file changed by <revrange> (e.g. origin/main...). Display filter only — rankings are still computed against the full window so the distribution is intact. (Note: `dup --diff` instead defines the comparison's base/head sides.)",
-      parseDiffOption,
+      parseDiff,
     )
     .option(
       "--ref <ref>",
@@ -180,69 +184,5 @@ function buildParsedArgs(
     limit,
     verbose: opts.verbose === true,
     file: opts.file,
-  };
-}
-
-function parseDiffOption(value: string): ReturnType<typeof parseRevRange> {
-  try {
-    return parseRevRange(value);
-  } catch (err) {
-    if (err instanceof RevRangeParseError) {
-      throw new InvalidArgumentError(err.message);
-    }
-    throw err;
-  }
-}
-
-function collectExcludeGlob(
-  value: string,
-  previous: readonly string[],
-): string[] {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    throw new InvalidArgumentError("--exclude requires a non-empty glob");
-  }
-  return [...previous, trimmed];
-}
-
-function parseFormatOption(value: string): ReportFormat {
-  if (value === "markdown" || value === "json") return value;
-  throw new InvalidArgumentError(
-    `invalid --format '${value}' (expected 'markdown' or 'json')`,
-  );
-}
-
-function parseLimitOption(value: string): number {
-  const trimmed = value.trim();
-  if (trimmed.toLowerCase() === "all") return Number.POSITIVE_INFINITY;
-  if (!/^\d+$/.test(trimmed)) {
-    throw new InvalidArgumentError(
-      `invalid --limit '${value}' (expected a positive integer or 'all')`,
-    );
-  }
-  const n = Number.parseInt(trimmed, 10);
-  if (n <= 0) {
-    throw new InvalidArgumentError(
-      `invalid --limit '${value}' (expected a positive integer or 'all')`,
-    );
-  }
-  return n;
-}
-
-function parsePositiveInteger(flagName: string): (value: string) => number {
-  return (value: string): number => {
-    const trimmed = value.trim();
-    if (!/^\d+$/.test(trimmed)) {
-      throw new InvalidArgumentError(
-        `invalid ${flagName} '${value}' (expected a positive integer)`,
-      );
-    }
-    const n = Number.parseInt(trimmed, 10);
-    if (n <= 0) {
-      throw new InvalidArgumentError(
-        `invalid ${flagName} '${value}' (expected a positive integer)`,
-      );
-    }
-    return n;
   };
 }

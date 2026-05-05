@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { relative, resolve } from "node:path";
-import { Command, InvalidArgumentError } from "commander";
+import { Command } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { aggregate } from "./aggregator/aggregate.ts";
 import { splitFunctionLocation } from "./aggregator/function-location.ts";
@@ -20,6 +20,13 @@ import {
 } from "./architecture/cli/main.ts";
 import { addArchitectureCommand } from "./architecture/cli/registerCommand.ts";
 import { runDismiss, runListDismissed, runUndismiss } from "./cli/dismiss.ts";
+import {
+  collectExcludeGlob,
+  parseDiff,
+  parseFormat,
+  parseLimit,
+  parsePositiveInteger,
+} from "./cli/optionParsers.ts";
 import { classifyGenericError } from "./cli/streaming.ts";
 import {
   DEFAULT_CHURN_WINDOW,
@@ -80,11 +87,7 @@ import type {
 import { FUNCTION_AXIS_IDS } from "./schema.ts";
 import { findGitRoot } from "./util/git/findGitRoot.ts";
 import { listChangedFilePaths } from "./util/git/listChangedFilePaths.ts";
-import {
-  parseRevRange,
-  type RevRange,
-  RevRangeParseError,
-} from "./util/git/parseRevRange.ts";
+import type { RevRange } from "./util/git/parseRevRange.ts";
 import { resolveDiffEndpoints } from "./util/git/runner.ts";
 
 interface WritableLike {
@@ -123,68 +126,6 @@ interface ListDismissedCliOptions {
 
 interface UndismissCliOptions {
   path?: string;
-}
-
-function parseLimit(value: string): number {
-  const trimmed = value.trim();
-  if (trimmed.toLowerCase() === "all") return Number.POSITIVE_INFINITY;
-  if (!/^\d+$/.test(trimmed)) {
-    throw new InvalidArgumentError(
-      `invalid --limit '${value}' (expected a positive integer or 'all')`,
-    );
-  }
-  const n = Number.parseInt(trimmed, 10);
-  if (n <= 0) {
-    throw new InvalidArgumentError(
-      `invalid --limit '${value}' (expected a positive integer or 'all')`,
-    );
-  }
-  return n;
-}
-
-function parseFormat(value: string): ReportFormat {
-  if (value === "markdown" || value === "json") return value;
-  throw new InvalidArgumentError(
-    `invalid --format '${value}' (expected 'markdown' or 'json')`,
-  );
-}
-
-function parseDiff(value: string): RevRange {
-  try {
-    return parseRevRange(value);
-  } catch (err) {
-    if (err instanceof RevRangeParseError) {
-      throw new InvalidArgumentError(err.message);
-    }
-    throw err;
-  }
-}
-
-function parseChurnWindow(value: string): number {
-  const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    throw new InvalidArgumentError(
-      `invalid --churn-window '${value}' (expected a positive integer)`,
-    );
-  }
-  const n = Number.parseInt(trimmed, 10);
-  if (n <= 0) {
-    throw new InvalidArgumentError(
-      `invalid --churn-window '${value}' (expected a positive integer)`,
-    );
-  }
-  return n;
-}
-
-function collectExcludeGlob(
-  value: string,
-  previous: readonly string[],
-): string[] {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    throw new InvalidArgumentError("--exclude requires a non-empty glob");
-  }
-  return [...previous, trimmed];
 }
 
 /**
@@ -426,7 +367,7 @@ function buildCli(onInvoke: (inv: PendingInvocation) => void): Command {
     .option(
       "--churn-window <N>",
       "commits scanned for git churn",
-      parseChurnWindow,
+      parsePositiveInteger("--churn-window"),
       DEFAULT_CHURN_WINDOW,
     )
     .option(
