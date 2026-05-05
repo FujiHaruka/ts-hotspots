@@ -30,8 +30,7 @@ All four operate on git-tracked TypeScript sources (`.ts` / `.tsx` / `.mts` / `.
 ## Quick start
 
 ```bash
-npx ts-hotspots complexity       # markdown report to stdout
-npx ts-hotspots complexity | claude --permission-mode plan
+claude --permission-mode plan "$(npx ts-hotspots complexity)"
 ```
 
 The default output is a Markdown document: a short instruction block followed by a fenced YAML data block — pipeable straight into an agent in plan mode, which then knows it should read the top candidates and propose a plan. The shape (schematic):
