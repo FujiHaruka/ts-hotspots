@@ -42,10 +42,13 @@ afterEach(() => {
   else process.env.XDG_CONFIG_HOME = savedXdg;
 });
 
-function makeEntry(id: string): DismissalEntry {
+function makeEntry(
+  id: string,
+  feature: DismissalEntry["feature"] = "comp",
+): DismissalEntry {
   return {
     id,
-    feature: "comp",
+    feature,
     reason: "test",
     dismissedAt: "2026-04-20T00:00:00Z",
   };
@@ -163,6 +166,7 @@ describe("pruneRegistry", () => {
     const withAB = addEntry(withA, makeEntry("comp:b")).registry;
     const { registry, prunedCount } = pruneRegistry(
       withAB,
+      "comp",
       new Set(["comp:a"]),
     );
     expect(prunedCount).toBe(1);
@@ -171,8 +175,48 @@ describe("pruneRegistry", () => {
 
   test("prunes nothing when all ids are present", () => {
     const reg = addEntry(emptyRegistry(), makeEntry("comp:a")).registry;
-    const { prunedCount } = pruneRegistry(reg, new Set(["comp:a"]));
+    const { prunedCount } = pruneRegistry(reg, "comp", new Set(["comp:a"]));
     expect(prunedCount).toBe(0);
+  });
+
+  test("leaves entries from other features untouched even when their ids are absent", () => {
+    // The whole point of feature-scoping: a comp run only knows comp:
+    // ids, so it must not prune dup/arch/coch entries that happen to
+    // sit in the same registry file.
+    let reg = emptyRegistry();
+    reg = addEntry(reg, makeEntry("comp:a", "comp")).registry;
+    reg = addEntry(reg, makeEntry("dup:b", "dup")).registry;
+    reg = addEntry(reg, makeEntry("arch:c", "arch")).registry;
+    reg = addEntry(reg, makeEntry("coch:d", "coch")).registry;
+    const { registry, prunedCount } = pruneRegistry(
+      reg,
+      "comp",
+      new Set(["comp:a"]),
+    );
+    expect(prunedCount).toBe(0);
+    expect(registry.entries.map((e) => e.id)).toEqual([
+      "comp:a",
+      "dup:b",
+      "arch:c",
+      "coch:d",
+    ]);
+  });
+
+  test("only prunes entries whose feature matches the calling feature", () => {
+    let reg = emptyRegistry();
+    reg = addEntry(reg, makeEntry("comp:a", "comp")).registry;
+    reg = addEntry(reg, makeEntry("comp:b", "comp")).registry;
+    reg = addEntry(reg, makeEntry("dup:b", "dup")).registry;
+    // Calling with feature "comp" and currentIds = {comp:a} should
+    // drop comp:b (stale comp) but keep dup:b even though its id
+    // string is not in currentIds.
+    const { registry, prunedCount } = pruneRegistry(
+      reg,
+      "comp",
+      new Set(["comp:a"]),
+    );
+    expect(prunedCount).toBe(1);
+    expect(registry.entries.map((e) => e.id)).toEqual(["comp:a", "dup:b"]);
   });
 });
 

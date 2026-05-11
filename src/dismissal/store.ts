@@ -8,11 +8,13 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { findGitRoot } from "../util/git/findGitRoot.ts";
 import {
   DISMISSAL_APP_DIR,
   DISMISSAL_REGISTRY_FILE,
   DISMISSAL_REGISTRY_VERSION,
   type DismissalEntry,
+  type DismissalFeature,
   type DismissalRegistry,
   emptyRegistry,
 } from "./types.ts";
@@ -39,6 +41,22 @@ export function registryPath(rootDir: string): string {
     projectKey(abs),
     DISMISSAL_REGISTRY_FILE,
   );
+}
+
+/**
+ * Pick the directory used as the registry key. The registry is shared
+ * across all four features (comp, dup, arch, coch) for one project, so
+ * the key has to be uniform regardless of which subcommand ran. When
+ * `start` is inside a git repo we use the repo root; otherwise we fall
+ * back to `start` itself so the dismissal flow keeps working in
+ * non-git directories (only comp supports that today).
+ */
+export function resolveRegistryDir(start: string): string {
+  try {
+    return findGitRoot(resolve(start));
+  } catch {
+    return resolve(start);
+  }
 }
 
 export function loadRegistry(
@@ -77,15 +95,26 @@ interface PruneResult {
   prunedCount: number;
 }
 
+/**
+ * Drop entries that belong to `feature` but whose id is no longer
+ * produced by the current run. Entries from other features are left
+ * alone — the registry is shared across all four subcommands and each
+ * one only knows the ids of its own hotspots, so a comp run must not
+ * decide that a dup / arch / coch entry is stale.
+ */
 export function pruneRegistry(
   registry: DismissalRegistry,
+  feature: DismissalFeature,
   currentIds: ReadonlySet<string>,
 ): PruneResult {
   const kept: DismissalEntry[] = [];
   let prunedCount = 0;
   for (const entry of registry.entries) {
-    if (currentIds.has(entry.id)) kept.push(entry);
-    else prunedCount += 1;
+    if (entry.feature !== feature || currentIds.has(entry.id)) {
+      kept.push(entry);
+    } else {
+      prunedCount += 1;
+    }
   }
   return {
     registry: withEntries(registry, kept),

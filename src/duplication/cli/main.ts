@@ -96,7 +96,11 @@ function applyDismissalRegistry(
 
   const currentIds = new Set<string>();
   for (const g of report.groups) currentIds.add(g.dismissalId);
-  const { registry: pruned, prunedCount } = pruneRegistry(original, currentIds);
+  const { registry: pruned, prunedCount } = pruneRegistry(
+    original,
+    "dup",
+    currentIds,
+  );
   if (prunedCount > 0) {
     saveRegistry(rootDir, withProjectPath(pruned, rootDir));
   }

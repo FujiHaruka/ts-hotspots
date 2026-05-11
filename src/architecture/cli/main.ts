@@ -129,7 +129,11 @@ function applyDismissalRegistry(
 
   const currentIds = new Set<string>();
   for (const h of hotspots) currentIds.add(h.dismissalId);
-  const { registry: pruned, prunedCount } = pruneRegistry(original, currentIds);
+  const { registry: pruned, prunedCount } = pruneRegistry(
+    original,
+    "arch",
+    currentIds,
+  );
   if (prunedCount > 0) {
     saveRegistry(rootDir, withProjectPath(pruned, rootDir));
   }

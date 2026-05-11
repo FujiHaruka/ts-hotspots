@@ -50,9 +50,11 @@ import {
   loadRegistry,
   pruneRegistry,
   registryIdSet,
+  resolveRegistryDir,
   saveRegistry,
   withProjectPath,
 } from "./dismissal/store.ts";
+import type { DismissalFeature } from "./dismissal/types.ts";
 import type { ParsedArgs as DuplicationParsedArgs } from "./duplication/cli/args.ts";
 import {
   runPipeline as runDuplicationPipeline,
@@ -641,6 +643,7 @@ function applyDismissalRegistry(
   }
   const { registry: pruned, prunedCount } = pruneRegistry(
     original,
+    "comp",
     activeDismissalIds,
   );
   if (prunedCount > 0) {
@@ -837,7 +840,11 @@ async function runFunctions(
       functions.map((f) => bodyHashToCompDismissalId(f.bodyHash)),
     );
     const { candidates: filteredCandidates, summary: dismissed } =
-      applyDismissalRegistry(rootDir, rawCandidates, activeDismissalIds);
+      applyDismissalRegistry(
+        resolveRegistryDir(rootDir),
+        rawCandidates,
+        activeDismissalIds,
+      );
 
     // Diff scope narrows the displayed surfaces (rankings, co-occurrence,
     // candidates) to functions in changed files. axisMeta keeps the full
@@ -1019,41 +1026,21 @@ export async function run(
   }
 
   try {
-    if (invocation.kind === "dismiss" || invocation.kind === "undismiss") {
-      if (invocation.id.startsWith("dup:")) {
-        return await runFeatureDismissalCommand(
-          "dup",
-          invocation,
-          stdout,
-          stderr,
-        );
-      }
-      if (invocation.id.startsWith("arch:")) {
-        return await runFeatureDismissalCommand(
-          "arch",
-          invocation,
-          stdout,
-          stderr,
-        );
-      }
-      if (invocation.id.startsWith("coch:")) {
-        return await runFeatureDismissalCommand(
-          "coch",
-          invocation,
-          stdout,
-          stderr,
-        );
-      }
-    }
-    const rootDir = resolveRootDir(invocation.path);
+    const analyzeRoot = resolveRootDir(invocation.path);
+    // All four features share one registry file per project, keyed on
+    // the git root (with a cwd fallback for non-git use). Anchoring the
+    // key on the git root means a dismiss issued from any subdirectory
+    // lands in the same place the pipeline reads from on the next run.
+    const rootDir = resolveRegistryDir(analyzeRoot);
     if (invocation.kind === "dismiss") {
+      const feature = featureFromDismissalId(invocation.id);
       return await runDismiss(
         {
           id: invocation.id,
           reason: invocation.reason,
           rootDir,
-          feature: "comp",
-          analyzeRoot: rootDir,
+          feature,
+          analyzeRoot: feature === "comp" ? analyzeRoot : undefined,
         },
         stdout,
         stderr,
@@ -1074,33 +1061,11 @@ export async function run(
   }
 }
 
-/**
- * Route `dup:<hex>`, `arch:<hex>`, and `coch:<hex>` ids to the git-root
- * registry. All three features resolve "the project" via `findGitRoot`,
- * so the registry key has to match — otherwise a feature run would never
- * see entries written by `dismiss`.
- */
-async function runFeatureDismissalCommand(
-  feature: "arch" | "coch" | "dup",
-  invocation:
-    | { kind: "dismiss"; id: string; reason: string; path: string | undefined }
-    | { kind: "undismiss"; id: string; path: string | undefined },
-  stdout: WritableLike,
-  stderr: WritableLike,
-): Promise<number> {
-  const start = invocation.path ?? process.cwd();
-  const rootDir = findGitRoot(resolve(start));
-  if (invocation.kind === "dismiss") {
-    return await runDismiss(
-      {
-        id: invocation.id,
-        reason: invocation.reason,
-        rootDir,
-        feature,
-      },
-      stdout,
-      stderr,
-    );
-  }
-  return runUndismiss({ id: invocation.id, rootDir }, stdout, stderr);
+function featureFromDismissalId(id: string): DismissalFeature {
+  if (id.startsWith("dup:")) return "dup";
+  if (id.startsWith("arch:")) return "arch";
+  if (id.startsWith("coch:")) return "coch";
+  // Falls through for `comp:<hex>` and for pre-M2 `sha256:<hex>` ids
+  // that `migrateLegacyId` will rewrite to `comp:<hex>` on load.
+  return "comp";
 }

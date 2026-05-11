@@ -869,6 +869,77 @@ describe("dismissal registry subcommands", () => {
     expect(parsed.entries.map((e) => e.id)).toEqual([target.dismissalId]);
   });
 
+  test("running comp does not prune dismissals owned by other features", async () => {
+    // Regression guard for the cross-feature pruning bug: the registry
+    // file is shared across all four subcommands, but each command only
+    // knows the ids of its own hotspots. `pruneRegistry` must therefore
+    // restrict itself to entries whose `feature` matches the calling
+    // subcommand. We seed the registry with foreign-feature ids that
+    // could never appear in a comp report, run `comp`, and assert they
+    // survive untouched.
+    const first = await analyze();
+    const target = first.hotspots[0];
+    if (target === undefined) throw new Error("fixture has no candidates");
+
+    for (const id of [
+      "dup:deadbeefdeadbeef",
+      "arch:cafebabecafebabe",
+      "coch:f00dface12345678",
+    ]) {
+      const code = await run(
+        [
+          ...ARGV_PREFIX,
+          "dismiss",
+          id,
+          "--reason",
+          "manual seed",
+          "--path",
+          projectDir,
+        ],
+        new StringSink(),
+        new StringSink(),
+      );
+      expect(code).toBe(0);
+    }
+
+    // Also dismiss one real comp id so the comp pipeline has something
+    // to filter and report a non-zero `dismissed` summary.
+    const dismissCode = await run(
+      [
+        ...ARGV_PREFIX,
+        "dismiss",
+        target.dismissalId,
+        "--reason",
+        "intentional",
+        "--path",
+        projectDir,
+      ],
+      new StringSink(),
+      new StringSink(),
+    );
+    expect(dismissCode).toBe(0);
+
+    // Run comp once more: pre-fix, this would have pruned every
+    // non-comp entry from the registry.
+    const second = await analyze();
+    expect(second.dismissed?.prunedThisRun).toBe(0);
+
+    const registryFile = registryPath(projectDir);
+    const saved = JSON.parse(readFileSync(registryFile, "utf8")) as {
+      entries: { id: string; feature: string }[];
+    };
+    const idsByFeature = new Map<string, string[]>();
+    for (const e of saved.entries) {
+      const arr = idsByFeature.get(e.feature) ?? [];
+      arr.push(e.id);
+      idsByFeature.set(e.feature, arr);
+    }
+    expect(idsByFeature.get("dup")).toEqual(["dup:deadbeefdeadbeef"]);
+    expect(idsByFeature.get("arch")).toEqual(["arch:cafebabecafebabe"]);
+    expect(idsByFeature.get("coch")).toEqual(["coch:f00dface12345678"]);
+    expect(idsByFeature.get("comp")).toEqual([target.dismissalId]);
+  });
+
   test("undismiss removes an entry and errors when id absent", async () => {
     const first = await analyze();
     const target = first.hotspots[0];
