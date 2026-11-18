@@ -88,6 +88,7 @@ export interface ReportInput {
    * raw `combined.max` and `aggregateChurn` is left off the report.
    */
   churnByFile?: ReadonlyMap<string, number>;
+  changedLineShareById?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -163,6 +164,7 @@ export function buildJsonReport(
         includeCode,
         thinVerdicts,
         input.churnByFile,
+        input.changedLineShareById,
       );
 
   if (perfLog !== undefined) {

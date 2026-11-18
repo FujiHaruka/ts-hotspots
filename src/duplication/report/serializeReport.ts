@@ -83,7 +83,7 @@ interface VerboseDupHotspot extends SlimDupHotspot {
   /** Statement-kind / token-ngram signals dropped from slim output. */
   evidenceFull: { statementKinds: string[]; tokenNgramsSample: string[] };
   members: VerboseMember[];
-  anchor?: { ref: HotspotRef; code?: string };
+  anchor?: { ref: HotspotRef; code?: string; changedLineShare?: number };
 }
 
 interface VerboseMember {
@@ -185,6 +185,9 @@ function toVerboseHotspot(group: CloneGroup): VerboseDupHotspot {
   if (group.anchor !== undefined) {
     const anchor: VerboseDupHotspot["anchor"] = { ref: toRef(group.anchor) };
     if (group.anchor.code !== undefined) anchor.code = group.anchor.code;
+    if (group.anchorChangedLineShare !== undefined) {
+      anchor.changedLineShare = group.anchorChangedLineShare;
+    }
     result.anchor = anchor;
   }
   return result;

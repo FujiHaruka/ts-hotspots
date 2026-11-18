@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { defaultConfig } from "../config/defaults.ts";
 import type { ChangedFile } from "../domain/diff.ts";
-import { extractChangedFragments } from "./extractChangedFragments.ts";
+import {
+  changedLineShare,
+  extractChangedFragments,
+} from "./extractChangedFragments.ts";
 
 function makeFile(
   text: string,
@@ -18,6 +21,32 @@ function makeFile(
     spans: [],
   };
 }
+
+describe("changedLineShare", () => {
+  const fragment = {
+    id: "src/a.ts#11-30-function",
+    filePath: "src/a.ts",
+    startLine: 11,
+    endLine: 30,
+    kind: "function" as const,
+    text: "",
+    astNodeKind: "FunctionDeclaration",
+  };
+
+  it("counts only the hunk lines inside the fragment", () => {
+    expect(
+      changedLineShare(fragment, [
+        { startLine: 1, endLine: 12 },
+        { startLine: 20, endLine: 21 },
+        { startLine: 30, endLine: 40 },
+      ]),
+    ).toBe(0.25);
+  });
+
+  it("is 1 for a fragment the diff wrote entirely", () => {
+    expect(changedLineShare(fragment, [{ startLine: 5, endLine: 50 }])).toBe(1);
+  });
+});
 
 describe("extractChangedFragments", () => {
   it("returns the enclosing function when the whole function is changed", () => {

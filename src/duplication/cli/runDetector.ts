@@ -3,6 +3,7 @@ import type ts from "typescript";
 import { collectChurn } from "../../collectors/churn/commit-count.ts";
 import { parseSource } from "../../parser/parseSource.ts";
 import type { Config } from "../config/config.ts";
+import { changedLineShare } from "../diff/extractChangedFragments.ts";
 import { headRangeToBase } from "../diff/lineMap.ts";
 import { collectChangedFragments } from "../diff/pipeline.ts";
 import type { Candidate } from "../domain/candidate.ts";
@@ -216,6 +217,7 @@ export async function runDetector(
   let changedFragments = 0;
   const changedFragmentsByKind = { function: 0, block: 0, window: 0 };
   const scoredPairs: ScoredPair[] = [];
+  const changedLineShareById = new Map<string, number>();
   const tracker = newPerHitTracker();
   const searchStats: SearchStats | undefined =
     perfLog !== undefined
@@ -316,6 +318,10 @@ export async function runDetector(
     const fileCtx = buildFileFeatureContext(parsed.sourceFile);
     for (const changedFragment of frags) {
       changedFragments += 1;
+      changedLineShareById.set(
+        changedFragment.id,
+        changedLineShare(changedFragment, file.hunks),
+      );
       changedFragmentsByKind[changedFragment.kind] += 1;
       const changedFeatures = extractFeatures(
         changedFragment,
@@ -408,6 +414,7 @@ export async function runDetector(
         changed: changedTextByPath,
       }),
       churnByFile,
+      changedLineShareById,
     },
     perfLog,
   );

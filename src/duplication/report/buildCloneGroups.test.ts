@@ -64,6 +64,38 @@ function mkPair(
 const noThin: ThinWrapperVerdicts = { changed: new Map(), base: new Map() };
 
 describe("buildCloneGroups", () => {
+  it("ranks a group below an equally similar one when the diff barely changed its anchor", () => {
+    const groups = buildCloneGroups(
+      [mkPair("a", "b1", 0.7), mkPair("z", "b2", 0.7)],
+      defaultConfig,
+      true,
+      noThin,
+      undefined,
+      new Map([
+        ["a", 0.04],
+        ["z", 1],
+      ]),
+    );
+    expect(groups.map((g) => g.anchor?.location)).toEqual([
+      "z.ts:1-10",
+      "a.ts:1-10",
+    ]);
+    expect(groups[1]?.anchorChangedLineShare).toBe(0.04);
+    expect(groups[1]?.aggregateScores.combined.amplified).toBeCloseTo(0.14);
+    expect(groups[0]?.aggregateScores.combined.amplified).toBeCloseTo(0.7);
+  });
+
+  it("leaves the ranking untouched without changed-line shares", () => {
+    const [group] = buildCloneGroups(
+      [mkPair("a", "b1", 0.7)],
+      defaultConfig,
+      true,
+      noThin,
+    );
+    expect(group?.anchorChangedLineShare).toBeUndefined();
+    expect(group?.aggregateScores.combined.amplified).toBeCloseTo(0.7);
+  });
+
   it("emits one group per unique changedFragment", () => {
     const groups = buildCloneGroups(
       [mkPair("c1", "b1", 0.7), mkPair("c2", "b2", 0.6)],

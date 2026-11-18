@@ -83,6 +83,7 @@ describe("runDetector", () => {
         g.members.some((m) => m.fragment.location.startsWith("src/math.ts:")),
     );
     expect(hasPair).toBe(true);
+    expect(result.groups.map((g) => g.anchorChangedLineShare)).toContain(1);
   });
 
   it("drops a pair of thin wrappers using the base and head sources", async () => {

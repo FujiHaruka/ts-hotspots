@@ -39,19 +39,20 @@ combined = (w_token / W) * tokenOverlap
 - `config.features.enabled` で **off にした系統の重みは分母分子両方から除外** する。残った軸の相対比は保たれる。`size` は系統ではなくペア属性なので常時 on。
 - 全重みが 0 のときは 0 を返す (defensive)。
 
-## 5.3 グループ並び順 (churn amplifier)
+## 5.3 グループ並び順 (churn amplifier と変更行割合)
 
 ペアの `combined` はそのままにしつつ、**グループの並び替えだけ** churn (= ファイル単位のコミット数) で増幅する。
 
 ```
 groupChurnMax = max(churn[file] for file in groupFiles)   // 同一ファイルは 1 回計上
 amplifier     = 1 + alpha * min(groupChurnMax, cap) / cap
-groupSortKey  = aggregateScores.combined.max * amplifier
+groupSortKey  = aggregateScores.combined.max * amplifier * sqrt(changedLineShare)   // PR モードのみ
 ```
 
 - 既定値は `alpha = 0.5`, `cap = 20`。最大増幅は 1.5×。combined=0.4 + churn 飽和 (=0.6) > combined=0.55 + churn 0 (=0.55) という入れ替わりが起きる程度に控えめにしてある。
 - churn が 0 / 利用不可 (`--no-churn`、非 git、shallow clone) の場合は `amplifier = 1.0` になり、増幅前の `combined.max` 順とビット同一。
 - pair-level の `scoreCandidate` / `ranking.ts` のペアソートには触らない。`combined.max` を持つペアそのものを動かさず、グループの並び順だけを leverage で矯正する設計。
+- PR モードでは anchor の行のうち diff が追加・変更した割合 `changedLineShare` の平方根を掛ける。ブランチが 1 行しか触っていない 100 行の関数が anchor の群は 1/10 に沈み、ブランチが書いたコードの群が上に来る。群は消さず並べ替えるだけなので、`--limit all` では引き続き見える (「クローンの片方だけ直した」という合図を残すため)。Whole-repo モードは anchor が無いので係数 1。
 - `aggregateScores.combined.amplified` フィールドにソートに使った値をそのまま露出 (verbose レポートのみ)。`aggregateChurn = { max, min, perFile }` も同梱され、下流の agent / レビュアが「max 高 + min 低 (サイレント分岐)」と「max 高 + min 高 (協調修正)」を読み分けられるようになっている。
 - churn コレクタは `comp` と同一実装 (`src/collectors/churn/commit-count.ts`)。CLI フラグ (`--churn-window`, `--churn-ref`, `--no-churn`) も完全に共通。
 

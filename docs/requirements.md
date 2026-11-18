@@ -286,7 +286,9 @@ churnAmplifier = 1 + alpha * min(groupChurnMax, cap) / cap
 
 `groupChurnMax` is the maximum recent-commit count across the files the group spans (`git log --first-parent -m --name-status -M`, same window and rename handling as `comp`). With the defaults (`alpha = 0.5`, `cap = 20`) a fully saturated group earns a 1.5× boost, just enough to flip a moderately-similar hot group above a colder near-clone — without letting churn overwhelm similarity. Pair-level scores are not modified, so `--limit` still cuts on similarity strength; the amplifier only re-orders the surviving groups.
 
-When churn collection is skipped (`--no-churn`) or returns empty (shallow clone with insufficient window) the amplifier is exactly `1.0` for every group and the ranking falls back to the legacy `combined.max` order. Non-git and missing-git-binary cases never reach churn — they fast-fail at source enumeration (§8.2). Flags (`--churn-window`, `--churn-ref`, `--no-churn`) carry the same meaning as in `comp` (§7.2).
+When churn collection is skipped (`--no-churn`) or returns empty (shallow clone with insufficient window) the amplifier is exactly `1.0` for every group and the ranking falls back to plain `combined.max` order.
+
+In diff mode the sort key is further multiplied by `sqrt(changedLineShare)`, where `changedLineShare` is the fraction of the anchor's lines that the diff added or modified. A group whose anchor the branch rewrote keeps its full score; one where a single line changed inside a 100-line function drops to a tenth, so groups about pre-existing code the branch barely touched sink below groups about code it actually wrote. They are re-ordered, not removed: `--limit all` still lists them, which keeps the "you edited one copy of a clone" signal reachable. Non-git and missing-git-binary cases never reach churn — they fast-fail at source enumeration (§8.2). Flags (`--churn-window`, `--churn-ref`, `--no-churn`) carry the same meaning as in `comp` (§7.2).
 
 ## B.6 Output: Hotspots
 
@@ -309,7 +311,8 @@ Each `hotspots[]` entry carries:
 - `summary` — mode, per-side scope stats (files / fragments / lines / `fragmentsByKind` / `excludedFiles`), and pipeline counters (`candidatePairs` / `reportedPairs`).
 - `members[].scores` — per-pair `combined` plus the five sub-axes.
 - `members[].code` — fragment source (omitted from the slim default to keep the report under an LLM's attention budget).
-- `aggregateScores` — group-level `min` / `median` / `max` per axis. `combined` additionally carries `amplified` (the churn-amplified value used as the group's sort key — see B.5.1).
+- `aggregateScores` — group-level `min` / `median` / `max` per axis. `combined` additionally carries `amplified` (the group's sort key — see B.5.1).
+- `anchor.changedLineShare` — diff mode only: fraction of the anchor's lines the diff changed (see B.5.1).
 - `aggregateChurn` — `{ max, min, perFile }` over the files this group spans. Absent when churn collection was disabled or skipped.
 - `evidenceFull` — `statementKinds` and `tokenNgramsSample` (the slim `evidence` block already covers `calls` / `properties`).
 - `recommendationHint` — `extract-function` / `parameterize` / `manual-review`, plus a confidence level computed from the weakest pair.

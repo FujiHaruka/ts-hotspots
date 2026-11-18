@@ -35,6 +35,7 @@ export function buildCloneGroups(
   includeCode: boolean,
   thinVerdicts: ThinWrapperVerdicts,
   churnByFile?: ReadonlyMap<string, number>,
+  changedLineShareById?: ReadonlyMap<string, number>,
 ): CloneGroup[] {
   // Bucket pairs by changedFragment.id, preserving the input order so
   // members within a group inherit the upstream ranking before the
@@ -55,7 +56,14 @@ export function buildCloneGroups(
     if (bucket.length === 0) continue;
     decorated.push({
       anchorId,
-      group: buildGroup(bucket, config, includeCode, thinVerdicts, churnByFile),
+      group: buildGroup(
+        bucket,
+        config,
+        includeCode,
+        thinVerdicts,
+        churnByFile,
+        changedLineShareById?.get(anchorId),
+      ),
     });
   }
 
@@ -69,6 +77,7 @@ function buildGroup(
   includeCode: boolean,
   thinVerdicts: ThinWrapperVerdicts,
   churnByFile: ReadonlyMap<string, number> | undefined,
+  anchorChangedLineShare: number | undefined,
 ): CloneGroup {
   const anchorPair = nonNull(bucket[0]);
   const anchor = fragmentView(anchorPair.changedFragment, includeCode);
@@ -115,7 +124,8 @@ function buildGroup(
           aggregateChurn?.max ?? 0,
           config.scoring.churn.alpha,
           config.scoring.churn.cap,
-        ),
+        ) *
+        Math.sqrt(anchorChangedLineShare ?? 1),
     },
   };
   const sharedEvidence = buildEvidence(
@@ -164,6 +174,9 @@ function buildGroup(
     recommendationHint,
   };
   if (aggregateChurn !== undefined) group.aggregateChurn = aggregateChurn;
+  if (anchorChangedLineShare !== undefined) {
+    group.anchorChangedLineShare = anchorChangedLineShare;
+  }
   return group;
 }
 

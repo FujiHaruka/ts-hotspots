@@ -288,4 +288,20 @@ describe("serializeReport (verbose)", () => {
     expect(member.scores.combined).toBeCloseTo(0.7);
     expect(member.code).toBeDefined();
   });
+
+  it("shows how much of the anchor the diff changed", () => {
+    const report = buildJsonReport({
+      diff: { baseSha: "a", headSha: "b", threeDot: false, changedFiles: 1 },
+      pairs: [mkPair("c", "b", 0.7, { intersections: SEMANTIC })],
+      config: defaultConfig,
+      summary: STUB_DIFF_SUMMARY,
+      changedLineShareById: new Map([["c", 0.25]]),
+    });
+    const h = serializeReport(report, { verbose: true }).hotspots[0];
+    expect(h?.anchor).toMatchObject({ changedLineShare: 0.25 });
+    const slim = serializeReport(report, { verbose: false }).hotspots[0];
+    expect(slim?.anchor).toEqual({
+      ref: { location: "c.ts:1-10", kind: "function" },
+    });
+  });
 });

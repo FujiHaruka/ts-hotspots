@@ -37,9 +37,9 @@ export interface AggregateAxis {
 
 interface AggregateCombinedAxis extends AggregateAxis {
   /**
-   * Group sort key: `max * churnAmplifier(aggregateChurn.max)`. Equals
-   * `max` when churn is unavailable or zero, so `--no-churn` runs (or
-   * shallow / non-git environments) preserve the prior ranking.
+   * Group sort key: `max * churnAmplifier(aggregateChurn.max)`, times the
+   * square root of `anchorChangedLineShare` in PR mode. Equals `max` when
+   * churn is unavailable or zero and the anchor is fully changed (or absent).
    */
   amplified: number;
 }
@@ -99,6 +99,7 @@ export interface CloneGroup {
    * outside a git repo, or on a fully shallow clone.
    */
   aggregateChurn?: AggregateChurn;
+  anchorChangedLineShare?: number;
   /** Evidence keys shared by every pair in the group. */
   sharedEvidence: Evidence;
   /** Group-level recommendation, computed against the weakest pair. */
