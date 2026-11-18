@@ -181,7 +181,10 @@ describe("resolveRegistryDir", () => {
     git(main, "worktree", "add", "-q", "-b", "feature", wt);
 
     const fromWt = resolveRegistryDir(wt);
-    saveRegistry(fromWt, addEntry(emptyRegistry(), makeEntry("dup:a")).registry);
+    saveRegistry(
+      fromWt,
+      addEntry(emptyRegistry(), makeEntry("dup:a")).registry,
+    );
     const loaded = loadRegistry(resolveRegistryDir(main));
     expect(loaded.entries.map((e) => e.id)).toEqual(["dup:a"]);
   });

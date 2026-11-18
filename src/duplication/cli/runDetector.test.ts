@@ -114,7 +114,9 @@ describe("runDetector", () => {
           },
         },
       });
-    const pairsBetweenFiles = (groups: Awaited<ReturnType<typeof run>>["groups"]) =>
+    const pairsBetweenFiles = (
+      groups: Awaited<ReturnType<typeof run>>["groups"],
+    ) =>
       groups.filter(
         (g) =>
           g.anchor?.location.startsWith("src/head.ts:") === true &&
@@ -126,7 +128,10 @@ describe("runDetector", () => {
   });
 
   it("locates base fragments against the base source when the changed file got shorter", async () => {
-    const fn = (name: string, message: string) => `export function ${name}(items: string[]): string[] {
+    const fn = (
+      name: string,
+      message: string,
+    ) => `export function ${name}(items: string[]): string[] {
   const result: string[] = [];
   for (const item of items) {
     if (item.length === 0) {
@@ -137,9 +142,15 @@ describe("runDetector", () => {
   return result;
 }
 `;
-    const filler = Array.from({ length: 60 }, (_, i) => `// line ${String(i)}`).join("\n");
+    const filler = Array.from(
+      { length: 60 },
+      (_, i) => `// line ${String(i)}`,
+    ).join("\n");
     const r = newRepo();
-    r.write("src/a.ts", `${fn("normalize", "empty")}${filler}\n${fn("normalizeAgain", "empty")}`);
+    r.write(
+      "src/a.ts",
+      `${fn("normalize", "empty")}${filler}\n${fn("normalizeAgain", "empty")}`,
+    );
     const base = r.commit("base");
     r.write("src/a.ts", fn("normalize", "empty item"));
     const head = r.commit("head");
