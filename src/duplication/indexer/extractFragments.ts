@@ -14,8 +14,11 @@ import { FragmentIdAllocator } from "./internal/fragmentId.ts";
  *    skipped.
  * 2. **block**: `if`, `for` (+ `for-in` / `for-of`), `while`, `do-while`,
  *    `try`, `catch`, `switch`. Both outer and inner matches are emitted.
- * 3. **window**: sliding windows over the `statements` array of
- *    `SourceFile`, `Block`, `ModuleBlock`, `CaseClause`, `DefaultClause`.
+ * 3. **window**: sliding windows over the `statements` array of `Block`,
+ *    `ModuleBlock`, `CaseClause`, `DefaultClause`. A file's top-level
+ *    statements are not windowed: they are declarations whose bodies are
+ *    already function fragments, and a window over several of them only
+ *    absorbs those function-level matches into one oversized pair.
  *
  * Visit order is the same as `ts.forEachChild`, giving deterministic output.
  */
@@ -84,41 +87,15 @@ export function extractFragments(
     }
     const minSize = Math.min(...sizes);
 
-    // Pure import / re-export statements carry no logic and are a known
-    // source of false positives (barrel files, header import blocks):
-    // they collapse to identical token n-grams and matching
-    // `ImportDeclaration` / `ExportDeclaration` statement-kind n-grams.
-    // Trim them off the leading and trailing edges of every emitted
-    // window so adjacent import blocks don't bleed into the indexed
-    // text. Structural statements in the middle are left intact —
-    // mixed-interior windows are rare in real TS code, and splitting
-    // them would complicate dedup without buying much.
-    const structuralOnly: boolean[] = statements.map(isStructuralOnlyStatement);
-
-    // Dedup by trimmed `(firstIdx, lastIdx)` span: trimming can collapse
-    // two raw ranges (different sizes, or stride vs tail) to the same
-    // pair, which would otherwise emit multiple fragments for one line
-    // range.
     const emittedSpans = new Set<string>();
-    const tryEmit = (rawStart: number, rawEndExclusive: number): void => {
-      let first = rawStart;
-      let last = rawEndExclusive - 1;
-      while (first <= last && structuralOnly[first] === true) {
-        first++;
-      }
-      while (last >= first && structuralOnly[last] === true) {
-        last--;
-      }
-      if (last - first + 1 < 2) {
-        return;
-      }
-      const key = `${String(first)}-${String(last)}`;
+    const tryEmit = (first: number, endExclusive: number): void => {
+      const key = `${String(first)}-${String(endExclusive)}`;
       if (emittedSpans.has(key)) {
         return;
       }
       emittedSpans.add(key);
       const firstStmt = statements[first];
-      const lastStmt = statements[last];
+      const lastStmt = statements[endExclusive - 1];
       if (firstStmt !== undefined && lastStmt !== undefined) {
         emitWindow(firstStmt, lastStmt);
       }
@@ -163,8 +140,7 @@ export function extractFragments(
       emit(node, "block", ts.SyntaxKind[node.kind]);
     }
 
-    // window fragments: any node with a `statements` array (SourceFile,
-    // Block, ModuleBlock, CaseClause, DefaultClause).
+    // window fragments: Block, ModuleBlock, CaseClause, DefaultClause.
     const statements = getStatementsIfAny(node);
     if (statements !== undefined) {
       emitWindowsForStatements(statements);
@@ -220,32 +196,10 @@ function isBlockLike(node: ts.Node): boolean {
   }
 }
 
-function isStructuralOnlyStatement(stmt: ts.Statement): boolean {
-  switch (stmt.kind) {
-    case ts.SyntaxKind.ImportDeclaration:
-    case ts.SyntaxKind.ExportDeclaration:
-    case ts.SyntaxKind.ImportEqualsDeclaration:
-    case ts.SyntaxKind.ExportAssignment:
-      return true;
-    case ts.SyntaxKind.ExpressionStatement: {
-      // ECMAScript directive prologue (`"use client"`, `"use strict"`, …)
-      // parses as `ExpressionStatement(StringLiteral)`. Treat it like an
-      // import edge so a leading directive does not block the trim loop
-      // from reaching the imports that usually follow.
-      const expr = (stmt as ts.ExpressionStatement).expression;
-      return ts.isStringLiteral(expr);
-    }
-    default:
-      return false;
-  }
-}
-
 function getStatementsIfAny(
   node: ts.Node,
 ): readonly ts.Statement[] | undefined {
   switch (node.kind) {
-    case ts.SyntaxKind.SourceFile:
-      return (node as ts.SourceFile).statements;
     case ts.SyntaxKind.Block:
       return (node as ts.Block).statements;
     case ts.SyntaxKind.ModuleBlock:

@@ -16,7 +16,8 @@
 - 外側のブロックと内側のブロックを **両方** 発火する。
 
 ### window フラグメント (sliding window)
-- 対象: `statements` 配列を持つコンテナ (`SourceFile` / `Block` / `ModuleBlock` / `CaseClause` / `DefaultClause`)
+- 対象: `statements` 配列を持つコンテナ (`Block` / `ModuleBlock` / `CaseClause` / `DefaultClause`)
+- ファイル直下 (`SourceFile`) の文は window にしない。ファイル直下の文は関数・クラス・定数などの宣言で、関数の本体はすでに function fragment として索引されている。宣言を 5〜10 個並べた window は数百行に膨らみ、§7.2 の collapse で最大の包含ペアが残るため、内側の関数単位の一致を 1 つの巨大なペアに吸収してしまう。
 - 設定の `statementWindowSizes` (デフォルト `[5, 10, 20]`) と `statementWindowStride` (デフォルト 3) で複数のサイズと stride を指定し、文の連続部分を切り出す。
 - **末尾フォールバック**: 各サイズについて、stride のリズムから外れて末尾の文が一度もウィンドウに含まれないことが起きないよう、最後尾を含むウィンドウを 1 つ追加で発火する。
 - **短ブロックフォールバック**: 文数が最小ウィンドウサイズ未満なら、ブロック全体を 1 つの window として発火する (1 文のみのブロックはスキップ)。

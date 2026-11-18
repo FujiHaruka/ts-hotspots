@@ -284,134 +284,14 @@ function foo(a: number): number {
     ).toBe(true);
   });
 
-  it("does not emit windows for runs of import/export-only statements", () => {
-    // Barrel-style file: nothing but re-exports. With statementWindowSizes
-    // [5, 10, 20] and stride 3, the previous behavior would emit several
-    // 5-statement windows here — all identical token/statement structure
-    // across barrel files, dominating the false-positive list.
-    const src = [
-      'export { a } from "./a.ts";',
-      'export type { A } from "./a.ts";',
-      'export { b } from "./b.ts";',
-      'export type { B } from "./b.ts";',
-      'export { c } from "./c.ts";',
-      'export type { C } from "./c.ts";',
-      'export { d } from "./d.ts";',
-      "",
-    ].join("\n");
-    const fragments = extract("file.ts", src);
-    const windows = fragments.filter((f) => f.kind === "window");
-    expect(windows).toHaveLength(0);
-  });
-
-  it("trims leading and trailing import/export edges from emitted windows", () => {
-    // Mixed file: 4 imports + 4 real statements. With size=5/stride=3,
-    // raw windows would touch the import block at their edges; emitted
-    // windows must have those edges trimmed off so import-only text
-    // never reaches the indexed fragment.
-    const src = [
-      'import { a } from "./a.ts";',
-      'import { b } from "./b.ts";',
-      'import { c } from "./c.ts";',
-      'import { d } from "./d.ts";',
-      "const x = 1;",
-      "const y = 2;",
-      "const z = 3;",
-      "console.log(x, y, z);",
-      "",
-    ].join("\n");
-    const config: Config = {
-      ...defaultConfig,
-      fragment: { statementWindowSizes: [5], statementWindowStride: 3 },
-    };
-    const fragments = extract("file.ts", src, config);
-    const windows = fragments.filter((f) => f.kind === "window");
-    expect(windows.length).toBeGreaterThan(0);
-    for (const w of windows) {
-      expect(w.text).not.toMatch(/^\s*import\b/m);
-      expect(w.text).not.toMatch(/^\s*export\s+(?:\{|type\s+\{|\*)/m);
-    }
-  });
-
-  it("trims trailing import/export edges from windows that begin in real code", () => {
-    // Inverse of the leading-trim case: real code at the top, imports
-    // re-introduced near the bottom (legal at module scope, even if
-    // unusual). Trailing import edges must be trimmed too.
-    const src = [
-      "const x = 1;",
-      "const y = 2;",
-      "const z = 3;",
-      "console.log(x, y, z);",
-      'import { a } from "./a.ts";',
-      'import { b } from "./b.ts";',
-      'import { c } from "./c.ts";',
-      'import { d } from "./d.ts";',
-      "",
-    ].join("\n");
-    const config: Config = {
-      ...defaultConfig,
-      fragment: { statementWindowSizes: [5], statementWindowStride: 3 },
-    };
-    const fragments = extract("file.ts", src, config);
-    const windows = fragments.filter((f) => f.kind === "window");
-    expect(windows.length).toBeGreaterThan(0);
-    for (const w of windows) {
-      expect(w.text).not.toMatch(/^\s*import\b/m);
-      expect(w.text).not.toMatch(/^\s*export\s+(?:\{|type\s+\{|\*)/m);
-    }
-  });
-
-  it('trims a leading "use client" directive together with the imports that follow it', () => {
-    // RSC-style file: directive prologue + imports + real code. Without
-    // directive-aware trimming, the leading-trim loop stops at the
-    // ExpressionStatement on line 1, and the import edge bleeds into
-    // every emitted window.
-    const src = [
-      '"use client";',
-      'import { a } from "./a.ts";',
-      'import { b } from "./b.ts";',
-      'import { c } from "./c.ts";',
-      'import { d } from "./d.ts";',
-      "const x = 1;",
-      "const y = 2;",
-      "const z = 3;",
-      "console.log(x, y, z);",
-      "",
-    ].join("\n");
-    const config: Config = {
-      ...defaultConfig,
-      fragment: { statementWindowSizes: [5], statementWindowStride: 3 },
-    };
-    const fragments = extract("file.ts", src, config);
-    const windows = fragments.filter((f) => f.kind === "window");
-    expect(windows.length).toBeGreaterThan(0);
-    for (const w of windows) {
-      expect(w.text).not.toMatch(/^\s*"use client"/m);
-      expect(w.text).not.toMatch(/^\s*import\b/m);
-    }
-  });
-
-  it('trims a leading "use client" directive even when no imports follow', () => {
-    // Directive + real code only: the directive itself must be trimmed
-    // so the emitted window covers only the meaningful statements.
-    const src = [
-      '"use client";',
-      "const x = 1;",
-      "const y = 2;",
-      "const z = 3;",
-      "console.log(x, y, z);",
-      "",
-    ].join("\n");
-    const config: Config = {
-      ...defaultConfig,
-      fragment: { statementWindowSizes: [5], statementWindowStride: 3 },
-    };
-    const fragments = extract("file.ts", src, config);
-    const windows = fragments.filter((f) => f.kind === "window");
-    expect(windows.length).toBeGreaterThan(0);
-    for (const w of windows) {
-      expect(w.text).not.toMatch(/^\s*"use client"/m);
-    }
+  it("does not window a file's top-level statements", () => {
+    const src = Array.from(
+      { length: 12 },
+      (_, i) => `export const value${String(i)} = compute(${String(i)});`,
+    ).join("\n");
+    expect(extract("src/a.ts", src).filter((f) => f.kind === "window")).toEqual(
+      [],
+    );
   });
 
   it("emits windows for statements inside case/default clauses", () => {
