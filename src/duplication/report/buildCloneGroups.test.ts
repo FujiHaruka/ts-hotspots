@@ -3,7 +3,7 @@ import { defaultConfig } from "../config/defaults.ts";
 import type { CandidateScore, ScoreBreakdown } from "../domain/candidate.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import { buildCloneGroups } from "./buildCloneGroups.ts";
-import type { ScoredPair } from "./jsonReport.ts";
+import type { ScoredPair, ThinWrapperVerdicts } from "./jsonReport.ts";
 
 function mkFragment(
   id: string,
@@ -61,7 +61,7 @@ function mkPair(
   };
 }
 
-const noThin: ReadonlyMap<string, boolean> = new Map();
+const noThin: ThinWrapperVerdicts = { changed: new Map(), base: new Map() };
 
 describe("buildCloneGroups", () => {
   it("emits one group per unique changedFragment", () => {

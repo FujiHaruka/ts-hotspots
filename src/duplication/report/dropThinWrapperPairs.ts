@@ -1,4 +1,4 @@
-import type { ScoredPair } from "./jsonReport.ts";
+import type { ScoredPair, ThinWrapperVerdicts } from "./jsonReport.ts";
 
 /**
  * Drop pairs whose **both** sides are "thin wrappers" — fragments whose
@@ -7,9 +7,9 @@ import type { ScoredPair } from "./jsonReport.ts";
  * DRYed against a shared component / helper, so they can't yield a
  * useful refactor suggestion.
  *
- * The judgement is supplied via `isThinById` (a precomputed
- * `fragmentId -> boolean` map). Building the map is the caller's
- * responsibility — this keeps `dropThinWrapperPairs` pure and lets the
+ * The judgement is supplied via `thinVerdicts` (precomputed
+ * per-side `fragmentId -> boolean` maps). Building the maps is
+ * the caller's responsibility — this keeps `dropThinWrapperPairs` pure and lets the
  * pipeline avoid re-parsing for fragments that appear in multiple
  * pairs.
  *
@@ -18,12 +18,12 @@ import type { ScoredPair } from "./jsonReport.ts";
  */
 export function dropThinWrapperPairs(
   pairs: readonly ScoredPair[],
-  isThinById: ReadonlyMap<string, boolean>,
+  thinVerdicts: ThinWrapperVerdicts,
 ): ScoredPair[] {
   const out: ScoredPair[] = [];
   for (const pair of pairs) {
-    const changedThin = isThinById.get(pair.changedFragment.id) ?? false;
-    const baseThin = isThinById.get(pair.baseFragment.id) ?? false;
+    const changedThin = thinVerdicts.changed.get(pair.changedFragment.id) ?? false;
+    const baseThin = thinVerdicts.base.get(pair.baseFragment.id) ?? false;
     if (changedThin && baseThin) {
       continue;
     }

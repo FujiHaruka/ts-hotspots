@@ -15,7 +15,7 @@ import { buildLocation } from "../util/location.ts";
 import { nonNull } from "../util/nonNull.ts";
 import { buildEvidence } from "./evidence.ts";
 import { intersectIntersections } from "./internal/intersectIntersections.ts";
-import type { ScoredPair } from "./jsonReport.ts";
+import type { ScoredPair, ThinWrapperVerdicts } from "./jsonReport.ts";
 import { deriveHint } from "./recommendationHint.ts";
 
 /**
@@ -33,7 +33,7 @@ export function buildCloneGroups(
   pairs: readonly ScoredPair[],
   config: Config,
   includeCode: boolean,
-  isThinById: ReadonlyMap<string, boolean>,
+  thinVerdicts: ThinWrapperVerdicts,
   churnByFile?: ReadonlyMap<string, number>,
 ): CloneGroup[] {
   // Bucket pairs by changedFragment.id, preserving the input order so
@@ -55,7 +55,7 @@ export function buildCloneGroups(
     if (bucket.length === 0) continue;
     decorated.push({
       anchorId,
-      group: buildGroup(bucket, config, includeCode, isThinById, churnByFile),
+      group: buildGroup(bucket, config, includeCode, thinVerdicts, churnByFile),
     });
   }
 
@@ -67,7 +67,7 @@ function buildGroup(
   bucket: readonly ScoredPair[],
   config: Config,
   includeCode: boolean,
-  isThinById: ReadonlyMap<string, boolean>,
+  thinVerdicts: ThinWrapperVerdicts,
   churnByFile: ReadonlyMap<string, number> | undefined,
 ): CloneGroup {
   const anchorPair = nonNull(bucket[0]);
@@ -129,10 +129,10 @@ function buildGroup(
   // every member so an XOR triggers `thin-wrapper-side` regardless of
   // which member ends up weakest.
   const weakestPair = pickWeakest(sortedBucket);
-  const anchorIsThin = isThinById.get(anchorPair.changedFragment.id) ?? false;
+  const anchorIsThin = thinVerdicts.changed.get(anchorPair.changedFragment.id) ?? false;
   let anyMemberIsThin = false;
   for (const pair of sortedBucket) {
-    if (isThinById.get(pair.baseFragment.id) === true) {
+    if (thinVerdicts.base.get(pair.baseFragment.id) === true) {
       anyMemberIsThin = true;
       break;
     }

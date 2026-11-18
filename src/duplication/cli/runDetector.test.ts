@@ -125,6 +125,40 @@ describe("runDetector", () => {
     expect(pairsBetweenFiles((await run(true)).groups)).toEqual([]);
   });
 
+  it("locates base fragments against the base source when the changed file got shorter", async () => {
+    const fn = (name: string, message: string) => `export function ${name}(items: string[]): string[] {
+  const result: string[] = [];
+  for (const item of items) {
+    if (item.length === 0) {
+      throw new Error("${message}");
+    }
+    result.push(item.trim().toLowerCase());
+  }
+  return result;
+}
+`;
+    const filler = Array.from({ length: 60 }, (_, i) => `// line ${String(i)}`).join("\n");
+    const r = newRepo();
+    r.write("src/a.ts", `${fn("normalize", "empty")}${filler}\n${fn("normalizeAgain", "empty")}`);
+    const base = r.commit("base");
+    r.write("src/a.ts", fn("normalize", "empty item"));
+    const head = r.commit("head");
+
+    const result = await runDetector({
+      repoPath: r.path,
+      baseRef: base,
+      headRef: head,
+      threeDot: false,
+      config: defaultConfig,
+    });
+    const memberLines = result.groups
+      .filter((g) => g.anchor?.location.startsWith("src/a.ts:") === true)
+      .flatMap((g) => g.members.map((m) => m.fragment.location))
+      .filter((loc) => loc.startsWith("src/a.ts:"))
+      .map((loc) => Number(loc.split(":")[1]?.split("-")[0]));
+    expect(memberLines.some((line) => line > 11)).toBe(true);
+  });
+
   describe("features.enabled: 1-axis-off extensibility", () => {
     function makeCopyRepo(): { repo: TempRepo; base: string; head: string } {
       const r = newRepo();

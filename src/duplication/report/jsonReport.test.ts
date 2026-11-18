@@ -505,6 +505,25 @@ describe("buildJsonReport", () => {
       expect(g.recommendationHint.riskFlags).toContain("thin-wrapper-side");
     });
 
+    it("judges each side against its own source when both sides share a fragment id", () => {
+      const changed = thinFragment("a.tsx#1-1-function", "a.tsx");
+      const base = realFragment("a.tsx#1-1-function", "a.tsx");
+      const changedSource = parseSource("a.tsx", thinSource).sourceFile;
+      const baseSource = parseSource("a.tsx", realSource).sourceFile;
+      const report = buildJsonReport({
+        diff: { baseSha: "x", headSha: "y", threeDot: false, changedFiles: 1 },
+        pairs: [makePair(changed, base)],
+        config: defaultConfig,
+        summary: STUB_DIFF_SUMMARY,
+        getSourceFile: (_filePath, side) =>
+          side === "changed" ? changedSource : baseSource,
+      });
+      expect(report.groups).toHaveLength(1);
+      expect(report.groups[0]?.recommendationHint.riskFlags).toContain(
+        "thin-wrapper-side",
+      );
+    });
+
     it("emits dropThinWrapperPairs in perfLog summary", () => {
       const a = thinFragment("a", "a.tsx");
       const b = thinFragment("b", "b.tsx");

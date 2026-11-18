@@ -28,6 +28,13 @@ export interface ScoredPair {
   intersections: Intersections;
 }
 
+export type FragmentSide = "changed" | "base";
+
+export interface ThinWrapperVerdicts {
+  changed: ReadonlyMap<string, boolean>;
+  base: ReadonlyMap<string, boolean>;
+}
+
 export interface ReportInput {
   /**
    * Stamped onto the report's `tool` field so consumers can branch on
@@ -46,25 +53,31 @@ export interface ReportInput {
    */
   includeCode?: boolean;
   /**
-   * Resolve a fragment's parsed `SourceFile`. The pipeline uses it to
-   * judge whether a fragment is a "thin wrapper" before applying
-   * `dropThinWrapperPairs`. When the hook is omitted (e.g. tests) or
-   * returns `undefined`, the filter conservatively treats the fragment
-   * as not-thin and the pair survives.
+   * Resolve the parsed `SourceFile` a fragment was extracted from, on the
+   * given side of the diff. The pipeline uses it to judge whether a
+   * fragment is a "thin wrapper" before applying `dropThinWrapperPairs`.
+   * A file changed on the branch has different text on each side, so the
+   * side must select which text the fragment's line range refers to.
+   * When the hook is omitted (e.g. tests) or returns `undefined`, the
+   * filter conservatively treats the fragment as not-thin and the pair
+   * survives.
    *
    * Mutually exclusive with `isThinFragmentById`. Whole-repo mode
    * precomputes the thin-wrapper map in worker threads to avoid
    * keeping `ts.SourceFile`s on the main thread; PR mode and tests
    * still use this lazy hook.
    */
-  getSourceFile?: (filePath: string) => ts.SourceFile | undefined;
+  getSourceFile?: (
+    filePath: string,
+    side: FragmentSide,
+  ) => ts.SourceFile | undefined;
   /**
-   * Pre-judged thin-wrapper map keyed by `fragment.id`. When provided,
-   * the pipeline uses it directly instead of calling `getSourceFile`
-   * to (re-)judge per fragment. Whole-repo mode populates this from
-   * the parallel base index workers, where each worker has the
-   * `ts.SourceFile` in scope and can run `isThinWrapperFragment` for
-   * free alongside feature extraction.
+   * Pre-judged thin-wrapper map keyed by `fragment.id`, applied to both
+   * sides. When provided, the pipeline uses it directly instead of
+   * calling `getSourceFile` to (re-)judge per fragment. Whole-repo mode
+   * populates this from the parallel base index workers, where each
+   * worker has the `ts.SourceFile` in scope and can run
+   * `isThinWrapperFragment` for free alongside feature extraction.
    */
   isThinFragmentById?: ReadonlyMap<string, boolean>;
   /**
@@ -122,9 +135,9 @@ export function buildJsonReport(
 
   const semanticallyFiltered = dropLowSemanticEvidence(unique);
   const collapsed = collapsePairs(semanticallyFiltered);
-  const isThinById = buildThinWrapperMap(collapsed, input);
+  const thinVerdicts = buildThinWrapperVerdicts(collapsed, input);
   const thinFiltered = input.config.report.thinWrapper.enabled
-    ? dropThinWrapperPairs(collapsed, isThinById)
+    ? dropThinWrapperPairs(collapsed, thinVerdicts)
     : collapsed;
   const sorted = sortCandidates(thinFiltered);
   const capped = capPerFragmentPairs(sorted);
@@ -141,14 +154,14 @@ export function buildJsonReport(
         clusterPairs(capped, input.config.report.cluster, clusterStats),
         input.config,
         includeCode,
-        isThinById,
+        thinVerdicts.base,
         input.churnByFile,
       )
     : buildCloneGroups(
         capped,
         input.config,
         includeCode,
-        isThinById,
+        thinVerdicts,
         input.churnByFile,
       );
 
@@ -175,35 +188,41 @@ export function buildJsonReport(
   };
 }
 
-function buildThinWrapperMap(
+function buildThinWrapperVerdicts(
   pairs: readonly ScoredPair[],
   input: ReportInput,
-): ReadonlyMap<string, boolean> {
+): ThinWrapperVerdicts {
   if (!input.config.report.thinWrapper.enabled) {
-    return new Map<string, boolean>();
+    const empty = new Map<string, boolean>();
+    return { changed: empty, base: empty };
   }
-  // Caller (whole-repo mode) precomputed the map alongside feature
-  // extraction in worker threads — use it as-is.
   if (input.isThinFragmentById !== undefined) {
-    return input.isThinFragmentById;
+    return {
+      changed: input.isThinFragmentById,
+      base: input.isThinFragmentById,
+    };
   }
-  // Legacy lazy path: PR mode + tests resolve `ts.SourceFile` on demand
-  // and judge each fragment that appears in `pairs` once.
-  const map = new Map<string, boolean>();
-  if (input.getSourceFile === undefined) return map;
+  const changed = new Map<string, boolean>();
+  const base = new Map<string, boolean>();
+  const getSourceFile = input.getSourceFile;
+  if (getSourceFile === undefined) return { changed, base };
   const thinCfg = input.config.report.thinWrapper;
-  const judge = (fragment: Fragment): void => {
+  const judge = (
+    fragment: Fragment,
+    side: FragmentSide,
+    map: Map<string, boolean>,
+  ): void => {
     if (map.has(fragment.id)) return;
-    const sourceFile = input.getSourceFile?.(fragment.filePath);
-    if (sourceFile === undefined) {
-      map.set(fragment.id, false);
-      return;
-    }
-    map.set(fragment.id, isThinWrapperFragment(fragment, sourceFile, thinCfg));
+    const sourceFile = getSourceFile(fragment.filePath, side);
+    map.set(
+      fragment.id,
+      sourceFile !== undefined &&
+        isThinWrapperFragment(fragment, sourceFile, thinCfg),
+    );
   };
   for (const pair of pairs) {
-    judge(pair.changedFragment);
-    judge(pair.baseFragment);
+    judge(pair.changedFragment, "changed", changed);
+    judge(pair.baseFragment, "base", base);
   }
-  return map;
+  return { changed, base };
 }

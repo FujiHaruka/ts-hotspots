@@ -22,7 +22,11 @@ import {
   buildInvertedIndex,
   type IndexInput,
 } from "../lookup/invertedIndex.ts";
-import { buildJsonReport, type ScoredPair } from "../report/jsonReport.ts";
+import {
+  buildJsonReport,
+  type FragmentSide,
+  type ScoredPair,
+} from "../report/jsonReport.ts";
 import { shouldReport } from "../scoring/decide.ts";
 import {
   buildFeatureSets,
@@ -163,14 +167,15 @@ export async function runDetector(
   const baseEntries: IndexInput[] = [];
   const baseEntryById = new Map<string, IndexInput>();
   const featureSetsById = new Map<string, FragmentFeatureSets>();
-  const textByPath = new Map<string, string>();
+  const baseTextByPath = new Map<string, string>();
+  const changedTextByPath = new Map<string, string>();
   const baseFragmentsByKind = { function: 0, block: 0, window: 0 };
   const fragmentsPerFile: number[] = [];
   const keyPool: FeatureKeyPool = new Map();
 
   for (const source of baseSources) {
     const parsed = parseSource(source.path, source.text);
-    textByPath.set(source.path, source.text);
+    baseTextByPath.set(source.path, source.text);
     const fragments = extractFragments(parsed, config);
     fragmentsPerFile.push(fragments.length);
     // Build per-file context once and share across every fragment of this
@@ -306,7 +311,7 @@ export async function runDetector(
     const frags = diff.fragmentsByFile.get(file.filePath) ?? [];
     if (frags.length === 0) continue;
     const parsed = parseSource(file.filePath, file.text);
-    textByPath.set(file.filePath, file.text);
+    changedTextByPath.set(file.filePath, file.text);
     const fileCtx = buildFileFeatureContext(parsed.sourceFile);
     for (const changedFragment of frags) {
       changedFragments += 1;
@@ -391,7 +396,10 @@ export async function runDetector(
         },
       },
       includeCode,
-      getSourceFile: lazySourceFiles(textByPath),
+      getSourceFile: lazySourceFiles({
+        base: baseTextByPath,
+        changed: changedTextByPath,
+      }),
       churnByFile,
     },
     perfLog,
@@ -402,16 +410,19 @@ export async function runDetector(
 }
 
 function lazySourceFiles(
-  textByPath: ReadonlyMap<string, string>,
-): (filePath: string) => ts.SourceFile | undefined {
-  const cache = new Map<string, ts.SourceFile>();
-  return (filePath) => {
-    const cached = cache.get(filePath);
+  textByPath: Readonly<Record<FragmentSide, ReadonlyMap<string, string>>>,
+): (filePath: string, side: FragmentSide) => ts.SourceFile | undefined {
+  const cache: Record<FragmentSide, Map<string, ts.SourceFile>> = {
+    base: new Map(),
+    changed: new Map(),
+  };
+  return (filePath, side) => {
+    const cached = cache[side].get(filePath);
     if (cached !== undefined) return cached;
-    const text = textByPath.get(filePath);
+    const text = textByPath[side].get(filePath);
     if (text === undefined) return undefined;
     const sourceFile = parseSource(filePath, text).sourceFile;
-    cache.set(filePath, sourceFile);
+    cache[side].set(filePath, sourceFile);
     return sourceFile;
   };
 }

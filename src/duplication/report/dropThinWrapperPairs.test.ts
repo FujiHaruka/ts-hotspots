@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CandidateScore } from "../domain/candidate.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import { dropThinWrapperPairs } from "./dropThinWrapperPairs.ts";
-import type { ScoredPair } from "./jsonReport.ts";
+import type { ScoredPair, ThinWrapperVerdicts } from "./jsonReport.ts";
 
 function fragment(id: string, filePath: string): Fragment {
   return {
@@ -37,14 +37,26 @@ function pair(changedId: string, baseId: string): ScoredPair {
   };
 }
 
+function bothSides(map: ReadonlyMap<string, boolean>): ThinWrapperVerdicts {
+  return { changed: map, base: map };
+}
+
 describe("dropThinWrapperPairs", () => {
+  it("looks up each side in its own verdict map", () => {
+    const p = pair("same", "same");
+    const thin = new Map<string, boolean>([["same", true]]);
+    const notThin = new Map<string, boolean>([["same", false]]);
+    expect(dropThinWrapperPairs([p], { changed: thin, base: notThin })).toEqual([p]);
+    expect(dropThinWrapperPairs([p], { changed: thin, base: thin })).toEqual([]);
+  });
+
   it("drops pairs where both sides are thin wrappers", () => {
     const p = pair("c", "b");
     const map = new Map<string, boolean>([
       ["c", true],
       ["b", true],
     ]);
-    expect(dropThinWrapperPairs([p], map)).toEqual([]);
+    expect(dropThinWrapperPairs([p], bothSides(map))).toEqual([]);
   });
 
   it("keeps pairs where only one side is a thin wrapper", () => {
@@ -56,7 +68,7 @@ describe("dropThinWrapperPairs", () => {
       ["c2", false],
       ["b2", true],
     ]);
-    expect(dropThinWrapperPairs([p1, p2], map)).toEqual([p1, p2]);
+    expect(dropThinWrapperPairs([p1, p2], bothSides(map))).toEqual([p1, p2]);
   });
 
   it("keeps pairs where neither side is a thin wrapper", () => {
@@ -65,18 +77,18 @@ describe("dropThinWrapperPairs", () => {
       ["c", false],
       ["b", false],
     ]);
-    expect(dropThinWrapperPairs([p], map)).toEqual([p]);
+    expect(dropThinWrapperPairs([p], bothSides(map))).toEqual([p]);
   });
 
   it("returns an empty list for empty input", () => {
-    expect(dropThinWrapperPairs([], new Map())).toEqual([]);
+    expect(dropThinWrapperPairs([], bothSides(new Map()))).toEqual([]);
   });
 
   it("treats fragments missing from the map as not thin (preserves the pair)", () => {
     // This is the conservative fallback the pipeline relies on when it
     // cannot reach the SourceFile for a fragment.
     const p = pair("c", "b");
-    expect(dropThinWrapperPairs([p], new Map())).toEqual([p]);
+    expect(dropThinWrapperPairs([p], bothSides(new Map()))).toEqual([p]);
   });
 
   it("uses the precomputed map (no per-pair re-evaluation)", () => {
@@ -108,7 +120,7 @@ describe("dropThinWrapperPairs", () => {
       },
       [Symbol.iterator]: () => inner[Symbol.iterator](),
     };
-    const out = dropThinWrapperPairs([p1, p2], counting);
+    const out = dropThinWrapperPairs([p1, p2], bothSides(counting));
     expect(out).toEqual([p2]);
     // 2 pairs × 2 lookups each.
     expect(lookups).toBe(4);
@@ -126,6 +138,6 @@ describe("dropThinWrapperPairs", () => {
       ["c3", false],
       ["b3", false],
     ]);
-    expect(dropThinWrapperPairs([p1, p2, p3], map)).toEqual([p1, p3]);
+    expect(dropThinWrapperPairs([p1, p2, p3], bothSides(map))).toEqual([p1, p3]);
   });
 });
