@@ -21,6 +21,8 @@ import {
   renderMarkdownHead,
 } from "../../reporter/render.ts";
 import { findGitRoot } from "../../util/git/findGitRoot.ts";
+import { resolveDiffEndpoints, resolveSha } from "../../util/git/runner.ts";
+import type { Config } from "../config/config.ts";
 import { defaultConfig } from "../config/defaults.ts";
 import type {
   CloneCandidateReport,
@@ -34,7 +36,13 @@ import {
   addDuplicationCommand,
   normalizePhaseTimingsArgv,
 } from "./registerCommand.ts";
-import { runDetector } from "./runDetector.ts";
+import {
+  readCachedReport,
+  reportCacheDir,
+  reportCacheKey,
+  writeCachedReport,
+} from "./reportCache.ts";
+import { type ChurnRunOptions, runDetector } from "./runDetector.ts";
 import { runWholeRepoDetector } from "./runWholeRepoDetector.ts";
 
 const TOOL: ReportTool = { name: TOOL_NAME, version: pkg.version };
@@ -123,6 +131,44 @@ function applyDismissalRegistry(
   };
 }
 
+async function locateCachedReport(
+  repoPath: string,
+  args: ParsedArgs,
+  config: Config,
+  churn: ChurnRunOptions | undefined,
+): Promise<{ dir: string; key: string } | undefined> {
+  try {
+    const commits =
+      args.mode === "diff"
+        ? {
+            ...(await resolveDiffEndpoints(
+              repoPath,
+              args.baseRef,
+              args.headRef,
+              args.threeDot,
+            )),
+            threeDot: args.threeDot,
+          }
+        : { sha: await resolveSha(repoPath, args.ref) };
+    const key = reportCacheKey({
+      version: TOOL.version,
+      mode: args.mode,
+      commits,
+      config,
+      churn:
+        churn === undefined
+          ? null
+          : {
+              window: churn.window,
+              sha: await resolveSha(repoPath, churn.ref),
+            },
+    });
+    return { dir: reportCacheDir(resolveRegistryDir(repoPath)), key };
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Run the duplication detector pipeline against pre-parsed args. Used
  * both from `main(argv, io)` here and from the root CLI in `src/cli.ts`
@@ -176,30 +222,42 @@ export async function runPipeline(
     : undefined;
 
   try {
-    const report: CloneCandidateReport =
-      args.mode === "diff"
-        ? await runDetector({
-            repoPath,
-            baseRef: args.baseRef,
-            headRef: args.headRef,
-            threeDot: args.threeDot,
-            config,
-            perfLog,
-            includeCode: args.verbose,
-            tool: TOOL,
-            churn: churnRunOpts,
-          })
-        : await runWholeRepoDetector({
-            repoPath,
-            ref: args.ref,
-            config,
-            perfLog,
-            includeCode: args.verbose,
-            tool: TOOL,
-            churn: churnRunOpts,
-          });
+    const cache = args.cache
+      ? await locateCachedReport(repoPath, args, config, churnRunOpts)
+      : undefined;
+    let report =
+      cache === undefined ? undefined : readCachedReport(cache.dir, cache.key);
+    if (report === undefined) {
+      const includeCode = args.verbose || cache !== undefined;
+      report =
+        args.mode === "diff"
+          ? await runDetector({
+              repoPath,
+              baseRef: args.baseRef,
+              headRef: args.headRef,
+              threeDot: args.threeDot,
+              config,
+              perfLog,
+              includeCode,
+              tool: TOOL,
+              churn: churnRunOpts,
+            })
+          : await runWholeRepoDetector({
+              repoPath,
+              ref: args.ref,
+              config,
+              perfLog,
+              includeCode,
+              tool: TOOL,
+              churn: churnRunOpts,
+            });
+      if (cache !== undefined) writeCachedReport(cache.dir, cache.key, report);
+    }
 
-    const dismissed = applyDismissalRegistry(resolveRegistryDir(repoPath), report);
+    const dismissed = applyDismissalRegistry(
+      resolveRegistryDir(repoPath),
+      report,
+    );
     if (dismissed !== undefined) report.dismissed = dismissed;
 
     if (Number.isFinite(args.limit) && report.groups.length > args.limit) {

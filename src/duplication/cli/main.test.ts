@@ -506,15 +506,15 @@ describe("main", () => {
 
     it("a dismissal made in the main checkout filters the group in a worktree", async () => {
       const r = makeDupRepo();
-      const main = realpathSync(r.path);
-      const wt = `${main}-wt`;
+      const mainPath = realpathSync(r.path);
+      const wt = `${mainPath}-wt`;
       r.git("worktree", "add", "-q", "-b", "feature", wt);
       try {
         const first = await runDup(wt);
         const target = first.hotspots[0];
         if (target === undefined) throw new Error("fixture has no dup groups");
 
-        const sink = { write: (_c: string): void => {} };
+        const sink = { write: (c: string): number => c.length };
         const dismissCode = await runRoot(
           [
             "node",
@@ -524,7 +524,7 @@ describe("main", () => {
             "--reason",
             "shared",
             "--path",
-            main,
+            mainPath,
           ],
           sink,
           sink,

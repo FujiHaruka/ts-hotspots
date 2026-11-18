@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -7,8 +6,8 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { projectKey, xdgConfigHome } from "../util/appDirs.ts";
 import { findGitRoot } from "../util/git/findGitRoot.ts";
 import {
   DISMISSAL_APP_DIR,
@@ -24,22 +23,11 @@ interface LoadOptions {
   onWarning?: (msg: string) => void;
 }
 
-function xdgConfigHome(): string {
-  const xdg = process.env.XDG_CONFIG_HOME;
-  if (xdg && xdg.length > 0 && isAbsolute(xdg)) return xdg;
-  return join(homedir(), ".config");
-}
-
-function projectKey(absProjectPath: string): string {
-  return createHash("sha256").update(absProjectPath).digest("hex").slice(0, 16);
-}
-
 export function registryPath(rootDir: string): string {
-  const abs = resolve(rootDir);
   return join(
     xdgConfigHome(),
     DISMISSAL_APP_DIR,
-    projectKey(abs),
+    projectKey(rootDir),
     DISMISSAL_REGISTRY_FILE,
   );
 }

@@ -59,6 +59,7 @@ interface DiffModeArgs {
   verbose: boolean;
   /** Churn-collector wiring; mirrors `comp`'s `--churn-*` flags. */
   churn: ChurnCliConfig;
+  cache: boolean;
 }
 
 interface WholeRepoModeArgs {
@@ -78,6 +79,7 @@ interface WholeRepoModeArgs {
   verbose: boolean;
   /** See `DiffModeArgs.churn`. */
   churn: ChurnCliConfig;
+  cache: boolean;
 }
 
 export type ParsedArgs = DiffModeArgs | WholeRepoModeArgs;

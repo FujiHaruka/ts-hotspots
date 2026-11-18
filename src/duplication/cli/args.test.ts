@@ -14,6 +14,7 @@ describe("parseCliArgs", () => {
       limit: 20,
       verbose: false,
       churn: { enabled: true, window: 200, ref: undefined },
+      cache: false,
     });
   });
 
@@ -38,6 +39,7 @@ describe("parseCliArgs", () => {
       limit: 20,
       verbose: false,
       churn: { enabled: true, window: 200, ref: undefined },
+      cache: false,
     });
   });
 

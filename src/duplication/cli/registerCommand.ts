@@ -30,13 +30,17 @@ function renderPhaseTimingsLevels(): string {
   ).join(" or ");
 }
 
+const RUNNING_FROM_BUILD = import.meta.url.endsWith(".js");
+
 const SHORT_DESCRIPTION =
   "detect Type-3 duplication candidates (whole repo by default; --diff for PR scope)";
 
 const LONG_DESCRIPTION = `By default the entire repository is scanned at ${DEFAULT_REF}. Pass --diff <revrange>
 to compare the head side of a diff against the rest of the codebase on the
 base side. The report is written to stdout; redirect it to a file if you
-want to keep it.
+want to keep it. Results are cached per commit and option set, so re-running
+the same command (e.g. to page through the report) is fast; --no-cache
+forces a fresh analysis.
 
 [path] points at a directory inside a git repository. The repo root is
 discovered by walking up from [path] until a .git entry is found
@@ -84,6 +88,7 @@ interface DuplicationCliOptions {
   churnWindow: number;
   churnRef?: string;
   churn: boolean;
+  cache: boolean;
 }
 
 /**
@@ -159,6 +164,10 @@ export function addDuplicationCommand(
       "--no-churn",
       "disable churn collection. Groups are sorted by raw similarity and 'aggregateChurn' is omitted from the report.",
     )
+    .option(
+      "--no-cache",
+      "re-run the analysis instead of reusing the cached result for the same commits and options",
+    )
     .action((pathArg: string | undefined, opts: DuplicationCliOptions) => {
       onParsed(buildParsedArgs(pathArg, opts));
     });
@@ -179,6 +188,7 @@ function buildParsedArgs(
     window: opts.churnWindow,
     ref: opts.churnRef,
   };
+  const cache = opts.cache && phaseTimings === undefined && RUNNING_FROM_BUILD;
 
   if (opts.diff !== undefined) {
     return {
@@ -194,6 +204,7 @@ function buildParsedArgs(
       limit,
       verbose: opts.verbose === true,
       churn,
+      cache,
     };
   }
 
@@ -208,6 +219,7 @@ function buildParsedArgs(
     limit,
     verbose: opts.verbose === true,
     churn,
+    cache,
   };
 }
 

@@ -1,7 +1,8 @@
 import type { FunctionKind } from "../schema.ts";
+import { APP_DIR } from "../util/appDirs.ts";
 
 export const DISMISSAL_REGISTRY_VERSION = 1 as const;
-export const DISMISSAL_APP_DIR = "ts-hotspots";
+export const DISMISSAL_APP_DIR = APP_DIR;
 export const DISMISSAL_REGISTRY_FILE = "dismissed.json";
 
 interface DismissalEntryDisplay {

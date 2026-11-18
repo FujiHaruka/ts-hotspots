@@ -83,12 +83,15 @@ ts-hotspots dup --ref release/v2             # scan a specific ref
 
 Each group reports the locations of every member fragment, a similarity score, and a short evidence block listing the shared calls and properties that drove the match. Group order is biased toward refactor value: when two groups have similar shapes, the one whose files have been edited more often comes first. Cold groups are not hidden — only re-ranked behind hotter ones.
 
+The analysis reads committed code only, so its result is cached per commit and option set (under `~/.cache/ts-hotspots/`, honoring `XDG_CACHE_HOME`). Re-running the same command — to page through a long report, switch `--format`, `--limit` or `--verbose`, or pick up a new dismissal — returns in about a second instead of re-analyzing. All git worktrees of a repository share the cache.
+
 Command-specific options:
 
 - `--diff <revrange>` — compare the diff's changed code against the rest of the tree (mutually exclusive with `--ref`)
 - `--ref <ref>` — ref to scan in whole-repo mode (default `HEAD`)
 - `--churn-window <N>` / `--no-churn` — control the recent-commit window used for ranking (default 200)
-- `--phase-timings[=summary|verbose]` — emit a JSON Lines perf log to stderr
+- `--phase-timings[=summary|verbose]` — emit a JSON Lines perf log to stderr (always re-analyzes)
+- `--no-cache` — re-analyze instead of reusing a cached result
 
 ### architecture (arch)
 
