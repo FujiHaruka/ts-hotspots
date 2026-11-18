@@ -301,7 +301,7 @@ function uniqueKeys(keys: readonly FeatureKey[]): FeatureKey[] {
  */
 const MIN_CORPUS_FOR_DF_CAP = 100;
 
-export interface SelfRange {
+interface SelfRange {
   filePath: string;
   startLine: number;
   endLine: number;

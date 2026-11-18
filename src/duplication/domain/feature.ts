@@ -1,5 +1,3 @@
-export type FeatureKind = "token" | "statement" | "call";
-
 export type FeatureKey = string;
 
 export interface FragmentFeatures {

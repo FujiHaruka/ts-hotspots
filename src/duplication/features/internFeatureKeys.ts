@@ -13,7 +13,7 @@ export function internFeatureKeys(
 
 function internInPlace(keys: FeatureKey[], pool: FeatureKeyPool): void {
   for (let i = 0; i < keys.length; i++) {
-    const key = keys[i] as FeatureKey;
+    const key = keys[i]!;
     const pooled = pool.get(key);
     if (pooled === undefined) {
       pool.set(key, key);
