@@ -4,6 +4,10 @@ import type { Config } from "../config/config.ts";
 import type { FragmentFeatures } from "../domain/feature.ts";
 import type { Fragment } from "../domain/fragment.ts";
 import {
+  type FeatureKeyPool,
+  internFeatureKeys,
+} from "../features/internFeatureKeys.ts";
+import {
   buildFeatureSets,
   type FragmentFeatureSets,
 } from "../scoring/featureSets.ts";
@@ -243,11 +247,13 @@ function aggregate(
   // and runParallel uses jobIndex slots, but if the partials array got
   // compacted we want an explicit reordering invariant here.
   const sorted = [...partials].sort((a, b) => a.jobIndex - b.jobIndex);
+  const keyPool: FeatureKeyPool = new Map();
   for (const p of sorted) {
     result.fragmentsPerFile.push(p.fragments.length);
     for (let i = 0; i < p.fragments.length; i++) {
       const fragment = nonNull(p.fragments[i]);
       const features = nonNull(p.features[i]);
+      internFeatureKeys(features, keyPool);
       result.fragmentsByKind[fragment.kind] += 1;
       result.entries.push({ fragment, features });
       result.featureSetsById.set(fragment.id, buildFeatureSets(features));

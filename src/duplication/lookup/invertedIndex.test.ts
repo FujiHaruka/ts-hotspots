@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FragmentFeatures } from "../domain/feature.ts";
 import type { Fragment } from "../domain/fragment.ts";
-import type { Posting } from "../domain/posting.ts";
 import { buildInvertedIndex, type IndexInput } from "./invertedIndex.ts";
 
 function makeFragment(overrides: Partial<Fragment> & { id: string }): Fragment {
@@ -45,9 +44,9 @@ describe("buildInvertedIndex", () => {
     expect(tokenPostings).toHaveLength(1);
     expect(stmtPostings).toHaveLength(1);
     expect(callPostings).toHaveLength(1);
-    expect(tokenPostings?.[0]?.featureKind).toBe("token");
-    expect(stmtPostings?.[0]?.featureKind).toBe("statement");
-    expect(callPostings?.[0]?.featureKind).toBe("call");
+    expect(tokenPostings?.[0]).toBe(frag);
+    expect(stmtPostings?.[0]).toBe(frag);
+    expect(callPostings?.[0]).toBe(frag);
   });
 
   it("puts two postings when two fragments share a feature key", () => {
@@ -63,7 +62,7 @@ describe("buildInvertedIndex", () => {
 
     const postings = index.postings.get("token:SHARED");
     expect(postings).toHaveLength(2);
-    expect(postings?.map((p) => p.fragmentId)).toEqual(["f1", "f2"]);
+    expect(postings?.map((p) => p.id)).toEqual(["f1", "f2"]);
   });
 
   it("dedupes postings when the same fragment emits the same key multiple times", () => {
@@ -82,34 +81,25 @@ describe("buildInvertedIndex", () => {
     expect(index.postings.get("call:c")).toHaveLength(1);
   });
 
-  it("preserves filePath / startLine / endLine / featureKind from the fragment", () => {
-    const f1 = makeFragment({
-      id: "f1",
-      filePath: "src/a.ts",
-      startLine: 12,
-      endLine: 34,
-    });
-    const features = makeFeatures(
-      "f1",
-      ["token:T"],
-      ["statement:ST"],
-      ["call:c"],
-    );
+  it("dedupes against the fragment id, not only the object identity", () => {
+    const f1 = makeFragment({ id: "f1" });
+    const f1Copy = makeFragment({ id: "f1" });
+    const index = buildInvertedIndex([
+      { fragment: f1, features: makeFeatures("f1", ["token:T"]) },
+      { fragment: f1Copy, features: makeFeatures("f1", ["token:T"]) },
+    ]);
+    expect(index.postings.get("token:T")).toEqual([f1]);
+  });
 
-    const index = buildInvertedIndex([{ fragment: f1, features }]);
-
-    const check = (p: Posting | undefined, kind: Posting["featureKind"]) => {
-      expect(p).toBeDefined();
-      if (p === undefined) throw new Error("unreachable");
-      expect(p.fragmentId).toBe("f1");
-      expect(p.filePath).toBe("src/a.ts");
-      expect(p.startLine).toBe(12);
-      expect(p.endLine).toBe(34);
-      expect(p.featureKind).toBe(kind);
-    };
-    check(index.postings.get("token:T")?.[0], "token");
-    check(index.postings.get("statement:ST")?.[0], "statement");
-    check(index.postings.get("call:c")?.[0], "call");
+  it("keeps keys of interleaved fragments in fragment order", () => {
+    const f1 = makeFragment({ id: "f1" });
+    const f2 = makeFragment({ id: "f2" });
+    const index = buildInvertedIndex([
+      { fragment: f1, features: makeFeatures("f1", ["token:A", "token:B", "token:A"]) },
+      { fragment: f2, features: makeFeatures("f2", ["token:B", "token:A", "token:B"]) },
+    ]);
+    expect(index.postings.get("token:A")?.map((p) => p.id)).toEqual(["f1", "f2"]);
+    expect(index.postings.get("token:B")?.map((p) => p.id)).toEqual(["f1", "f2"]);
   });
 
   it("returns an empty index for empty input", () => {

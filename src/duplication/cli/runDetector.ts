@@ -13,6 +13,10 @@ import type {
 } from "../domain/report.ts";
 import { extractFeatures } from "../features/extractFeatures.ts";
 import { buildFileFeatureContext } from "../features/fileContext.ts";
+import {
+  type FeatureKeyPool,
+  internFeatureKeys,
+} from "../features/internFeatureKeys.ts";
 import { extractFragments } from "../indexer/extractFragments.ts";
 import {
   buildInvertedIndex,
@@ -162,6 +166,7 @@ export async function runDetector(
   const sourceFileByPath = new Map<string, ts.SourceFile>();
   const baseFragmentsByKind = { function: 0, block: 0, window: 0 };
   const fragmentsPerFile: number[] = [];
+  const keyPool: FeatureKeyPool = new Map();
 
   for (const source of baseSources) {
     const parsed = parseSource(source.path, source.text);
@@ -180,6 +185,7 @@ export async function runDetector(
         config,
         fileCtx,
       );
+      internFeatureKeys(features, keyPool);
       baseEntries.push({ fragment, features });
       fragmentById.set(fragment.id, fragment);
       featureSetsById.set(fragment.id, buildFeatureSets(features));

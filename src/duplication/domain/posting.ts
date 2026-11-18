@@ -1,15 +1,8 @@
-import type { FeatureKey, FeatureKind } from "./feature.ts";
-
-export interface Posting {
-  fragmentId: string;
-  filePath: string;
-  startLine: number;
-  endLine: number;
-  featureKind: FeatureKind;
-}
+import type { FeatureKey } from "./feature.ts";
+import type { Fragment } from "./fragment.ts";
 
 export interface InvertedIndex {
-  readonly postings: ReadonlyMap<FeatureKey, readonly Posting[]>;
+  readonly postings: ReadonlyMap<FeatureKey, readonly Fragment[]>;
   /**
    * Distinct fragment count fed into `buildInvertedIndex`. Used at query
    * time to compute document frequency (`postings.length / totalFragments`)

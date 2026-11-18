@@ -327,7 +327,7 @@ function tally(
     if (postings.length > maxPostingSize) continue;
     if (stats !== undefined) stats.postingsHit += postings.length;
     for (const posting of postings) {
-      if (posting.fragmentId === changed.id) continue;
+      if (posting.id === changed.id) continue;
       // Same-file fragments whose line ranges intersect are sliding-window
       // siblings of one another: their feature sets share the overlapping
       // region, so any "match" mostly reports the extractor's own
@@ -336,10 +336,10 @@ function tally(
       if (isSameFileOverlap(posting, changed)) {
         continue;
       }
-      let counts = hits.get(posting.fragmentId);
+      let counts = hits.get(posting.id);
       if (counts === undefined) {
         counts = { token: 0, statement: 0, call: 0 };
-        hits.set(posting.fragmentId, counts);
+        hits.set(posting.id, counts);
       }
       counts[kind]++;
     }

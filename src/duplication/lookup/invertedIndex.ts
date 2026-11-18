@@ -1,10 +1,6 @@
-import type {
-  FeatureKey,
-  FeatureKind,
-  FragmentFeatures,
-} from "../domain/feature.ts";
+import type { FeatureKey, FragmentFeatures } from "../domain/feature.ts";
 import type { Fragment } from "../domain/fragment.ts";
-import type { InvertedIndex, Posting } from "../domain/posting.ts";
+import type { InvertedIndex } from "../domain/posting.ts";
 
 export interface IndexInput {
   fragment: Fragment;
@@ -21,48 +17,26 @@ export interface IndexInput {
 export function buildInvertedIndex(
   inputs: readonly IndexInput[],
 ): InvertedIndex {
-  const postings = new Map<FeatureKey, Posting[]>();
-  // Per-key set of fragment ids already recorded, to dedupe postings.
-  const seen = new Map<FeatureKey, Set<string>>();
-
+  const postings = new Map<FeatureKey, Fragment[]>();
   for (const { fragment, features } of inputs) {
-    addKeys(postings, seen, fragment, features.tokens, "token");
-    addKeys(postings, seen, fragment, features.statements, "statement");
-    addKeys(postings, seen, fragment, features.calls, "call");
+    addKeys(postings, fragment, features.tokens);
+    addKeys(postings, fragment, features.statements);
+    addKeys(postings, fragment, features.calls);
   }
-
   return { postings, totalFragments: inputs.length };
 }
 
 function addKeys(
-  postings: Map<FeatureKey, Posting[]>,
-  seen: Map<FeatureKey, Set<string>>,
+  postings: Map<FeatureKey, Fragment[]>,
   fragment: Fragment,
   keys: readonly FeatureKey[],
-  featureKind: FeatureKind,
 ): void {
   for (const key of keys) {
-    let fragmentIds = seen.get(key);
-    if (fragmentIds === undefined) {
-      fragmentIds = new Set<string>();
-      seen.set(key, fragmentIds);
-    }
-    if (fragmentIds.has(fragment.id)) {
-      continue;
-    }
-    fragmentIds.add(fragment.id);
-
-    let list = postings.get(key);
+    const list = postings.get(key);
     if (list === undefined) {
-      list = [];
-      postings.set(key, list);
+      postings.set(key, [fragment]);
+    } else if (list.at(-1)?.id !== fragment.id) {
+      list.push(fragment);
     }
-    list.push({
-      fragmentId: fragment.id,
-      filePath: fragment.filePath,
-      startLine: fragment.startLine,
-      endLine: fragment.endLine,
-      featureKind,
-    });
   }
 }
