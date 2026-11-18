@@ -11,6 +11,7 @@ import {
   loadRegistry,
   pruneRegistry,
   registryIdSet,
+  resolveRegistryDir,
   saveRegistry,
   withProjectPath,
 } from "../../dismissal/store.ts";
@@ -198,7 +199,7 @@ export async function runPipeline(
             churn: churnRunOpts,
           });
 
-    const dismissed = applyDismissalRegistry(repoPath, report);
+    const dismissed = applyDismissalRegistry(resolveRegistryDir(repoPath), report);
     if (dismissed !== undefined) report.dismissed = dismissed;
 
     if (Number.isFinite(args.limit) && report.groups.length > args.limit) {

@@ -4,10 +4,11 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { findGitRoot } from "../util/git/findGitRoot.ts";
 import {
   DISMISSAL_APP_DIR,
@@ -43,19 +44,30 @@ export function registryPath(rootDir: string): string {
   );
 }
 
-/**
- * Pick the directory used as the registry key. The registry is shared
- * across all four features (comp, dup, arch, coch) for one project, so
- * the key has to be uniform regardless of which subcommand ran. When
- * `start` is inside a git repo we use the repo root; otherwise we fall
- * back to `start` itself so the dismissal flow keeps working in
- * non-git directories (only comp supports that today).
- */
 export function resolveRegistryDir(start: string): string {
+  let gitRoot: string;
   try {
-    return findGitRoot(resolve(start));
+    gitRoot = findGitRoot(resolve(start));
   } catch {
     return resolve(start);
+  }
+  return mainRepoKeyDir(gitRoot) ?? gitRoot;
+}
+
+function mainRepoKeyDir(gitRoot: string): string | undefined {
+  const dotGit = join(gitRoot, ".git");
+  try {
+    if (statSync(dotGit).isDirectory()) return gitRoot;
+    const match = /^gitdir:\s*(.+?)\s*$/m.exec(readFileSync(dotGit, "utf8"));
+    if (match?.[1] === undefined) return undefined;
+    const gitDir = resolve(gitRoot, match[1]);
+    const commonDirFile = join(gitDir, "commondir");
+    const commonDir = existsSync(commonDirFile)
+      ? resolve(gitDir, readFileSync(commonDirFile, "utf8").trim())
+      : gitDir;
+    return basename(commonDir) === ".git" ? dirname(commonDir) : commonDir;
+  } catch {
+    return undefined;
   }
 }
 

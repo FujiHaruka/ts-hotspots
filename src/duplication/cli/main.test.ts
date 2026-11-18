@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -464,7 +464,6 @@ describe("main", () => {
       );
       expect(dismissCode).toBe(0);
 
-      // Registry sits at the git-root key (dup uses findGitRoot, not tsconfig).
       const regPath = registryPath(r.path);
       const saved = JSON.parse(readFileSync(regPath, "utf-8")) as {
         entries: { id: string; feature: string; reason: string }[];
@@ -503,6 +502,43 @@ describe("main", () => {
         third.hotspots.find((g) => g.dismissalId === target.dismissalId),
       ).toBeDefined();
       expect(third.dismissed).toBeUndefined();
+    });
+
+    it("a dismissal made in the main checkout filters the group in a worktree", async () => {
+      const r = makeDupRepo();
+      const main = realpathSync(r.path);
+      const wt = `${main}-wt`;
+      r.git("worktree", "add", "-q", "-b", "feature", wt);
+      try {
+        const first = await runDup(wt);
+        const target = first.hotspots[0];
+        if (target === undefined) throw new Error("fixture has no dup groups");
+
+        const sink = { write: (_c: string): void => {} };
+        const dismissCode = await runRoot(
+          [
+            "node",
+            "ts-hotspots",
+            "dismiss",
+            target.dismissalId,
+            "--reason",
+            "shared",
+            "--path",
+            main,
+          ],
+          sink,
+          sink,
+        );
+        expect(dismissCode).toBe(0);
+
+        const second = await runDup(wt);
+        expect(
+          second.hotspots.find((g) => g.dismissalId === target.dismissalId),
+        ).toBeUndefined();
+        expect(second.dismissed?.filteredThisRun).toBe(1);
+      } finally {
+        rmSync(wt, { recursive: true, force: true });
+      }
     });
 
     it("stale dup entries get pruned automatically when membership shifts", async () => {

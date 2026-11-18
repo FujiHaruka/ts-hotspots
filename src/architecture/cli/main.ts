@@ -36,6 +36,7 @@ import {
   loadRegistry,
   pruneRegistry,
   registryIdSet,
+  resolveRegistryDir,
   saveRegistry,
   withProjectPath,
 } from "../../dismissal/store.ts";
@@ -233,7 +234,7 @@ export async function runPipeline(
           );
 
     const { hotspots: hotspotsAfterDismissal, summary: dismissed } =
-      applyDismissalRegistry(repoPath, hotspotsAfterDiff);
+      applyDismissalRegistry(resolveRegistryDir(repoPath), hotspotsAfterDiff);
 
     const finalHotspots = Number.isFinite(args.limit)
       ? hotspotsAfterDismissal.slice(0, args.limit)

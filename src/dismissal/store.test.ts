@@ -1,7 +1,9 @@
+import { execFileSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -15,6 +17,7 @@ import {
   registryIdSet,
   registryPath,
   removeEntry,
+  resolveRegistryDir,
   saveRegistry,
   withProjectPath,
 } from "./store.ts";
@@ -127,6 +130,82 @@ describe("loadRegistry", () => {
     } finally {
       rmSync(other, { recursive: true, force: true });
     }
+  });
+});
+
+describe("resolveRegistryDir", () => {
+  function git(cwd: string, ...args: string[]): void {
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=test",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "-C",
+        cwd,
+        ...args,
+      ],
+      { stdio: "ignore" },
+    );
+  }
+
+  test("all worktrees of a repo resolve to the main checkout root", () => {
+    const base = realpathSync(tmpRoot);
+    const main = join(base, "main");
+    mkdirSync(join(main, "src"), { recursive: true });
+    writeFileSync(join(main, "src", "a.ts"), "export const a = 1;\n");
+    git(main, "init", "-q", "-b", "main");
+    git(main, "add", "-A");
+    git(main, "commit", "-q", "-m", "init");
+    const wt = join(base, "wt");
+    git(main, "worktree", "add", "-q", "-b", "feature", wt);
+
+    expect(resolveRegistryDir(main)).toBe(main);
+    expect(resolveRegistryDir(join(main, "src"))).toBe(main);
+    expect(resolveRegistryDir(wt)).toBe(main);
+    expect(resolveRegistryDir(join(wt, "src"))).toBe(main);
+  });
+
+  test("a dismissal saved from a worktree is visible from the main checkout", () => {
+    const base = realpathSync(tmpRoot);
+    const main = join(base, "main");
+    mkdirSync(main, { recursive: true });
+    writeFileSync(join(main, "a.ts"), "export const a = 1;\n");
+    git(main, "init", "-q", "-b", "main");
+    git(main, "add", "-A");
+    git(main, "commit", "-q", "-m", "init");
+    const wt = join(base, "wt");
+    git(main, "worktree", "add", "-q", "-b", "feature", wt);
+
+    const fromWt = resolveRegistryDir(wt);
+    saveRegistry(fromWt, addEntry(emptyRegistry(), makeEntry("dup:a")).registry);
+    const loaded = loadRegistry(resolveRegistryDir(main));
+    expect(loaded.entries.map((e) => e.id)).toEqual(["dup:a"]);
+  });
+
+  test("a .git file without commondir keys on its git dir", () => {
+    const base = realpathSync(tmpRoot);
+    const modules = join(base, "super", ".git", "modules", "sub");
+    mkdirSync(modules, { recursive: true });
+    const sub = join(base, "super", "sub");
+    mkdirSync(sub, { recursive: true });
+    writeFileSync(join(sub, ".git"), "gitdir: ../.git/modules/sub\n");
+    expect(resolveRegistryDir(sub)).toBe(modules);
+  });
+
+  test("an unreadable .git file falls back to its directory", () => {
+    const base = realpathSync(tmpRoot);
+    writeFileSync(join(base, ".git"), "garbage\n");
+    expect(resolveRegistryDir(base)).toBe(base);
+  });
+
+  test("outside git the start directory is the key", () => {
+    const dir = join(tmpRoot, "nested");
+    mkdirSync(dir);
+    expect(resolveRegistryDir(dir)).toBe(dir);
   });
 });
 

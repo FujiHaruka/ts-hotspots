@@ -1027,10 +1027,6 @@ export async function run(
 
   try {
     const analyzeRoot = resolveRootDir(invocation.path);
-    // All four features share one registry file per project, keyed on
-    // the git root (with a cwd fallback for non-git use). Anchoring the
-    // key on the git root means a dismiss issued from any subdirectory
-    // lands in the same place the pipeline reads from on the next run.
     const rootDir = resolveRegistryDir(analyzeRoot);
     if (invocation.kind === "dismiss") {
       const feature = featureFromDismissalId(invocation.id);

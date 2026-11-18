@@ -148,7 +148,7 @@ All four features are heuristics — some surfaces will be fine as-is (intention
 ts-hotspots dismiss <dismissalId> --reason "<why it's fine>"
 ```
 
-Entries are stored per machine under `~/.config/ts-hotspots/<projectKey>/dismissed.json` (honoring `XDG_CONFIG_HOME`). This is a personal cache — nothing is written into your repository, and dismissals are not shared across machines or teammates. Subsequent runs filter the entry from the report.
+Entries are stored per machine under `~/.config/ts-hotspots/<projectKey>/dismissed.json` (honoring `XDG_CONFIG_HOME`). This is a personal cache — nothing is written into your repository, and dismissals are not shared across machines or teammates. All git worktrees of a repository share one registry. Subsequent runs filter the entry from the report.
 
 The id is a hash of the underlying source, so any meaningful edit invalidates it and the candidate re-surfaces. Stale entries are pruned automatically.
 
