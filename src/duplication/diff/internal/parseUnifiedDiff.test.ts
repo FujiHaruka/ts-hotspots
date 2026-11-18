@@ -65,7 +65,40 @@ describe("parseUnifiedDiff", () => {
     const parsed = parseUnifiedDiff(out);
     expect(parsed).toHaveLength(1);
     expect(parsed[0]?.filePath).toBe("src/new.ts");
+    expect(parsed[0]?.basePath).toBeUndefined();
     expect(parsed[0]?.hunks).toEqual([{ startLine: 1, endLine: 5 }]);
+  });
+
+  it("records the old path of a renamed file", () => {
+    const out = [
+      "diff --git a/src/old.ts b/src/new.ts",
+      "similarity index 90%",
+      "rename from src/old.ts",
+      "rename to src/new.ts",
+      "index 1111111..2222222 100644",
+      "--- a/src/old.ts",
+      "+++ b/src/new.ts",
+      "@@ -4 +4 @@",
+      "-old",
+      "+new",
+      "",
+    ].join("\n");
+    const parsed = parseUnifiedDiff(out);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.filePath).toBe("src/new.ts");
+    expect(parsed[0]?.basePath).toBe("src/old.ts");
+    expect(parsed[0]?.hunks).toEqual([{ startLine: 4, endLine: 4 }]);
+  });
+
+  it("drops a pure rename that changes no lines", () => {
+    const out = [
+      "diff --git a/src/old.ts b/src/new.ts",
+      "similarity index 100%",
+      "rename from src/old.ts",
+      "rename to src/new.ts",
+      "",
+    ].join("\n");
+    expect(parseUnifiedDiff(out)).toEqual([]);
   });
 
   it("skips a deleted file (+++ /dev/null)", () => {
@@ -103,5 +136,10 @@ describe("parseUnifiedDiff", () => {
     const parsed = parseUnifiedDiff(out);
     expect(parsed).toHaveLength(1);
     expect(parsed[0]?.hunks).toEqual([{ startLine: 17, endLine: 17 }]);
+    expect(parsed[0]?.spans).toEqual([
+      { baseStart: 5, baseCount: 3, headStart: 4, headCount: 0 },
+      { baseStart: 20, baseCount: 1, headStart: 17, headCount: 1 },
+    ]);
+    expect(parsed[0]?.basePath).toBe("src/a.ts");
   });
 });

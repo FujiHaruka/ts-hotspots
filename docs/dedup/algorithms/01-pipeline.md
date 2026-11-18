@@ -11,7 +11,7 @@ diff 取得 → base 側ソース列挙 → base 索引構築 → 変更 fragmen
 
 実装は `src/cli/runDetector.ts`。
 
-- **Diff Collector**: `git diff baseSha..headSha` をパースし、変更があった `.ts` / `.tsx` ファイルだけ残す。除外グロブにマッチするファイルや、削除のみの hunk しか持たないファイルは落とす。
+- **Diff Collector**: `git diff --find-renames baseSha..headSha` をパースし、変更があった `.ts` / `.tsx` ファイルだけ残す。除外グロブにマッチするファイルや、削除のみの hunk しか持たないファイルは落とす。リネームされたファイルは実際に変わった行だけが hunk になり、旧パスが base 側の対応ファイルとして記録される (§4.2 の自己マッチ除外で使う)。
 - **Base 索引**: `git show baseSha:path` で取得した base 側ソースをパースし、すべての fragment と特徴量を抽出して転置索引に積む。索引は PR 実行時にメモリ上で構築するだけで、永続化しない。
 - **変更 fragment 抽出**: head 側ソースから抽出した全 fragment のうち、いずれかの hunk と行範囲が交差するものを残す。「最小包含」のような追加フィルタはかけない (高 recall 優先)。
 - **再スコア & レポート**: 各候補ペアに対して 4 軸スコアを計算し、閾値判定をクリアしたペアだけ収集する。後処理 (重複落とし・崩し落とし・ソート) ののち、`changedFragment.id` で **クローン群 (`CloneGroup`)** に集約して JSON / Markdown 形式で出力する。レポートの最終単位は群 (anchor + N members) であり、ペアではない (§7.5)。

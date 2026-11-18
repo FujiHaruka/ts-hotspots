@@ -3,6 +3,7 @@ import type ts from "typescript";
 import { collectChurn } from "../../collectors/churn/commit-count.ts";
 import { parseSource } from "../../parser/parseSource.ts";
 import type { Config } from "../config/config.ts";
+import { headRangeToBase } from "../diff/lineMap.ts";
 import { collectChangedFragments } from "../diff/pipeline.ts";
 import type { Candidate } from "../domain/candidate.ts";
 import type { Fragment } from "../domain/fragment.ts";
@@ -331,6 +332,12 @@ export async function runDetector(
         index,
         config,
         searchStats,
+        file.basePath === undefined
+          ? undefined
+          : {
+              filePath: file.basePath,
+              ...headRangeToBase(file.spans, changedFragment),
+            },
       );
       tracker.tSearch += now() - ts;
       tracker.queries += 1;

@@ -129,7 +129,8 @@ function buildGroup(
   // every member so an XOR triggers `thin-wrapper-side` regardless of
   // which member ends up weakest.
   const weakestPair = pickWeakest(sortedBucket);
-  const anchorIsThin = thinVerdicts.changed.get(anchorPair.changedFragment.id) ?? false;
+  const anchorIsThin =
+    thinVerdicts.changed.get(anchorPair.changedFragment.id) ?? false;
   let anyMemberIsThin = false;
   for (const pair of sortedBucket) {
     if (thinVerdicts.base.get(pair.baseFragment.id) === true) {

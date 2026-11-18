@@ -22,7 +22,8 @@ export function dropThinWrapperPairs(
 ): ScoredPair[] {
   const out: ScoredPair[] = [];
   for (const pair of pairs) {
-    const changedThin = thinVerdicts.changed.get(pair.changedFragment.id) ?? false;
+    const changedThin =
+      thinVerdicts.changed.get(pair.changedFragment.id) ?? false;
     const baseThin = thinVerdicts.base.get(pair.baseFragment.id) ?? false;
     if (changedThin && baseThin) {
       continue;

@@ -152,7 +152,10 @@ describe("runDetector", () => {
       `${fn("normalize", "empty")}${filler}\n${fn("normalizeAgain", "empty")}`,
     );
     const base = r.commit("base");
-    r.write("src/a.ts", fn("normalize", "empty item"));
+    r.write(
+      "src/a.ts",
+      `${fn("normalize", "empty item")}${fn("normalizeAgain", "empty")}`,
+    );
     const head = r.commit("head");
 
     const result = await runDetector({
@@ -168,6 +171,87 @@ describe("runDetector", () => {
       .filter((loc) => loc.startsWith("src/a.ts:"))
       .map((loc) => Number(loc.split(":")[1]?.split("-")[0]));
     expect(memberLines.some((line) => line > 11)).toBe(true);
+  });
+
+  describe("self-matches across the diff", () => {
+    const fn = (
+      name: string,
+      message: string,
+    ) => `export function ${name}(items: string[]): string[] {
+  const result: string[] = [];
+  for (const item of items) {
+    if (item.length === 0) {
+      throw new Error("${message}");
+    }
+    result.push(item.trim().toLowerCase());
+  }
+  return result;
+}
+`;
+    const filler = Array.from(
+      { length: 30 },
+      (_, i) => `export const c${String(i)} = ${String(i)};`,
+    ).join("\n");
+    const run = (r: TempRepo, base: string, head: string) =>
+      runDetector({
+        repoPath: r.path,
+        baseRef: base,
+        headRef: head,
+        threeDot: false,
+        config: defaultConfig,
+      });
+    const pairs = (
+      groups: Awaited<ReturnType<typeof run>>["groups"],
+      anchorFile: string,
+      memberFile: string,
+    ) =>
+      groups.filter(
+        (g) =>
+          g.anchor?.location.startsWith(`${anchorFile}:`) === true &&
+          g.members.some((m) =>
+            m.fragment.location.startsWith(`${memberFile}:`),
+          ),
+      );
+
+    it("does not match an edited function against its own old version after lines were inserted above it", async () => {
+      const r = newRepo();
+      r.write("src/a.ts", fn("normalize", "empty"));
+      const base = r.commit("base");
+      r.write("src/a.ts", `${filler}\n${fn("normalize", "empty item")}`);
+      const head = r.commit("head");
+
+      expect(
+        pairs((await run(r, base, head)).groups, "src/a.ts", "src/a.ts"),
+      ).toEqual([]);
+    });
+
+    it("does not match a renamed and edited file against its old path", async () => {
+      const r = newRepo();
+      r.write("src/old.ts", `${filler}\n${fn("normalize", "empty")}`);
+      const base = r.commit("base");
+      r.git("mv", "src/old.ts", "src/new.ts");
+      r.write("src/new.ts", `${filler}\n${fn("normalize", "empty item")}`);
+      const head = r.commit("head");
+
+      expect(
+        pairs((await run(r, base, head)).groups, "src/new.ts", "src/old.ts"),
+      ).toEqual([]);
+    });
+
+    it("still matches a copy inserted next to the function it copies", async () => {
+      const r = newRepo();
+      r.write("src/a.ts", `${filler}\n${fn("normalize", "empty")}`);
+      const base = r.commit("base");
+      r.write(
+        "src/a.ts",
+        `${filler}\n${fn("canonicalize", "blank")}\n${fn("normalize", "empty")}`,
+      );
+      const head = r.commit("head");
+
+      expect(
+        pairs((await run(r, base, head)).groups, "src/a.ts", "src/a.ts"),
+      ).not.toEqual([]);
+    });
   });
 
   describe("features.enabled: 1-axis-off extensibility", () => {

@@ -8,7 +8,7 @@ export {
 } from "../../util/git/runner.ts";
 
 /**
- * Run `git diff --unified=0 --no-color --no-renames <base>..<head>`.
+ * Run `git diff --unified=0 --no-color --find-renames <base>..<head>`.
  */
 export async function gitDiff(
   cwd: string,
@@ -19,7 +19,7 @@ export async function gitDiff(
     "diff",
     "--unified=0",
     "--no-color",
-    "--no-renames",
+    "--find-renames",
     `${baseSha}..${headSha}`,
   ]);
 }

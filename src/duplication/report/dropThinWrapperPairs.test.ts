@@ -46,8 +46,12 @@ describe("dropThinWrapperPairs", () => {
     const p = pair("same", "same");
     const thin = new Map<string, boolean>([["same", true]]);
     const notThin = new Map<string, boolean>([["same", false]]);
-    expect(dropThinWrapperPairs([p], { changed: thin, base: notThin })).toEqual([p]);
-    expect(dropThinWrapperPairs([p], { changed: thin, base: thin })).toEqual([]);
+    expect(dropThinWrapperPairs([p], { changed: thin, base: notThin })).toEqual(
+      [p],
+    );
+    expect(dropThinWrapperPairs([p], { changed: thin, base: thin })).toEqual(
+      [],
+    );
   });
 
   it("drops pairs where both sides are thin wrappers", () => {
@@ -138,6 +142,9 @@ describe("dropThinWrapperPairs", () => {
       ["c3", false],
       ["b3", false],
     ]);
-    expect(dropThinWrapperPairs([p1, p2, p3], bothSides(map))).toEqual([p1, p3]);
+    expect(dropThinWrapperPairs([p1, p2, p3], bothSides(map))).toEqual([
+      p1,
+      p3,
+    ]);
   });
 });

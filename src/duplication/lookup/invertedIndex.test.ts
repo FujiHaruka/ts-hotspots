@@ -95,11 +95,23 @@ describe("buildInvertedIndex", () => {
     const f1 = makeFragment({ id: "f1" });
     const f2 = makeFragment({ id: "f2" });
     const index = buildInvertedIndex([
-      { fragment: f1, features: makeFeatures("f1", ["token:A", "token:B", "token:A"]) },
-      { fragment: f2, features: makeFeatures("f2", ["token:B", "token:A", "token:B"]) },
+      {
+        fragment: f1,
+        features: makeFeatures("f1", ["token:A", "token:B", "token:A"]),
+      },
+      {
+        fragment: f2,
+        features: makeFeatures("f2", ["token:B", "token:A", "token:B"]),
+      },
     ]);
-    expect(index.postings.get("token:A")?.map((p) => p.id)).toEqual(["f1", "f2"]);
-    expect(index.postings.get("token:B")?.map((p) => p.id)).toEqual(["f1", "f2"]);
+    expect(index.postings.get("token:A")?.map((p) => p.id)).toEqual([
+      "f1",
+      "f2",
+    ]);
+    expect(index.postings.get("token:B")?.map((p) => p.id)).toEqual([
+      "f1",
+      "f2",
+    ]);
   });
 
   it("returns an empty index for empty input", () => {

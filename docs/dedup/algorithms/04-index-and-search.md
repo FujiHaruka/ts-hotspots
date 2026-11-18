@@ -23,13 +23,19 @@
 
 1. クエリ側の 3 系統 (token / statement / call) を **それぞれユニーク化** する (key の重複は 1 ヒットとして数える)。
 2. 各キーで索引を引き、posting を fragment 単位で集約する。同じ base fragment id に対して `{ token, statement, call }` のヒット数を足し合わせ、`hitCounts` を作る。
-3. **自己マッチ除外**: `posting.id === changedFragmentId` のものは捨てる。
+3. **自己マッチ除外**: `posting.id === changedFragmentId` のものは捨てる (Whole-repo モード)。
 4. **同一ファイル × 行範囲重なり除外**: `posting.filePath === changedFragment.filePath` かつ
    `[posting.startLine, posting.endLine]` と `[changedFragment.startLine, changedFragment.endLine]` が
    1 行でも交わる場合は捨てる。fragmentation で同じファイルから function / block / window を多粒度に
    切り出しているため、行範囲が交わる pair は同じ region を別の切り出しで比較しているだけで
    "クローン" として無意味な signal にしかならない。同一ファイルでも非重複ペア (隣接する 2 関数など)
    は通す。
+   PR モードでは変更 fragment は head 側、posting は base 側の行番号を持つので、比較の前に変更 fragment の
+   行範囲を diff の hunk で base 側の座標に写す (`src/diff/lineMap.ts`)。変更されていない行は上の hunk の
+   増減ぶんずらし、hunk 内の行はその hunk の base 側範囲に、純粋な挿入は挿入位置の隙間に写す。
+   リネームされたファイルは旧パスを base 側のファイルとして扱う。これにより、上に行が挿入されて位置が
+   ずれた関数が自分の変更前の版とマッチすることも、たまたま同じ行番号にある無関係な base 側コードが
+   除外されることもない。この場合 3. の id 一致による除外は使わない。
 5. **OR 集合**: いずれか 1 系統でも 1 件でもヒットすれば候補に入る。これが要求仕様 §4.5 の「複数特徴系統の OR」に対応する。
 6. **決定的ソート**:
    - `hitCounts.token + statement + call` の合計降順

@@ -79,10 +79,12 @@ export async function collectDiff(
     const text = await gitShow(repoPath, headSha, p.filePath);
     result.push({
       filePath: p.filePath,
+      basePath: p.basePath,
       headSha,
       baseSha,
       text,
       hunks: p.hunks,
+      spans: p.spans,
     });
   }
   return { files: result, excludedCount };

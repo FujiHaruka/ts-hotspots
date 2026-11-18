@@ -10,10 +10,12 @@ function makeFile(
 ): ChangedFile {
   return {
     filePath,
+    basePath: filePath,
     baseSha: "0".repeat(40),
     headSha: "1".repeat(40),
     text,
     hunks,
+    spans: [],
   };
 }
 

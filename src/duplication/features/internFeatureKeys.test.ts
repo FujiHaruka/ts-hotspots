@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { FragmentFeatures } from "../domain/feature.ts";
 import { type FeatureKeyPool, internFeatureKeys } from "./internFeatureKeys.ts";
 
-function features(tokens: string[], statements: string[], calls: string[]): FragmentFeatures {
+function features(
+  tokens: string[],
+  statements: string[],
+  calls: string[],
+): FragmentFeatures {
   return { fragmentId: "f", tokens, statements, calls };
 }
 
@@ -17,6 +21,11 @@ describe("internFeatureKeys", () => {
     expect(b.tokens).toEqual(["token:y", "token:x", "token:y"]);
     expect(b.statements).toEqual(["statement:s"]);
     expect(a.tokens).toEqual(["token:x", "token:y"]);
-    expect([...pool.keys()]).toEqual(["token:x", "token:y", "statement:s", "call:c"]);
+    expect([...pool.keys()]).toEqual([
+      "token:x",
+      "token:y",
+      "statement:s",
+      "call:c",
+    ]);
   });
 });

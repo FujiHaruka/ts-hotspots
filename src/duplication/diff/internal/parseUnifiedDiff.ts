@@ -1,13 +1,15 @@
-import type { ChangedHunk } from "../../domain/diff.ts";
+import type { ChangedHunk, HunkSpan } from "../../domain/diff.ts";
 
 interface ParsedDiffFile {
   /** head-side path (forward slash). Deleted files are skipped entirely. */
   filePath: string;
+  basePath: string | undefined;
   hunks: ChangedHunk[];
+  spans: HunkSpan[];
 }
 
 /**
- * Parse the stdout of `git diff --unified=0 --no-color --no-renames`.
+ * Parse the stdout of `git diff --unified=0 --no-color --find-renames`.
  *
  * Only head-side ranges are returned (hunks consisting solely of deletions —
  * `@@ -a,b +c,0 @@` — are skipped because they have no head line range).
@@ -33,7 +35,7 @@ export function parseUnifiedDiff(stdout: string): ParsedDiffFile[] {
   for (const line of lines) {
     if (line.startsWith("diff --git ")) {
       flush();
-      current = { filePath: "", hunks: [] };
+      current = { filePath: "", basePath: undefined, hunks: [], spans: [] };
       skipCurrent = false;
       continue;
     }
@@ -53,13 +55,20 @@ export function parseUnifiedDiff(stdout: string): ParsedDiffFile[] {
       continue;
     }
     if (line.startsWith("--- ")) {
-      // `--- a/<path>` or `--- /dev/null` for new files. Nothing to do.
+      const rest = line.slice(4);
+      current.basePath = rest === "/dev/null" ? undefined : stripAB(rest);
       continue;
     }
     if (line.startsWith("@@")) {
-      const hunk = parseHunkHeader(line);
-      if (hunk !== null) {
-        current.hunks.push(hunk);
+      const span = parseHunkHeader(line);
+      if (span !== null) {
+        current.spans.push(span);
+        if (span.headCount > 0) {
+          current.hunks.push({
+            startLine: span.headStart,
+            endLine: span.headStart + span.headCount - 1,
+          });
+        }
       }
       continue;
     }
@@ -77,28 +86,15 @@ function stripAB(p: string): string {
   return p;
 }
 
-/**
- * Parse a `@@ -a,b +c,d @@` header.
- *
- * Returns `null` when the head-side length `d` is 0 (deletion-only hunk has
- * no head line range).
- */
-function parseHunkHeader(line: string): ChangedHunk | null {
-  // Regex: `@@ -<a>[,<b>] +<c>[,<d>] @@ ...`
+function parseHunkHeader(line: string): HunkSpan | null {
   const m = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
-  if (m === null) {
-    return null;
-  }
-  const cStr = m[3];
-  const dStr = m[4];
-  if (cStr === undefined) {
-    return null;
-  }
-  const c = Number.parseInt(cStr, 10);
-  const d = dStr === undefined ? 1 : Number.parseInt(dStr, 10);
-  if (d <= 0) {
-    // Deletion-only hunk: head has no lines here.
-    return null;
-  }
-  return { startLine: c, endLine: c + d - 1 };
+  if (m === null) return null;
+  const [, a, b, c, d] = m;
+  if (a === undefined || c === undefined) return null;
+  return {
+    baseStart: Number.parseInt(a, 10),
+    baseCount: b === undefined ? 1 : Number.parseInt(b, 10),
+    headStart: Number.parseInt(c, 10),
+    headCount: d === undefined ? 1 : Number.parseInt(d, 10),
+  };
 }

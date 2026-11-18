@@ -44,7 +44,9 @@ export interface SearchStats {
  * statement / call) and unions the results. `hitCounts` counts the number of
  * *unique* changed-side feature keys that also appear in the index per kind.
  *
- * Self-matches (same `fragmentId`) are excluded. Results are sorted
+ * Self-matches are excluded: the same `fragmentId`, or — when `selfRange`
+ * gives the changed fragment's position on the base side of a diff — any
+ * fragment of that base file overlapping it. Results are sorted
  * deterministically and truncated to `config.search.maxCandidatesPerFragment`.
  *
  * If `stats` is provided, the function fills it with per-query telemetry
@@ -57,6 +59,7 @@ export function searchCandidates(
   index: InvertedIndex,
   config: Config,
   stats?: SearchStats,
+  selfRange?: SelfRange,
 ): Candidate[] {
   const uniqueTokens = uniqueKeys(changedFeatures.tokens);
   const uniqueStatements = uniqueKeys(changedFeatures.statements);
@@ -96,10 +99,10 @@ export function searchCandidates(
   const noCap: AxisOptions = { maxDocumentFrequency: undefined };
 
   const changed: ChangedRange = {
-    id: changedFragment.id,
-    filePath: changedFragment.filePath,
-    startLine: changedFragment.startLine,
-    endLine: changedFragment.endLine,
+    id: selfRange === undefined ? changedFragment.id : undefined,
+    filePath: selfRange?.filePath ?? changedFragment.filePath,
+    startLine: selfRange?.startLine ?? changedFragment.startLine,
+    endLine: selfRange?.endLine ?? changedFragment.endLine,
   };
 
   tally(hits, index, uniqueTokens, changed, "token", tokenOpts, stats);
@@ -298,11 +301,14 @@ function uniqueKeys(keys: readonly FeatureKey[]): FeatureKey[] {
  */
 const MIN_CORPUS_FOR_DF_CAP = 100;
 
-interface ChangedRange {
-  id: string;
+export interface SelfRange {
   filePath: string;
   startLine: number;
   endLine: number;
+}
+
+interface ChangedRange extends SelfRange {
+  id: string | undefined;
 }
 
 function tally(
