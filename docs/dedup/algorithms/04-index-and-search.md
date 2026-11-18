@@ -4,12 +4,13 @@
 
 実装は `src/duplication/lookup/invertedIndex.ts`。
 
-データ構造は `Map<FeatureKey, Posting[]>`。`Posting` は `{ fragmentId, filePath, startLine, endLine, featureKind }`。
+データ構造は `Map<FeatureKey, Fragment[]>`。posting は base 側 `Fragment` への参照そのもので、posting ごとのオブジェクトは作らない。
 
 構築規則:
 
 - 入力は base 側の `(fragment, features)` ペアの配列。
-- 同じ `(featureKey, fragmentId)` は 1 度だけ posting に積む (per-key の `Set<fragmentId>` で重複排除)。
+- 同じ `(featureKey, fragmentId)` は 1 度だけ posting に積む。1 fragment のキーは連続して投入されるので、posting 列の末尾の fragment id と比べるだけで重複排除できる。
+- 特徴キー文字列は base index 構築時に intern 済み (`features/internFeatureKeys.ts`)。同じキーは 1 つの文字列インスタンスを共有する。
 - これにより索引は **「どのキーがどの fragment に出現するか」** だけを答え、bag multiplicity は持たない。Jaccard ベースのスコアは bag を必要としないため十分。
 
 挿入順は入力順 = 走査順 = 決定的。
@@ -22,7 +23,7 @@
 
 1. クエリ側の 3 系統 (token / statement / call) を **それぞれユニーク化** する (key の重複は 1 ヒットとして数える)。
 2. 各キーで索引を引き、posting を fragment 単位で集約する。同じ base fragment id に対して `{ token, statement, call }` のヒット数を足し合わせ、`hitCounts` を作る。
-3. **自己マッチ除外**: `posting.fragmentId === changedFragmentId` のものは捨てる。
+3. **自己マッチ除外**: `posting.id === changedFragmentId` のものは捨てる。
 4. **同一ファイル × 行範囲重なり除外**: `posting.filePath === changedFragment.filePath` かつ
    `[posting.startLine, posting.endLine]` と `[changedFragment.startLine, changedFragment.endLine]` が
    1 行でも交わる場合は捨てる。fragmentation で同じファイルから function / block / window を多粒度に
