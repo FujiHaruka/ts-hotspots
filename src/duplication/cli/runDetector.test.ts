@@ -85,6 +85,46 @@ describe("runDetector", () => {
     expect(hasPair).toBe(true);
   });
 
+  it("drops a pair of thin wrappers using the base and head sources", async () => {
+    const wrapper = (name: string) => `export function ${name}(id: string) {
+  const client = createClient();
+  return client.fetchRecord(
+    id,
+    { include: ["owner", "tags", "history"], retries: 3, timeoutMs: 5000 },
+  );
+}
+`;
+    const r = newRepo();
+    r.write("src/base.ts", wrapper("loadRecord"));
+    const base = r.commit("base");
+    r.write("src/head.ts", wrapper("loadRecordCopy"));
+    const head = r.commit("head");
+
+    const run = (enabled: boolean) =>
+      runDetector({
+        repoPath: r.path,
+        baseRef: base,
+        headRef: head,
+        threeDot: false,
+        config: {
+          ...defaultConfig,
+          report: {
+            ...defaultConfig.report,
+            thinWrapper: { ...defaultConfig.report.thinWrapper, enabled },
+          },
+        },
+      });
+    const pairsBetweenFiles = (groups: Awaited<ReturnType<typeof run>>["groups"]) =>
+      groups.filter(
+        (g) =>
+          g.anchor?.location.startsWith("src/head.ts:") === true &&
+          g.members.some((m) => m.fragment.location.startsWith("src/base.ts:")),
+      );
+
+    expect(pairsBetweenFiles((await run(false)).groups)).not.toEqual([]);
+    expect(pairsBetweenFiles((await run(true)).groups)).toEqual([]);
+  });
+
   describe("features.enabled: 1-axis-off extensibility", () => {
     function makeCopyRepo(): { repo: TempRepo; base: string; head: string } {
       const r = newRepo();

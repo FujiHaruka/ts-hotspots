@@ -161,16 +161,16 @@ export async function runDetector(
   t0 = now();
   emitPhaseStart(perfLog, "baseIndex");
   const baseEntries: IndexInput[] = [];
-  const fragmentById = new Map<string, Fragment>();
+  const baseEntryById = new Map<string, IndexInput>();
   const featureSetsById = new Map<string, FragmentFeatureSets>();
-  const sourceFileByPath = new Map<string, ts.SourceFile>();
+  const textByPath = new Map<string, string>();
   const baseFragmentsByKind = { function: 0, block: 0, window: 0 };
   const fragmentsPerFile: number[] = [];
   const keyPool: FeatureKeyPool = new Map();
 
   for (const source of baseSources) {
     const parsed = parseSource(source.path, source.text);
-    sourceFileByPath.set(source.path, parsed.sourceFile);
+    textByPath.set(source.path, source.text);
     const fragments = extractFragments(parsed, config);
     fragmentsPerFile.push(fragments.length);
     // Build per-file context once and share across every fragment of this
@@ -186,9 +186,9 @@ export async function runDetector(
         fileCtx,
       );
       internFeatureKeys(features, keyPool);
-      baseEntries.push({ fragment, features });
-      fragmentById.set(fragment.id, fragment);
-      featureSetsById.set(fragment.id, buildFeatureSets(features));
+      const entry = { fragment, features };
+      baseEntries.push(entry);
+      baseEntryById.set(fragment.id, entry);
     }
   }
 
@@ -227,9 +227,14 @@ export async function runDetector(
     changedFeatureSets: FragmentFeatureSets,
     candidate: Candidate,
   ): void => {
-    const baseFragment = fragmentById.get(candidate.baseFragmentId);
-    const baseFeatureSets = featureSetsById.get(candidate.baseFragmentId);
-    if (baseFragment === undefined || baseFeatureSets === undefined) return;
+    const baseEntry = baseEntryById.get(candidate.baseFragmentId);
+    if (baseEntry === undefined) return;
+    const baseFragment = baseEntry.fragment;
+    let baseFeatureSets = featureSetsById.get(baseFragment.id);
+    if (baseFeatureSets === undefined) {
+      baseFeatureSets = buildFeatureSets(baseEntry.features);
+      featureSetsById.set(baseFragment.id, baseFeatureSets);
+    }
     if (
       !meetsMinSize(
         changedFragment,
@@ -301,7 +306,7 @@ export async function runDetector(
     const frags = diff.fragmentsByFile.get(file.filePath) ?? [];
     if (frags.length === 0) continue;
     const parsed = parseSource(file.filePath, file.text);
-    sourceFileByPath.set(file.filePath, parsed.sourceFile);
+    textByPath.set(file.filePath, file.text);
     const fileCtx = buildFileFeatureContext(parsed.sourceFile);
     for (const changedFragment of frags) {
       changedFragments += 1;
@@ -386,7 +391,7 @@ export async function runDetector(
         },
       },
       includeCode,
-      getSourceFile: (filePath) => sourceFileByPath.get(filePath),
+      getSourceFile: lazySourceFiles(textByPath),
       churnByFile,
     },
     perfLog,
@@ -394,4 +399,19 @@ export async function runDetector(
   emitPhaseEnd(perfLog, "report", now() - t0);
 
   return report;
+}
+
+function lazySourceFiles(
+  textByPath: ReadonlyMap<string, string>,
+): (filePath: string) => ts.SourceFile | undefined {
+  const cache = new Map<string, ts.SourceFile>();
+  return (filePath) => {
+    const cached = cache.get(filePath);
+    if (cached !== undefined) return cached;
+    const text = textByPath.get(filePath);
+    if (text === undefined) return undefined;
+    const sourceFile = parseSource(filePath, text).sourceFile;
+    cache.set(filePath, sourceFile);
+    return sourceFile;
+  };
 }
